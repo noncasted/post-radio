@@ -4,7 +4,6 @@ namespace Audio;
 
 public class TrackData
 {
-    public required int Index { get; init; }
     public required string DownloadUrl { get; init; }
     public required SongMetadata Metadata { get; init; }
 }
@@ -15,7 +14,12 @@ public class SongMetadata
     public required string Url { get; init; }
     public required string Author { get; init; }
     public required string Name { get; init; }
-    public required string ShortName { get; init; }
+    public required string ShortName { get; set; }
+
+    public override string ToString()
+    {
+        return $"{Author} - {Name}\n{ShortName}";
+    }
 }
 
 public static class TrackDataExtensions

@@ -85,3 +85,4 @@ secrets.json
 /client/[Aa]ssets/[Ss]treamingAssets/aa.meta
 /client/[Aa]ssets/[Ss]treamingAssets/aa/
 /backend/TelegramBot/Gateway/secrets.json
+backend/Core/Settings/sectrets.json

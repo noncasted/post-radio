@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -7,14 +6,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Minio" Version="6.0.3" />
-      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-      <PackageReference Include="SoundCloudExplode" Version="1.6.5" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+        <PackageReference Include="Minio" Version="6.0.3" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+        <PackageReference Include="SoundCloudExplode" Version="1.6.5" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Extensions\Extensions.csproj" />
-      <ProjectReference Include="..\Options\Options.csproj" />
+        <ProjectReference Include="..\Extensions\Extensions.csproj" />
+        <ProjectReference Include="..\Options\Options.csproj" />
     </ItemGroup>
 
 </Project>

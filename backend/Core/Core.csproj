@@ -11,4 +11,10 @@
         <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Audio\Audio.csproj" />
+      <ProjectReference Include="..\Images\Images.csproj" />
+      <ProjectReference Include="..\Options\Options.csproj" />
+    </ItemGroup>
+
 </Project>

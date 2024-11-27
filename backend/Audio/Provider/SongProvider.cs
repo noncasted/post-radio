@@ -1,4 +1,6 @@
-﻿using Minio;
+﻿using System.Text;
+using Microsoft.Extensions.Logging;
+using Minio;
 using Minio.DataModel.Args;
 using Options;
 using SoundCloudExplode;
@@ -12,13 +14,15 @@ public class SongProvider : ISongProvider
         MinioClient minio,
         SoundCloudClient soundCloud,
         HttpClient http,
-        MinioOptions options)
+        MinioOptions options,
+        ILogger<SongProvider> logger)
     {
         _repository = repository;
         _minio = minio;
         _soundCloud = soundCloud;
         _http = http;
         _options = options;
+        _logger = logger;
     }
 
     private readonly ISongsRepository _repository;
@@ -26,57 +30,62 @@ public class SongProvider : ISongProvider
     private readonly SoundCloudClient _soundCloud;
     private readonly HttpClient _http;
     private readonly MinioOptions _options;
-
-    private int _index = 0;
+    private readonly ILogger<SongProvider> _logger;
 
     private readonly Dictionary<string, string> _nameToUrl = new();
 
-    public int GetCurrentIndex()
-    {
-        return _index;
-    }
-
     public async Task<TrackData> GetNext(int current)
     {
-        var nextIndex = current + 1;
+        current = (current + 1) % _repository.Tracks.Count;
+        var metadata = _repository.Tracks[current];
 
-        if (nextIndex >= _repository.Tracks.Count)
-            nextIndex = 0;
-
-        var metadata = _repository.Tracks[nextIndex];
+        _logger.AudioGetStarted(current, metadata);
 
         var url = await GetUrl();
 
         return new TrackData()
         {
             DownloadUrl = url,
-            Index = nextIndex,
             Metadata = metadata
         };
 
         async Task<string> GetUrl()
         {
             if (_nameToUrl.TryGetValue(metadata.ShortName, out var downloadUrl) == true)
+            {
+                _logger.AudioAlreadyCached(current, metadata);
                 return downloadUrl;
+            }
 
             try
             {
-                return await ExtractUrl();
+                await _minio.StatObjectAsync(new StatObjectArgs()
+                    .WithBucket(_options.AudioBucket)
+                    .WithObject(metadata.ShortName));
+
+                _logger.AudioFound(metadata);
             }
-            catch (Exception e)
+            catch
             {
+                _logger.AudioNotLoaded(metadata);
                 await DownloadAsync(metadata);
-                return await ExtractUrl();
             }
+
+            return await ExtractUrl();
 
             async Task<string> ExtractUrl()
             {
                 var presignedArgs = new PresignedGetObjectArgs()
                     .WithBucket(_options.AudioBucket)
-                    .WithObject(metadata.ShortName);
+                    .WithObject(metadata.ShortName)
+                    .WithExpiry(50000);
 
                 var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
-                _nameToUrl.Add(metadata.ShortName, signedUrl);
+
+                var encodedUrl = Convert.ToBase64String(Encoding.UTF8.GetBytes(signedUrl));
+                var shareableUrl = $"https://minio-console.post-radio.io/api/v1/download-shared-object/{encodedUrl}";
+
+                _nameToUrl.Add(metadata.ShortName, shareableUrl);
                 return signedUrl;
             }
         }
@@ -125,6 +134,10 @@ public class SongProvider : ISongProvider
                 .WithStreamData(destination)
                 .WithObjectSize(destination.Length)
                 .WithContentType("audio/mpeg"));
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
         }
         finally
         {
