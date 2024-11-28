@@ -7,7 +7,7 @@ namespace Core;
 
 public static class EndpointsExtensions
 {
-    public static IEndpointRouteBuilder AddAudioEndpoints(this IEndpointRouteBuilder builder)
+    public static IEndpointRouteBuilder AddEndpoints(this IEndpointRouteBuilder builder)
     {
         builder.MapGet("audio/refresh", ([FromServices] IAudioAPI api) => api.Refresh());
 
