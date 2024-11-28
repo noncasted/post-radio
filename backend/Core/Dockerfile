@@ -24,4 +24,5 @@ RUN dotnet publish "Core.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseA
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+RUN chmod -R 755 /app/Settings
 ENTRYPOINT ["dotnet", "Core.dll"]
