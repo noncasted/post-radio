@@ -40,16 +40,19 @@ var audioStarted = false; // Flag to track if the audio has started
 var audioInvoked = false;
 function fetchNextAudio(index) {
     return __awaiter(this, void 0, void 0, function () {
-        var response;
+        var url, response;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, fetch(endpoint + "audio/getNext", {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ Index: index.toString() })
-                    })];
+                case 0:
+                    url = endpoint + "audio/getNext";
+                    console.log('get next audio: ' + url);
+                    return [4 /*yield*/, fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ Index: index.toString() })
+                        })];
                 case 1:
                     response = _a.sent();
                     if (!response.ok) {
@@ -97,7 +100,7 @@ function startAudioPlayback() {
                     if (audioInvoked)
                         return [2 /*return*/];
                     audioInvoked = true;
-                    index = 0;
+                    index = Math.floor(Math.random() * 1001);
                     _b.label = 1;
                 case 1:
                     if (!true) return [3 /*break*/, 8];
@@ -196,7 +199,7 @@ function updateImage(index) {
 document.body.addEventListener('click', startAudioPlayback, { once: true });
 document.body.addEventListener('keydown', startAudioPlayback, { once: true });
 document.addEventListener("DOMContentLoaded", function () {
-    var index = 0;
+    var index = Math.floor(Math.random() * 1001);
     // Update the image every 5 seconds
     setInterval(function () { return __awaiter(_this, void 0, void 0, function () {
         return __generator(this, function (_a) {
@@ -207,7 +210,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     return [2 /*return*/];
             }
         });
-    }); }, 5000);
+    }); }, 10000);
     // Load the first image immediately
     updateImage(index);
 });

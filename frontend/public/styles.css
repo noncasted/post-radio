@@ -6,7 +6,7 @@
     height: 100vh; /* Full screen height */
     object-fit: contain;
     opacity: 0;
-    transition: opacity 1s ease-in-out;
+    transition: opacity 2s ease-in-out;
     z-index: 0; /* Initially behind */
 }
 

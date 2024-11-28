@@ -4,7 +4,9 @@ let audioStarted = false; // Flag to track if the audio has started
 let audioInvoked = false;
 
 async function fetchNextAudio(index: number): Promise<any> {
-    const response = await fetch(endpoint + "audio/getNext", {
+    const url =endpoint + "audio/getNext";
+    console.log('get next audio: ' + url);
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -59,7 +61,7 @@ async function startAudioPlayback() {
 
     audioInvoked = true;
 
-    let index = 0;
+    let index = Math.floor(Math.random() * 1001);
 
     while (true) {
         try {
@@ -135,12 +137,12 @@ document.body.addEventListener('click', startAudioPlayback, { once: true });
 document.body.addEventListener('keydown', startAudioPlayback, { once: true });
 
 document.addEventListener("DOMContentLoaded", () => {
-    let index = 0;
+    let index = Math.floor(Math.random() * 1001);
 
     // Update the image every 5 seconds
     setInterval(async () => {
         index = await updateImage(index);
-    }, 5000);
+    }, 10000);
 
     // Load the first image immediately
     updateImage(index);
