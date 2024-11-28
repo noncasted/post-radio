@@ -30,6 +30,7 @@ builder.Services.AddHostedService<CoreStartup>();
 
 var app = builder.Build();
 
+app.UseCors("AllowSpecificOrigin");
 app.AddAudioEndpoints(); 
 
 if (app.Environment.IsDevelopment())
