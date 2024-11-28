@@ -1,5 +1,8 @@
-﻿using Extensions;
+﻿using System.Text;
+using Extensions;
 using Microsoft.Extensions.Logging;
+using Minio;
+using Minio.DataModel.Args;
 using Newtonsoft.Json;
 using Options;
 using SoundCloudExplode;
@@ -11,18 +14,24 @@ public class SongsRepository : ISongsRepository
 {
     public SongsRepository(
         SoundCloudClient soundCloud,
-        PlaylistsOptions options,
+        PlaylistsOptions playlistsOptions,
+        MinioClient minio,
+        MinioOptions minioOptions,
         ILogger<SongsRepository> logger)
     {
         _soundCloud = soundCloud;
-        _options = options;
+        _playlistsOptions = playlistsOptions;
+        _minio = minio;
+        _minioOptions = minioOptions;
         _logger = logger;
     }
 
     private const string PathPostfix = "-playlist-metadata.json";
 
     private readonly SoundCloudClient _soundCloud;
-    private readonly PlaylistsOptions _options;
+    private readonly PlaylistsOptions _playlistsOptions;
+    private readonly MinioClient _minio;
+    private readonly MinioOptions _minioOptions;
     private readonly ILogger<SongsRepository> _logger;
     private readonly List<SongMetadata> _tracks = new();
     private readonly Dictionary<string, SongMetadata> _shortNameToMetadata = new();
@@ -36,24 +45,29 @@ public class SongsRepository : ISongsRepository
         _tracks.Clear();
         _shortNameToMetadata.Clear();
 
-        foreach (var (name, _) in _options.Urls)
+        foreach (var (name, _) in _playlistsOptions.Urls)
         {
-            var path = $"{_options.PlaylistsPath}{name}{PathPostfix}";
+            var json = string.Empty;
+            var path = $"{name}{PathPostfix}";
 
-            if (File.Exists(path) == false)
-            {
-                var tmp = JsonConvert.SerializeObject(new Dictionary<string, SongMetadata>());
-                await File.WriteAllTextAsync(path, tmp);
-            }
+            var getArgs = new GetObjectArgs()
+                .WithBucket(_minioOptions.AudioBucket)
+                .WithObject(path)
+                .WithCallbackStream(stream =>
+                {
+                    using var reader = new StreamReader(stream);
+                    json = reader.ReadToEnd();
+                });
 
-            var json = await File.ReadAllTextAsync(path);
+            await _minio.GetObjectAsync(getArgs);
+
             var oldMetadata = JsonConvert.DeserializeObject<Dictionary<string, SongMetadata>>(json)!;
             var newMetadata = new Dictionary<string, SongMetadata>();
 
             foreach (var (_, data) in oldMetadata)
                 data.ShortName = data.Url.ToShortName();
 
-            var link = _options.Urls[name];
+            var link = _playlistsOptions.Urls[name];
             var tracks = await _soundCloud.Playlists.GetTracksAsync(link);
 
             foreach (var track in tracks)
@@ -82,7 +96,17 @@ public class SongsRepository : ISongsRepository
 
             var resultObject = JsonConvert.SerializeObject(newMetadata, Formatting.Indented);
 
-            await File.WriteAllTextAsync(path, resultObject);
+            var jsonBytes = Encoding.UTF8.GetBytes(resultObject);
+
+            using var memoryStream = new MemoryStream(jsonBytes);
+            
+            await _minio.PutObjectAsync(new PutObjectArgs()
+                .WithBucket(_minioOptions.AudioBucket)
+                .WithObject(path)
+                .WithStreamData(memoryStream)
+                .WithObjectSize(memoryStream.Length)
+                .WithContentType("application/json")
+            );
         }
 
         _logger.AudioRefreshCompleted(_tracks.Count);
