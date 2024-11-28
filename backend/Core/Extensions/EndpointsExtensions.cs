@@ -18,6 +18,8 @@ public static class EndpointsExtensions
 
         builder.MapPost("image/getNext", ([FromBody] ImageRequest request, [FromServices] IImageAPI api)
             => api.GetNext(request));
+
+        builder.MapGet("/", ([FromServices] BuildUrl url) => Results.Redirect(url.Value));
         return builder;
     }
 }

@@ -19,8 +19,11 @@ public static class EnvironmentExtensions
         void AddDev()
         {
             builder.Configuration.AddJsonFile("Settings/secrets.json");
-            var options = builder.Configuration.GetSection("MinioCredentials").Get<MinioCredentials>();
-            builder.Services.AddSingleton(options!);
+            var options = builder.Configuration.GetSection("MinioCredentials").Get<MinioCredentials>()!;
+            builder.Services.AddSingleton(options);
+            
+            var buildUrl = builder.Configuration.GetSection("BuildUrl").Get<BuildUrl>()!;
+            builder.Services.AddSingleton(buildUrl);
         }
 
         void AddProd()
@@ -33,6 +36,13 @@ public static class EnvironmentExtensions
             };
 
             builder.Services.AddSingleton(minioCredentials);
+            
+            var buildUrl = new BuildUrl()
+            {
+                Value = Environment.GetEnvironmentVariable("BUILD_URL")!
+            };
+            
+            builder.Services.AddSingleton(buildUrl);
         }
     }
     

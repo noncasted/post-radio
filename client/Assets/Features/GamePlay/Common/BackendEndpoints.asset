@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: BackendEndpoints
   m_EditorClassIdentifier: 
   _assetId: 67
-  _url: http://localhost:5058/
+  _url: https://api.post-radio.io/
