@@ -3,5 +3,5 @@
 public interface IImageRepository
 {
     Task Refresh();
-    ImageData GetNext(int current);
+    Task<ImageData> GetNext(int current);
 }

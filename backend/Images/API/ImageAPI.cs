@@ -14,7 +14,7 @@ public class ImageAPI : IImageAPI
         return _repository.Refresh();
     }
 
-    public ImageData GetNext(ImageRequest request)
+    public Task<ImageData> GetNext(ImageRequest request)
     {
         return _repository.GetNext(request.Index);
     }

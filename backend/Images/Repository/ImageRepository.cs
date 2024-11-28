@@ -21,12 +21,12 @@ public class ImageRepository : IImageRepository
     private readonly MinioOptions _options;
     private readonly ILogger<ImageRepository> _logger;
 
-    private readonly List<ImageData> _images = new();
+    private readonly List<string> _images = new();
 
     public async Task Refresh()
     {
         _logger.ImageRefreshStarted();
-        
+
         var listArgs = new ListObjectsArgs()
             .WithBucket(_options.ImagesBucket);
 
@@ -35,27 +35,27 @@ public class ImageRepository : IImageRepository
         _images.Clear();
 
         await foreach (var item in objects)
-        {
-            var presignedArgs = new PresignedGetObjectArgs()
-                .WithBucket(_options.ImagesBucket)
-                .WithObject(item.Key)
-                .WithExpiry(50000);
+            _images.Add(item.Key);
 
-            var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
-            signedUrl = signedUrl.Replace("http://", "https://");
-
-            _images.Add(new ImageData()
-            {
-                Url = signedUrl
-            });
-        }
-        
         _logger.ImageRefreshCompleted(_images.Count);
     }
 
-    public ImageData GetNext(int current)
+    public async Task<ImageData> GetNext(int current)
     {
         current = (current + 1) % _images.Count;
-        return _images[current];
+        var key = _images[current];
+
+        var presignedArgs = new PresignedGetObjectArgs()
+            .WithBucket(_options.ImagesBucket)
+            .WithObject(key)
+            .WithExpiry(50000);
+
+        var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
+        signedUrl = signedUrl.Replace("http://", "https://");
+
+        return new ImageData()
+        {
+            Url = signedUrl
+        };
     }
 }

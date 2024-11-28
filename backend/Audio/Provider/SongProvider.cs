@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Minio;
 using Minio.DataModel.Args;
 using Options;
@@ -32,8 +31,6 @@ public class SongProvider : ISongProvider
     private readonly MinioOptions _options;
     private readonly ILogger<SongProvider> _logger;
 
-    private readonly Dictionary<string, string> _nameToUrl = new();
-
     public async Task<TrackData> GetNext(int current)
     {
         current = (current + 1) % _repository.Tracks.Count;
@@ -51,12 +48,6 @@ public class SongProvider : ISongProvider
 
         async Task<string> GetUrl()
         {
-            if (_nameToUrl.TryGetValue(metadata.ShortName, out var downloadUrl) == true)
-            {
-                _logger.AudioAlreadyCached(current, metadata);
-                return downloadUrl;
-            }
-
             try
             {
                 await _minio.StatObjectAsync(new StatObjectArgs()
@@ -83,7 +74,6 @@ public class SongProvider : ISongProvider
                 var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
                 signedUrl = signedUrl.Replace("http://", "https://");
                 
-                _nameToUrl.Add(metadata.ShortName, signedUrl);
                 return signedUrl;
             }
         }
