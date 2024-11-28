@@ -35,7 +35,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 var _this = this;
-var endpoint = "http://localhost:5058/";
+var endpoint = "https://post-radio.io/";
 var audioStarted = false; // Flag to track if the audio has started
 var audioInvoked = false;
 function fetchNextAudio(index) {

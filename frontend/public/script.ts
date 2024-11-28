@@ -1,4 +1,4 @@
-const endpoint = "http://localhost:5058/";
+const endpoint = "https://post-radio.io/";
 
 let audioStarted = false; // Flag to track if the audio has started
 let audioInvoked = false;
