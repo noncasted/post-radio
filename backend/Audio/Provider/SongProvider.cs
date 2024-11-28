@@ -81,7 +81,8 @@ public class SongProvider : ISongProvider
                     .WithExpiry(50000);
 
                 var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
-
+                signedUrl = signedUrl.Replace("http://", "https://");
+                
                 _nameToUrl.Add(metadata.ShortName, signedUrl);
                 return signedUrl;
             }

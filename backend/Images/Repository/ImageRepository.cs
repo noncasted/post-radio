@@ -43,6 +43,7 @@ public class ImageRepository : IImageRepository
                 .WithExpiry(50000);
 
             var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
+            signedUrl = signedUrl.Replace("http://", "https://");
 
             _images.Add(new ImageData()
             {
