@@ -16,8 +16,8 @@ public class AudioAPI : IAudioAPI
         return _repository.Refresh();
     }
 
-    public Task<TrackData> GetNext(int index)
+    public Task<TrackData> GetNext(GetNextTrackRequest request)
     {
-        return _provider.GetNext(index);
+        return _provider.GetNext(request.Index);
     }
 }

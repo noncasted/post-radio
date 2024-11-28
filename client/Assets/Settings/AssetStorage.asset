@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2dd192e50dd46fcb6410022057e0ef2, type: 3}
+  m_Name: AssetStorage
+  m_EditorClassIdentifier: 
+  _assets:
+    _keys:
+    - GamePlay.Common.BackendEndpoints
+    - GamePlay.Images.ImagesOptions
+    - GamePlay.Setup.GamePlayScene
+    - GamePlay.Setup.GamePlayScopeOptions
+    - GamePlay.Setup.GamePlayServicesScene
+    - Global.GameLoops.BaseGameLoopFactory
+    - Global.Audio.GlobalAudioOptions
+    - Global.Cameras.GlobalCameraOptions
+    - Global.Inputs.GlobalInputOptions
+    - Global.Publisher.GlobalPublisherOptions
+    - Global.Systems.GlobalSystemUtilsOptions
+    - Global.UI.LanguageTextDataRegistry
+    - Global.UI.LoadingScreenScene
+    - Global.UI.LanguageTextData
+    - Internal.InternalScopeConfig
+    - Global.Setup.GlobalScopeOptions
+    - Global.Setup.GlobalServicesScene
+    _values:
+    - {fileID: 11400000, guid: 8990adbbc20331c4aa4190a0eeff3def, type: 2}
+    - {fileID: 11400000, guid: 8ac67f5e1244b664b888842c15076bf6, type: 2}
+    - {fileID: 11400000, guid: df9dd13e6357b7947b6c5995137ca6d3, type: 2}
+    - {fileID: 11400000, guid: ed7b9377ee72f3d4f890782b9df4014a, type: 2}
+    - {fileID: 11400000, guid: 006f05fa44c5ca2429051b8363e0db03, type: 2}
+    - {fileID: 11400000, guid: 2555befb465da1243b3d8e9d8c20bee5, type: 2}
+    - {fileID: 11400000, guid: 087c4e37354bce64a96d6019412879a1, type: 2}
+    - {fileID: 11400000, guid: 317f15a6b1b4b334bb1e3f4b54bf8dd2, type: 2}
+    - {fileID: 11400000, guid: c8c0a1c314f94f844b7f6f990445ceb6, type: 2}
+    - {fileID: 11400000, guid: 9cfaf8122a7ac3049903b7f01f42b865, type: 2}
+    - {fileID: 11400000, guid: 89f6ea3845afda74eabe59191f8b9bef, type: 2}
+    - {fileID: 11400000, guid: 1e67759ed273b064b901f65b251c8771, type: 2}
+    - {fileID: 11400000, guid: 36e4a66df3341d943afb3659af1626d2, type: 2}
+    - {fileID: 11400000, guid: 8144c5c656ba14a4b88bcc6ad58af919, type: 2}
+    - {fileID: 11400000, guid: 406935e01522cc441bd92868777d3e67, type: 2}
+    - {fileID: 11400000, guid: d24fda57210b0534b93bdf1bc41ca66b, type: 2}
+    - {fileID: 11400000, guid: 974b052432fbdba498b4e519fbee2214, type: 2}
+  _options:
+    _keys: 0000000001000000020000000300000004000000
+    _values:
+    - {fileID: 11400000, guid: 6673ed85b579ef644a3aec194f9cc485, type: 2}
+    - {fileID: 11400000, guid: 6673ed85b579ef644a3aec194f9cc485, type: 2}
+    - {fileID: 11400000, guid: 6673ed85b579ef644a3aec194f9cc485, type: 2}
+    - {fileID: 11400000, guid: 6673ed85b579ef644a3aec194f9cc485, type: 2}
+    - {fileID: 11400000, guid: 6673ed85b579ef644a3aec194f9cc485, type: 2}

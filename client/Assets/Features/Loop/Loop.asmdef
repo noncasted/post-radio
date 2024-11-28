@@ -1,0 +1,20 @@
+{
+    "name": "Loop",
+    "references": [
+        "GUID:0111c49bb9c84f9ca0b14bd86d9e0630",
+        "GUID:01f60cffe1f34ab2a431167c2fa3d728",
+        "GUID:f039cb8c565843dba6da5b3c1ccde7d6",
+        "GUID:25b7e03fa7ea4ed9a6217ec60de5aaa7",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:b0214a6008ed146ff8f122a6a9c2f6cc"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "precompiledReferences": [],
+    "defineConstraints": [],
+    "versionDefines": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "autoReferenced": false,
+    "noEngineReferences": false
+}

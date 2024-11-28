@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 494f40082d264adfbf309a50a3cb097a, type: 3}
+  m_Name: GlobalServicesScene
+  m_EditorClassIdentifier: 
+  _assetId: 37
+  _scene:
+    m_SceneAsset: {fileID: 102900000, guid: fa9902c71b5f7cd4f98e1a5c19e15def, type: 3}
+    m_SceneName: Services_Global

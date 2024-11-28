@@ -8,6 +8,11 @@ public class TrackData
     public required SongMetadata Metadata { get; init; }
 }
 
+public class GetNextTrackRequest
+{
+    public required int Index { get; init; }
+}
+
 [Serializable]
 public class SongMetadata
 {
@@ -24,6 +29,11 @@ public class SongMetadata
 
 public static class TrackDataExtensions
 {
+    public static string ToShortName(this string url)
+    {
+        return url.Replace("https://soundcloud.com/", "");
+    }
+    
     public static SongMetadata? ToMetadata(this Track track)
     {
         if (track.Title == null || track.PermalinkUrl == null)
@@ -60,7 +70,7 @@ public static class TrackDataExtensions
             throw new NullReferenceException();
         
         var url = track.PermalinkUrl.ToString();
-        var shortName = url.Replace("https://soundcloud.com/", "");
+        var shortName = url.ToShortName();
 
         return new SongMetadata()
         {

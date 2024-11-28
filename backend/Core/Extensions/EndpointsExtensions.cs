@@ -1,4 +1,6 @@
 ﻿using Audio;
+using Images;
+using Images.API;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Core;
@@ -7,11 +9,15 @@ public static class EndpointsExtensions
 {
     public static IEndpointRouteBuilder AddAudioEndpoints(this IEndpointRouteBuilder builder)
     {
-        builder.MapGet("audio/refresh", ([FromServices] ISongsRepository repository) => repository.Refresh());
+        builder.MapGet("audio/refresh", ([FromServices] IAudioAPI api) => api.Refresh());
 
-        builder.MapGet("audio/getNext", ([FromBody] int current, [FromServices] ISongProvider provider)
-            => provider.GetNext(current));
+        builder.MapPost("audio/getNext", ([FromBody] GetNextTrackRequest request, [FromServices] IAudioAPI api)
+            => api.GetNext(request));
 
+        builder.MapGet("image/refresh", ([FromServices] IImageAPI api) => api.Refresh());
+
+        builder.MapPost("image/getNext", ([FromBody] ImageRequest request, [FromServices] IImageAPI api)
+            => api.GetNext(request));
         return builder;
     }
 }

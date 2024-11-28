@@ -1,0 +1,18 @@
+{
+    "name": "Internal.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:f039cb8c565843dba6da5b3c1ccde7d6"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

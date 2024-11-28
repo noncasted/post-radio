@@ -1,0 +1,20 @@
+{
+    "name": "Global",
+    "references": [
+        "GUID:da1917f3a79694c539a148addd06d33b",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:75469ad4d38634e559750d17036d5f7c",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f",
+        "GUID:b0214a6008ed146ff8f122a6a9c2f6cc",
+        "GUID:f039cb8c565843dba6da5b3c1ccde7d6"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "precompiledReferences": [],
+    "defineConstraints": [],
+    "versionDefines": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "autoReferenced": false,
+    "noEngineReferences": false
+}

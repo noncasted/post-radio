@@ -32,7 +32,7 @@ public class SongsRepository : ISongsRepository
     public async Task Refresh()
     {
         _logger.AudioRefreshStarted();
-        
+
         _tracks.Clear();
         _shortNameToMetadata.Clear();
 
@@ -51,7 +51,7 @@ public class SongsRepository : ISongsRepository
             var newMetadata = new Dictionary<string, SongMetadata>();
 
             foreach (var (_, data) in oldMetadata)
-                data.ShortName = data.Url.Replace("https://soundcloud.com/", "");
+                data.ShortName = data.Url.ToShortName();
 
             var link = _options.Urls[name];
             var tracks = await _soundCloud.Playlists.GetTracksAsync(link);
@@ -84,7 +84,7 @@ public class SongsRepository : ISongsRepository
 
             await File.WriteAllTextAsync(path, resultObject);
         }
-        
+
         _logger.AudioRefreshCompleted(_tracks.Count);
     }
 }

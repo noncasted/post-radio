@@ -82,10 +82,7 @@ public class SongProvider : ISongProvider
 
                 var signedUrl = await _minio.PresignedGetObjectAsync(presignedArgs);
 
-                var encodedUrl = Convert.ToBase64String(Encoding.UTF8.GetBytes(signedUrl));
-                var shareableUrl = $"https://minio-console.post-radio.io/api/v1/download-shared-object/{encodedUrl}";
-
-                _nameToUrl.Add(metadata.ShortName, shareableUrl);
+                _nameToUrl.Add(metadata.ShortName, signedUrl);
                 return signedUrl;
             }
         }

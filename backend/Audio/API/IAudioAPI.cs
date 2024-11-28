@@ -3,5 +3,5 @@
 public interface IAudioAPI
 {
     Task Refresh();
-    Task<TrackData> GetNext(int index);
+    Task<TrackData> GetNext(GetNextTrackRequest request);
 }
