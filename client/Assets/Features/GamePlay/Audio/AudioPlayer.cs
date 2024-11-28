@@ -32,6 +32,8 @@ namespace GamePlay.Audio
 
                 if (_source.isPlaying == true || timer < length)
                     await UniTask.Yield(lifetime.Token);
+                else 
+                    break;
             }
         }
     }

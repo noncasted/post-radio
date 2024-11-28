@@ -8,7 +8,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigin", policy =>
     {
-        policy.WithOrigins("https://minio-api.post-radio.io") 
+        policy.WithOrigins("http://localhost:63342") 
             .AllowAnyMethod() 
             .AllowAnyHeader() 
             .AllowCredentials(); 

@@ -5,7 +5,7 @@ namespace Internal
 {
     public struct ProfilingScope
     {
-        private const bool _isEnabled = false;
+        private const bool _isEnabled = true;
 
         private readonly string _name;
         private readonly Stopwatch _stopwatch;

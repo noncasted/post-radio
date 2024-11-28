@@ -1,0 +1,42 @@
+#image_1, #image_2 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw; /* Full screen width */
+    height: 100vh; /* Full screen height */
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+    z-index: 0; /* Initially behind */
+}
+
+#next-image {
+    opacity: 0; /* Initially hidden */
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: black;
+}
+
+.audio-info {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: white;
+    font-size: 34px;
+    font-family: 'Roboto', sans-serif;
+    padding: 3px;
+    opacity: 0.35;
+    border-radius: 5px;
+    line-height: 0.3;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+audio {
+    width: 100%;
+    margin-top: 20px;
+}
+

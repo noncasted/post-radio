@@ -1,4 +1,4 @@
-﻿namespace Images.API;
+﻿namespace Images;
 
 public class ImageAPI : IImageAPI
 {

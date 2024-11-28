@@ -1,6 +1,5 @@
 ﻿using Audio;
 using Images;
-using Images.API;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Core;

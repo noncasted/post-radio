@@ -4,6 +4,7 @@ using Global.Cameras;
 using Global.GameLoops;
 using Global.UI;
 using Internal;
+using UnityEngine;
 
 namespace Loop
 {
@@ -40,6 +41,7 @@ namespace Loop
 
         private async UniTask LoadGamePlay()
         {
+            Screen.fullScreen = true;
             _globalCamera.Enable();
             _currentCameraProvider.SetCamera(_globalCamera.Camera);
 
