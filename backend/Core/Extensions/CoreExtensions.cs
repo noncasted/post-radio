@@ -88,7 +88,9 @@ public static class EnvironmentExtensions
         {
             options.AddPolicy("cors", policy =>
             {
-                policy.WithOrigins(GetUrl())
+                var url = GetUrl();
+                Console.WriteLine($"Configuring CORS for {url}");
+                policy.WithOrigins(url)
                     .AllowAnyMethod()
                     .AllowAnyHeader()
                     .AllowCredentials();
