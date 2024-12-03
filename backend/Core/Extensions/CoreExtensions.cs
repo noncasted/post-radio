@@ -21,7 +21,7 @@ public static class EnvironmentExtensions
             builder.Configuration.AddJsonFile("Settings/secrets.json");
             var options = builder.Configuration.GetSection("MinioCredentials").Get<MinioCredentials>()!;
             builder.Services.AddSingleton(options);
-            
+
             var buildUrl = builder.Configuration.GetSection("BuildUrl").Get<BuildUrl>()!;
             builder.Services.AddSingleton(buildUrl);
         }
@@ -36,16 +36,16 @@ public static class EnvironmentExtensions
             };
 
             builder.Services.AddSingleton(minioCredentials);
-            
+
             var buildUrl = new BuildUrl()
             {
                 Value = Environment.GetEnvironmentVariable("BUILD_URL")!
             };
-            
+
             builder.Services.AddSingleton(buildUrl);
         }
     }
-    
+
     public static IHostApplicationBuilder AddDefaultServices(this IHostApplicationBuilder builder)
     {
         var credentials = builder.GetMinioCredentials();
@@ -59,7 +59,7 @@ public static class EnvironmentExtensions
 
         var soundCloud = new SoundCloudClient();
         builder.Services.AddSingleton(soundCloud);
-        
+
         builder.AddOptionsFile("Settings/appsettings.minio.json");
         builder.AddOptions<MinioOptions>("MinioOptions");
 
@@ -80,5 +80,33 @@ public static class EnvironmentExtensions
             AccessKey = Environment.GetEnvironmentVariable("MINIO_ACCESSKEY")!,
             SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRETKEY")!
         };
+    }
+
+    public static void ConfigureCors(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddCors(options =>
+        {
+
+            options.AddPolicy("cors", policy =>
+            {
+                policy.WithOrigins(GetUrl())
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials();
+            });
+        });
+        
+        return;
+
+        string GetUrl()
+        {
+            if (builder.Environment.IsDevelopment() == true)
+            {
+                var url = builder.Configuration.GetSection("BuildUrl").Get<BuildUrl>()!;
+                return url.Value;
+            }
+
+            return Environment.GetEnvironmentVariable("BUILD_URL")!;
+        }
     }
 }
