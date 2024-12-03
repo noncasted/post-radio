@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -35,65 +36,15 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 var _a;
-var audioStarted = false; // Flag to track if the audio has started
+Object.defineProperty(exports, "__esModule", { value: true });
+var api_js_1 = require("./api.js");
 var audioInvoked = false;
-var audioEndpoint = "https://api.post-radio.io/";
 document.body.addEventListener('click', startAudioPlayback, { once: true });
 document.body.addEventListener('keydown', startAudioPlayback, { once: true });
 (_a = document.getElementById('next-button')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', skipAudio);
 var audioPlayer = document.getElementById('audio-player');
-function fetchNextAudio(index) {
-    return __awaiter(this, void 0, void 0, function () {
-        var url, response;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    url = audioEndpoint + "audio/getNext";
-                    console.log('get next audio: ' + url);
-                    return [4 /*yield*/, fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ Index: index.toString() })
-                        })];
-                case 1:
-                    response = _a.sent();
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch audio');
-                    }
-                    return [2 /*return*/, response.json()];
-            }
-        });
-    });
-}
-function updateAudioInfo(author, name) {
-    var authorElement = document.getElementById('author');
-    var nameElement = document.getElementById('name');
-    authorElement.textContent = author;
-    nameElement.textContent = name;
-}
-function playAudio(url) {
-    return new Promise(function (resolve, reject) {
-        audioPlayer.volume = 0.2;
-        audioPlayer.src = url;
-        audioPlayer.load(); // Ensure the audio is loaded
-        // When the audio is ready to play, start automatically
-        audioPlayer.oncanplaythrough = function () {
-            // If it's the first user interaction, unmute and play
-            if (!audioStarted) {
-                audioStarted = true; // Mark audio as started
-                audioPlayer.play().then(function () {
-                    // Unmute once playback begins
-                    audioPlayer.muted = false;
-                    audioStarted = false; // Mark audio as started
-                    resolve(audioPlayer);
-                }).catch(reject);
-            }
-        };
-        audioPlayer.onerror = function () { return reject('Error loading audio'); };
-    });
-}
+var authorElement = document.getElementById('author');
+var nameElement = document.getElementById('name');
 function startAudioPlayback() {
     return __awaiter(this, void 0, void 0, function () {
         var index, data, _a, author, name_1, error_1;
@@ -106,11 +57,11 @@ function startAudioPlayback() {
                     index = Math.floor(Math.random() * 1001);
                     _b.label = 1;
                 case 1:
-                    if (!true) return [3 /*break*/, 8];
+                    if (!true) return [3 /*break*/, 9];
                     _b.label = 2;
                 case 2:
-                    _b.trys.push([2, 6, , 7]);
-                    return [4 /*yield*/, fetchNextAudio(index)];
+                    _b.trys.push([2, 6, , 8]);
+                    return [4 /*yield*/, (0, api_js_1.fetchNextAudio)(index)];
                 case 3:
                     data = _b.sent();
                     _a = data.metadata, author = _a.author, name_1 = _a.name;
@@ -118,28 +69,45 @@ function startAudioPlayback() {
                     return [4 /*yield*/, playAudio(data.downloadUrl)];
                 case 4:
                     _b.sent();
-                    // Wait for the audio to finish playing
                     return [4 /*yield*/, new Promise(function (resolve) {
                             audioPlayer.onended = function () { return resolve(); };
                         })];
                 case 5:
-                    // Wait for the audio to finish playing
                     _b.sent();
-                    // Increment index to fetch the next audio
-                    index++;
-                    return [3 /*break*/, 7];
+                    return [3 /*break*/, 8];
                 case 6:
                     error_1 = _b.sent();
                     console.error(error_1);
-                    index++;
+                    return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, 3000); })];
+                case 7:
+                    _b.sent();
                     return [3 /*break*/, 8];
-                case 7: return [3 /*break*/, 1];
-                case 8: return [2 /*return*/];
+                case 8:
+                    index++;
+                    return [3 /*break*/, 1];
+                case 9: return [2 /*return*/];
             }
         });
     });
 }
+function playAudio(url) {
+    return new Promise(function (resolve, reject) {
+        audioPlayer.volume = 1;
+        audioPlayer.src = url;
+        audioPlayer.load();
+        audioPlayer.oncanplaythrough = function () {
+            audioPlayer.play().then(function () {
+                audioPlayer.muted = false;
+                resolve(audioPlayer);
+            }).catch(reject);
+        };
+        audioPlayer.onerror = function () { return reject('Error loading audio'); };
+    });
+}
+function updateAudioInfo(author, name) {
+    authorElement.textContent = author;
+    nameElement.textContent = name;
+}
 function skipAudio() {
-    var audioPlayer = document.getElementById('audio-player');
     audioPlayer.currentTime = audioPlayer.duration;
 }

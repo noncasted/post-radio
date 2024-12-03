@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -34,44 +35,16 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var _this = this;
-var imageEndpoint = "https://api.post-radio.io/";
-function fetchNextImage(index) {
-    return __awaiter(this, void 0, void 0, function () {
-        var apiUrl, response, data;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    apiUrl = imageEndpoint + "image/getNext";
-                    return [4 /*yield*/, fetch(apiUrl, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({ Index: index.toString() }),
-                        })];
-                case 1:
-                    response = _a.sent();
-                    if (!response.ok) {
-                        throw new Error("Failed to fetch image: ".concat(response.statusText));
-                    }
-                    return [4 /*yield*/, response.json()];
-                case 2:
-                    data = _a.sent();
-                    return [2 /*return*/, data.url];
-            }
-        });
-    });
-}
+Object.defineProperty(exports, "__esModule", { value: true });
+var api_js_1 = require("./api.js");
+var first = document.getElementById("image_1");
+var second = document.getElementById("image_2");
 function updateImage(index) {
     return __awaiter(this, void 0, void 0, function () {
-        var first, second, imageUrl;
+        var imageUrl;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0:
-                    first = document.getElementById("image_1");
-                    second = document.getElementById("image_2");
-                    return [4 /*yield*/, fetchNextImage(index)];
+                case 0: return [4 /*yield*/, (0, api_js_1.fetchNextImage)(index)];
                 case 1:
                     imageUrl = _a.sent();
                     console.log("Fetched image URL: ".concat(imageUrl));
@@ -96,8 +69,7 @@ function updateImage(index) {
 }
 document.addEventListener("DOMContentLoaded", function () {
     var index = Math.floor(Math.random() * 1001);
-    // Update the image every 5 seconds
-    setInterval(function () { return __awaiter(_this, void 0, void 0, function () {
+    setInterval(function () { return __awaiter(void 0, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0: return [4 /*yield*/, updateImage(index)];
@@ -107,6 +79,5 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     }); }, 10000);
-    // Load the first image immediately
     updateImage(index);
 });
