@@ -1,0 +1,29 @@
+.next-button {
+    position: fixed;  /* Fix the button in place */
+    bottom: 20px;     /* Space from the bottom */
+    right: 20px;      /* Space from the right */
+    width: 50px;      /* Width of the button */
+    height: 50px;     /* Height of the button */
+    background-color: #007bff;  /* Blue background */
+    color: white;     /* White arrow */
+    border: none;     /* No border */
+    border-radius: 50%;  /* Round button */
+    font-size: 24px;  /* Arrow size */
+    display: flex;    /* Center the arrow inside the button */
+    justify-content: center; /* Horizontally center the arrow */
+    align-items: center;    /* Vertically center the arrow */
+    cursor: pointer; /* Make the button clickable */
+    transition: transform 0.3s ease, background-color 0.3s ease;
+    opacity: 0.3;
+}
+
+/* Add a hover effect */
+.next-button:hover {
+    background-color: #0056b3;  /* Darker blue on hover */
+    transform: scale(1.1);       /* Slightly enlarge the button on hover */
+}
+
+/* Optional: Add a click effect */
+.next-button:active {
+    transform: scale(1.05);  /* Slight shrink when button is clicked */
+}

@@ -2,16 +2,11 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 100vw; /* Full screen width */
-    height: 100vh; /* Full screen height */
-    object-fit: contain;
+    width: 100%; /* Full screen width */
+    height: 100%; /* Full screen height */
     opacity: 0;
     transition: opacity 2s ease-in-out;
     z-index: 0; /* Initially behind */
-}
-
-#next-image {
-    opacity: 0; /* Initially hidden */
 }
 
 body {
