@@ -86,7 +86,6 @@ public static class EnvironmentExtensions
     {
         builder.Services.AddCors(options =>
         {
-
             options.AddPolicy("cors", policy =>
             {
                 policy.WithOrigins(GetUrl())
