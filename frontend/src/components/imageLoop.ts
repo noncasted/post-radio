@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setInterval(async () => {
         index = await updateImage(index);
-    }, 10000);
+    }, 20000);
 
     updateImage(index);
 });

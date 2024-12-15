@@ -78,6 +78,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     return [2 /*return*/];
             }
         });
-    }); }, 10000);
+    }); }, 20000);
     updateImage(index);
 });
