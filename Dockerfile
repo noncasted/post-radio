@@ -11,11 +11,13 @@ ENV MINIO_SECRETKEY=$MINIO_SECRETKEY
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+
 COPY ["Frontend/Frontend/Frontend.csproj", "Frontend/Frontend/"]
 COPY ["Backend/Audio/Audio.csproj", "Backend/Audio/"]
 COPY ["Backend/Extensions/Extensions.csproj", "Backend/Extensions/"]
 COPY ["Backend/Images/Images.csproj", "Backend/Images/"]
 COPY ["Backend/Options/Options.csproj", "Backend/Options/"]
+
 RUN dotnet restore "Frontend/Frontend/Frontend.csproj"
 COPY . .
 WORKDIR "/src/Frontend/Frontend"

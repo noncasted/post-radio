@@ -5,7 +5,7 @@ services:
     image: post-radio
     build:
       context: .
-      dockerfile: Frontend/Frontend/Dockerfile
+      dockerfile: Dockerfile
     environment:
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_ACCESSKEY=${MINIO_ACCESSKEY}
