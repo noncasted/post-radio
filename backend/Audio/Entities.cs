@@ -11,6 +11,7 @@ public class TrackData
 public class GetNextTrackRequest
 {
     public required int Index { get; init; }
+    public required PlaylistType TargetPlaylist { get; init; }
 }
 
 [Serializable]

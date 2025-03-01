@@ -18,6 +18,6 @@ public class AudioAPI : IAudioAPI
 
     public Task<TrackData> GetNext(GetNextTrackRequest request)
     {
-        return _provider.GetNext(request.Index);
+        return _provider.GetNext(request.Index, request.TargetPlaylist);
     }
 }

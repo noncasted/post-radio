@@ -2,5 +2,5 @@
 
 public interface ISongProvider
 {
-    Task<TrackData> GetNext(int current);
+    Task<TrackData> GetNext(int current, PlaylistType playlist);
 }

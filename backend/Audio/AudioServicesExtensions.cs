@@ -11,11 +11,13 @@ public static class AudioServicesExtensions
     {
         builder.AddOptionsFile("Settings/appsettings.playlists.json");
         builder.AddOptions<PlaylistsOptions>("PlaylistsOptions");
-        
+
         builder.Services.AddSingleton<ISongProvider, SongProvider>();
 
         builder.Services.AddSingleton<ISongsRepository, SongsRepository>();
         builder.Services.AddSingleton<IAudioAPI, AudioAPI>();
+
+        builder.Services.AddSingleton<IAudioPreloader, AudioPreloader>();
 
         return builder;
     }

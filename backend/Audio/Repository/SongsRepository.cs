@@ -33,10 +33,10 @@ public class SongsRepository : ISongsRepository
     private readonly MinioClient _minio;
     private readonly MinioOptions _minioOptions;
     private readonly ILogger<SongsRepository> _logger;
-    private readonly List<SongMetadata> _tracks = new();
+    private readonly Dictionary<PlaylistType, IReadOnlyList<SongMetadata>> _tracks = new();
     private readonly Dictionary<string, SongMetadata> _shortNameToMetadata = new();
 
-    public IReadOnlyList<SongMetadata> Tracks => _tracks;
+    public IReadOnlyDictionary<PlaylistType, IReadOnlyList<SongMetadata>> Playlists => _tracks;
 
     public async Task Refresh()
     {
@@ -45,68 +45,74 @@ public class SongsRepository : ISongsRepository
         _tracks.Clear();
         _shortNameToMetadata.Clear();
 
-        foreach (var (name, _) in _playlistsOptions.Urls)
+        foreach (var (type, options) in _playlistsOptions.Urls)
         {
-            var json = string.Empty;
-            var path = $"{name}{PathPostfix}";
+            var playlistSongs = new List<SongMetadata>();
+            _tracks.Add(type, playlistSongs);
 
-            var getArgs = new GetObjectArgs()
-                .WithBucket(_minioOptions.AudioBucket)
-                .WithObject(path)
-                .WithCallbackStream(stream =>
+            foreach (var (name, _) in options)
+            {
+                var json = string.Empty;
+                var path = $"{name}{PathPostfix}";
+
+                var getArgs = new GetObjectArgs()
+                    .WithBucket(_minioOptions.AudioBucket)
+                    .WithObject(path)
+                    .WithCallbackStream(stream =>
+                    {
+                        using var reader = new StreamReader(stream);
+                        json = reader.ReadToEnd();
+                    });
+
+                await _minio.GetObjectAsync(getArgs);
+
+                var oldMetadata = JsonConvert.DeserializeObject<Dictionary<string, SongMetadata>>(json)!;
+                var newMetadata = new Dictionary<string, SongMetadata>();
+
+                foreach (var (_, data) in oldMetadata)
+                    data.ShortName = data.Url.ToShortName();
+
+                var link = _playlistsOptions.Urls[type][name];
+                var tracks = await _soundCloud.Playlists.GetTracksAsync(link);
+
+                foreach (var track in tracks)
                 {
-                    using var reader = new StreamReader(stream);
-                    json = reader.ReadToEnd();
-                });
+                    var data = track.ToMetadata();
 
-            await _minio.GetObjectAsync(getArgs);
+                    if (data == null)
+                        continue;
 
-            var oldMetadata = JsonConvert.DeserializeObject<Dictionary<string, SongMetadata>>(json)!;
-            var newMetadata = new Dictionary<string, SongMetadata>();
+                    if (oldMetadata.TryGetValue(data.Url, out var value) == true)
+                        newMetadata.TryAdd(data.Url, value);
+                    else
+                        newMetadata.TryAdd(data.Url, data);
+                }
 
-            foreach (var (_, data) in oldMetadata)
-                data.ShortName = data.Url.ToShortName();
+                foreach (var (_, data) in newMetadata)
+                {
+                    if (_shortNameToMetadata.ContainsKey(data.ShortName) == true)
+                        continue;
 
-            var link = _playlistsOptions.Urls[name];
-            var tracks = await _soundCloud.Playlists.GetTracksAsync(link);
+                    playlistSongs.Add(data);
+                    _shortNameToMetadata.Add(data.ShortName, data);
+                }
 
-            foreach (var track in tracks)
-            {
-                var data = track.ToMetadata();
+                var resultObject = JsonConvert.SerializeObject(newMetadata, Formatting.Indented);
 
-                if (data == null)
-                    continue;
+                var jsonBytes = Encoding.UTF8.GetBytes(resultObject);
 
-                if (oldMetadata.TryGetValue(data.Url, out var value) == true)
-                    newMetadata.TryAdd(data.Url, value);
-                else
-                    newMetadata.TryAdd(data.Url, data);
+                using var memoryStream = new MemoryStream(jsonBytes);
+
+                await _minio.PutObjectAsync(new PutObjectArgs()
+                    .WithBucket(_minioOptions.AudioBucket)
+                    .WithObject(path)
+                    .WithStreamData(memoryStream)
+                    .WithObjectSize(memoryStream.Length)
+                    .WithContentType("application/json")
+                );
             }
 
-            foreach (var (_, data) in newMetadata)
-            {
-                if (_shortNameToMetadata.ContainsKey(data.ShortName) == true)
-                    continue;
-
-                _tracks.Add(data);
-                _shortNameToMetadata.Add(data.ShortName, data);
-            }
-
-            _tracks.Shuffle();
-
-            var resultObject = JsonConvert.SerializeObject(newMetadata, Formatting.Indented);
-
-            var jsonBytes = Encoding.UTF8.GetBytes(resultObject);
-
-            using var memoryStream = new MemoryStream(jsonBytes);
-            
-            await _minio.PutObjectAsync(new PutObjectArgs()
-                .WithBucket(_minioOptions.AudioBucket)
-                .WithObject(path)
-                .WithStreamData(memoryStream)
-                .WithObjectSize(memoryStream.Length)
-                .WithContentType("application/json")
-            );
+            playlistSongs.Shuffle();
         }
 
         _logger.AudioRefreshCompleted(_tracks.Count);

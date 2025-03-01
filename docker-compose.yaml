@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  post-radio:
+    image: post-radio
+    build:
+      context: .
+      dockerfile: Frontend/Frontend/Dockerfile
+    environment:
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESSKEY=${MINIO_ACCESSKEY}
+      - MINIO_SECRETKEY=${MINIO_SECRETKEY}
+      - BUILD_URL=${BUILD_URL}

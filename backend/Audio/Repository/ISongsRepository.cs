@@ -2,7 +2,7 @@
 
 public interface ISongsRepository
 {
-    IReadOnlyList<SongMetadata> Tracks { get; }
+    IReadOnlyDictionary<PlaylistType, IReadOnlyList<SongMetadata>> Playlists { get; }
     
     Task Refresh();
 }

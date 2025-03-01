@@ -31,10 +31,10 @@ public class SongProvider : ISongProvider
     private readonly MinioOptions _options;
     private readonly ILogger<SongProvider> _logger;
 
-    public async Task<TrackData> GetNext(int current)
+    public async Task<TrackData> GetNext(int current, PlaylistType playlist)
     {
-        current = (current + 1) % _repository.Tracks.Count;
-        var metadata = _repository.Tracks[current];
+        current %= _repository.Playlists[playlist].Count;
+        var metadata = _repository.Playlists[playlist][current];
 
         _logger.AudioGetStarted(current, metadata);
 

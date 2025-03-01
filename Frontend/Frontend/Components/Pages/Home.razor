@@ -1,0 +1,266 @@
+﻿@page "/"
+@using Audio
+@using Images
+@inject IJSRuntime _jsRuntime;
+
+<PageTitle>Post radio</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="image-container">
+    <MudImage Src="@_firstImageSource" Class=@_firstImageState/>
+    <MudImage Src="@_secondImageSource" Class=@_secondImageState/>
+</MudContainer>
+
+<MudItem style="position: fixed; bottom: 10px; right: 20px" xs="12" md="1">
+    <MudRadioGroup
+        Value="@_targetPlaylist"
+        ValueChanged="@(EventCallback.Factory.Create<PlaylistType>(this, (value) => OnTargetPlaylistChanged(value)))">
+        <MudRadio Color="Color.Primary" Value="@(PlaylistType.PostPunk)">P</MudRadio>
+        <MudRadio Color="Color.Primary" Value="@(PlaylistType.Gay)">M</MudRadio>
+    </MudRadioGroup>
+</MudItem>
+
+<MudSlider
+    Size="Size.Large"
+    Value="@_volume"
+    Vertical="true"
+    Class="slider-bottom-left"
+    ValueChanged="@(EventCallback.Factory.Create<double>(this, (value) => OnVolumeSlider(value)))">
+</MudSlider>
+
+<MudFab
+    Style="position: fixed; bottom: 80px; right: 10px"
+    Color="Color.Primary"
+    StartIcon="@Icons.Material.Filled.ArrowForward"
+    OnClick="OnSkipClicked"/>
+
+@if (_isStarted == false)
+{
+    <MudButton
+        Style="position: fixed; left: 50vw; bottom: 50vh; height: 70px; width: 300px; font-size: 2rem"
+        Variant="Variant.Filled"
+        Color="Color.Secondary"
+        OnClick="StartFromClick">
+        Play
+    </MudButton>
+}
+
+<MudText Style="position: fixed; left: 20px; bottom: 70px" Typo="Typo.h3">@_currentTitle</MudText>
+<MudText Style="position: fixed; left: 20px; bottom: 20px" Typo="Typo.h6">@_currentAuthor</MudText>
+
+<audio id="audio-1" src="@_audioUrl"></audio>
+<audio id="audio-2" src="@_audioUrl"></audio>
+
+<style>
+    .image-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .image {
+        position: absolute;
+        width: 100%;
+        object-fit: cover;
+        object-position: center;
+        transition: opacity 3.5s ease-in-out;
+    }
+
+    .hidden {
+        opacity: 0;
+    }
+
+    .visible {
+        opacity: 1;
+    }
+
+    .slider-bottom-left.mud-slider.mud-slider-vertical {
+        height: auto !important; /* Disable the height */
+        position: fixed;
+        bottom: 250px;
+        right: -60px;
+        width: 200px;
+    }
+</style>
+
+<script>
+    window.audioHelper = {
+        setAudioElement: (dotnetHelper) => {
+            const audio_1 = document.getElementById("audio-1");
+            const audio_2 = document.getElementById("audio-2");
+            console.log("initialize audio");
+
+            audio_1.ontimeupdate = () => {
+                console.log("audio-1 time update" + audio_1.currentTime);
+                dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-1", audio_1.currentTime, audio_1.duration);
+            };
+
+            audio_2.ontimeupdate = () => {
+                console.log("audio-2 time update" + audio_2.currentTime);
+                dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-2", audio_2.currentTime, audio_2.duration);
+            };
+        },
+    };
+
+    function play(source) {
+        console.log("Playing audio from source: " + source);
+        document.getElementById(source).currentTime = 0;
+        document.getElementById(source).play();
+    }
+
+    function stop(source) {
+        console.log("stop source: " + source);
+        document.getElementById(source).pause();
+        document.getElementById(source).currentTime = 0;
+
+    }
+
+    function setVolume(volume) {
+        document.getElementById("audio-1").volume = volume;
+        document.getElementById("audio-2").volume = volume;
+    }
+
+</script>
+
+@code {
+    private const double _startOverTime = 1;
+
+    [Inject] private IImageAPI ImageApi { get; set; }
+    [Inject] private IAudioAPI AudioApi { get; set; }
+
+    private string _firstImageSource = string.Empty;
+    private string _secondImageSource = string.Empty;
+
+    private string _firstImageState = string.Empty;
+    private string _secondImageState = string.Empty;
+
+    private int _imageIndex = Random.Shared.Next();
+    private int _audioIndex = Random.Shared.Next();
+
+    private string _audioUrl;
+
+    private string _currentAuthor = string.Empty;
+    private string _currentTitle = string.Empty;
+
+    private double _volume = 75;
+    private bool _isStarted;
+    private PlaylistType _targetPlaylist = PlaylistType.PostPunk;
+
+    private TaskCompletionSource _audioCompletion;
+    private DotNetObjectReference<Home> _dotNetRef;
+
+    public bool IsImageEven => _imageIndex % 2 == 0;
+    public bool IsAudioEven => _audioIndex % 2 == 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Task.Run(CycleImagesAsync);
+    }
+
+    private async Task StartFromClick()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await _jsRuntime.InvokeVoidAsync("audioHelper.setAudioElement", _dotNetRef);
+
+        _isStarted = true;
+
+        await OnVolumeSlider(_volume);
+        await InvokeAsync(StateHasChanged);
+
+        Task.Run(PlayAudioLoopAsync);
+    }
+
+    private async Task CycleImagesAsync()
+    {
+        while (true)
+        {
+            var data = await ImageApi.GetNext(new ImageRequest()
+            {
+                Index = _imageIndex,
+                TargetPlaylist = _targetPlaylist
+            });
+
+            if (IsImageEven)
+            {
+                _firstImageSource = data.Url;
+                _firstImageState = "image fade-in visible";
+                _secondImageState = "image fade-in hidden";
+            }
+            else
+            {
+                _secondImageSource = data.Url;
+                _firstImageState = "image fade-in hidden";
+                _secondImageState = "image fade-in visible";
+            }
+
+            await InvokeAsync(StateHasChanged);
+
+            _imageIndex++;
+            await Task.Delay(10000);
+        }
+    }
+
+    private async Task PlayAudioLoopAsync()
+    {
+        while (true)
+        {
+            var audioData = await AudioApi.GetNext(new GetNextTrackRequest
+            {
+                Index = _audioIndex,
+                TargetPlaylist = _targetPlaylist
+            });
+
+            _audioUrl = audioData.DownloadUrl;
+            _audioCompletion = new TaskCompletionSource();
+
+            _currentAuthor = audioData.Metadata.Author;
+            _currentTitle = audioData.Metadata.Name;
+
+            await InvokeAsync(StateHasChanged);
+
+            await _jsRuntime.InvokeAsync<string>("play", IsAudioEven ? "audio-1" : "audio-2");
+            await _audioCompletion.Task;
+
+            _audioIndex++;
+        }
+    }
+
+    [JSInvokable]
+    public Task OnAudioProgress(string from, double currentTime, double duration)
+    {
+        if (IsAudioEven == true && from == "audio-2" || IsAudioEven == false && from == "audio-1")
+            return Task.CompletedTask;
+
+        var difference = duration - currentTime;
+
+        if (difference >= _startOverTime)
+            return Task.CompletedTask;
+
+        _audioCompletion.TrySetResult();
+
+        return Task.CompletedTask;
+    }
+
+    private async Task OnVolumeSlider(double value)
+    {
+        _volume = value;
+        await _jsRuntime.InvokeAsync<string>("setVolume", Math.Clamp(_volume / 100, 0, 1));
+    }
+
+    private async Task OnSkipClicked()
+    {
+        await _jsRuntime.InvokeAsync<string>("stop", IsAudioEven ? "audio-1" : "audio-2");
+        _audioCompletion.TrySetResult();
+    }
+
+    private async Task OnTargetPlaylistChanged(PlaylistType value)
+    {
+        _targetPlaylist = value;
+        await OnSkipClicked();
+    }
+}

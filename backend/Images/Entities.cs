@@ -1,4 +1,6 @@
-﻿namespace Images;
+﻿using Audio;
+
+namespace Images;
 
 public class ImageData
 {
@@ -8,4 +10,5 @@ public class ImageData
 public class ImageRequest
 {
     public required int Index { get; init; }
+    public required PlaylistType TargetPlaylist { get; init; }
 }

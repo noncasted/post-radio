@@ -1,7 +1,8 @@
-﻿namespace Options;
+﻿using Audio;
+
+namespace Options;
 
 public class PlaylistsOptions
 {
-    public required IReadOnlyDictionary<string, string> Urls { get; init; }
-    public required string PlaylistsPath { get; init; }
+    public required IReadOnlyDictionary<PlaylistType, IReadOnlyDictionary<string, string>> Urls { get; init; }
 }
