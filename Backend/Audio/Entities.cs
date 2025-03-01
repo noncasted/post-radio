@@ -22,6 +22,14 @@ public class SongMetadata
     public required string Name { get; init; }
     public required string ShortName { get; set; }
 
+    public static SongMetadata Empty => new()
+    {
+        Url = string.Empty,
+        Author = string.Empty,
+        Name = string.Empty,
+        ShortName = string.Empty
+    };
+
     public override string ToString()
     {
         return $"{Author} - {Name}\n{ShortName}";

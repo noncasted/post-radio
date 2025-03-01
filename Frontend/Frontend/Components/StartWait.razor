@@ -1,0 +1,24 @@
+﻿@if (_isStarted == false)
+{
+    <MudButton
+        Style="position: fixed; left: 50%; bottom: 50%; height: 70px; width: 300px; font-size: 2rem"
+        Variant="Variant.Filled"
+        Color="Color.Secondary"
+        OnClick="StartFromClick">
+        Play
+    </MudButton>
+}
+
+@code {
+    [Parameter] public SessionState State { get; set; }
+
+    private bool _isStarted;
+
+    private async Task StartFromClick()
+    {
+        _isStarted = true;
+        State.InvokeStart();
+
+        await InvokeAsync(StateHasChanged);
+    }
+}

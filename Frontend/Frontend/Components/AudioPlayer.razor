@@ -1,0 +1,129 @@
+﻿@using Audio
+@using Extensions
+@inject IJSRuntime _jsRuntime;
+
+<audio id="audio-1" src="@_audioUrl"></audio>
+<audio id="audio-2" src="@_audioUrl"></audio>
+
+<script>
+    window.audioHelper = {
+        setAudioElement: (dotnetHelper) => {
+            const audio_1 = document.getElementById("audio-1");
+            const audio_2 = document.getElementById("audio-2");
+
+            audio_1.ontimeupdate = () => {
+                dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-1", audio_1.currentTime, audio_1.duration);
+            };
+
+            audio_2.ontimeupdate = () => {
+                dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-2", audio_2.currentTime, audio_2.duration);
+            };
+        },
+    };
+
+    function play(source) {
+        document.getElementById(source).currentTime = 0;
+        document.getElementById(source).play();
+    }
+
+    function stop(source) {
+        document.getElementById(source).pause();
+        document.getElementById(source).currentTime = 0;
+
+    }
+
+    function setVolume(volume) {
+        document.getElementById("audio-1").volume = volume;
+        document.getElementById("audio-2").volume = volume;
+    }
+
+</script>
+
+@code {
+    [Parameter] public SessionState State { get; set; }
+
+    [Inject] private IAudioAPI AudioApi { get; set; }
+
+    private const double _startOverTime = 1;
+
+    private int _audioIndex = Random.Shared.Next();
+    private string _audioUrl;
+
+    private TaskCompletionSource _audioCompletion;
+    private DotNetObjectReference<AudioPlayer> _dotNetRef;
+
+    public bool IsAudioEven => _audioIndex % 2 == 0;
+    public string CurrentSource => IsAudioEven ? "audio-1" : "audio-2";
+
+    protected override void OnInitialized()
+    {
+        var lifetime = State.Lifetime;
+
+        State.Started.Advise(lifetime, () => Loop().NoAwait());
+        State.SkipRequested.Advise(lifetime, () => OnSkipRequested().NoAwait());
+        State.Playlist.Advise(lifetime, () => OnPlaylistChanged().NoAwait());
+        State.Volume.Advise(lifetime, value => OnVolumeChanged(value).NoAwait());
+    }
+
+    private async Task Loop()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await _jsRuntime.InvokeVoidAsync("audioHelper.setAudioElement", _dotNetRef);
+
+        await OnVolumeChanged(State.Volume.Value);
+
+        while (State.Lifetime.IsTerminated == false)
+        {
+            var audioData = await AudioApi.GetNext(new GetNextTrackRequest
+            {
+                Index = _audioIndex,
+                TargetPlaylist = State.Playlist.Value
+            });
+
+            State.SetCurrentSong(audioData.Metadata);
+
+            _audioUrl = audioData.DownloadUrl;
+            _audioCompletion = new TaskCompletionSource();
+
+            _audioIndex++;
+
+            await InvokeAsync(StateHasChanged);
+            await _jsRuntime.InvokeAsync<string>("play", CurrentSource);
+            await _audioCompletion.Task;
+        }
+    }
+
+    private async Task OnSkipRequested()
+    {
+        await _jsRuntime.InvokeAsync<string>("stop", CurrentSource);
+        _audioCompletion.TrySetResult();
+    }
+
+    private async Task OnPlaylistChanged()
+    {
+        await _jsRuntime.InvokeAsync<string>("stop", CurrentSource);
+        _audioCompletion.TrySetResult();
+    }
+
+    private async Task OnVolumeChanged(double value)
+    {
+        await _jsRuntime.InvokeAsync<string>("setVolume", Math.Clamp(value / 100, 0, 1));
+    }
+
+    [JSInvokable]
+    public Task OnAudioProgress(string from, double currentTime, double duration)
+    {
+        if (CurrentSource != from)
+            return Task.CompletedTask;
+
+        var difference = duration - currentTime;
+
+        if (difference >= _startOverTime)
+            return Task.CompletedTask;
+
+        _audioCompletion.TrySetResult();
+
+        return Task.CompletedTask;
+    }
+
+}

@@ -1,0 +1,48 @@
+﻿@using Audio
+
+<MudItem style="position: fixed; bottom: 10px; right: 40px" xs="12" md="1">
+    <MudRadioGroup
+        Value="@State.Playlist.Value"
+        ValueChanged="@(EventCallback.Factory.Create<PlaylistType>(this, (value) => OnTargetPlaylistChanged(value)))">
+        <MudRadio Color="Color.Primary" Value="@(PlaylistType.PostPunk)">P</MudRadio>
+        <MudRadio Color="Color.Primary" Value="@(PlaylistType.Gay)">M</MudRadio>
+    </MudRadioGroup>
+</MudItem>
+
+<MudSlider
+    Size="Size.Large"
+    Value="@State.Volume.Value"
+    Vertical="true"
+    Class="slider-bottom-left"
+    ValueChanged="@(EventCallback.Factory.Create<double>(this, (value) => OnVolumeSlider(value)))">
+</MudSlider>
+
+<MudFab
+    Style="position: fixed; bottom: 80px; right: 10px"
+    Color="Color.Primary"
+    StartIcon="@Icons.Material.Filled.ArrowForward"
+    OnClick="@(() => State.RequestSkip())"/>
+
+<style>
+    .slider-bottom-left.mud-slider.mud-slider-vertical {
+        height: auto !important;
+        position: fixed;
+        bottom: 250px;
+        right: -60px;
+        width: 200px;
+    }
+</style>
+
+@code {
+    [Parameter] public SessionState State { get; set; }
+
+    private void OnVolumeSlider(double value)
+    {
+        State.SetVolume(value);
+    }
+
+    private async Task OnTargetPlaylistChanged(PlaylistType value)
+    {
+        State.SetPlaylist(value);
+    }
+}

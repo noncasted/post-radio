@@ -1,0 +1,94 @@
+﻿@using Extensions
+@using Images
+
+<MudContainer MaxWidth="MaxWidth.False" Class="image-container">
+    <MudImage Src="@_first.Url" Class=@_first.State/>
+    <MudImage Src="@_second.Url" Class=@_second.State/>
+</MudContainer>
+
+<style>
+    .image-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .image {
+        position: absolute;
+        width: 100%;
+        object-fit: cover;
+        object-position: center;
+        transition: opacity 3.5s ease-in-out;
+    }
+
+    .hidden {
+        opacity: 0;
+    }
+
+    .visible {
+        opacity: 1;
+    }
+</style>
+
+@code {
+    [Inject] private IImageAPI ImageApi { get; set; }
+
+    [Parameter] public SessionState State { get; set; }
+
+    private readonly ImageHandle _first = new();
+    private readonly ImageHandle _second = new();
+
+    private int _imageIndex = Random.Shared.Next();
+
+    protected override Task OnInitializedAsync()
+    {
+        CycleImagesAsync().NoAwait();
+        return Task.CompletedTask;
+    }
+    
+    private async Task CycleImagesAsync()
+    {
+        var current = _first;
+
+        while (true)
+        {
+            var data = await ImageApi.GetNext(new ImageRequest()
+            {
+                Index = _imageIndex,
+                TargetPlaylist = State.Playlist.Value
+            });
+
+            current.Hide();
+            current = current == _first ? _second : _first;
+            current.Url = data.Url;
+            current.Show();
+
+            await InvokeAsync(StateHasChanged);
+
+            _imageIndex++;
+            await Task.Delay(10000);
+        }
+    }
+
+    public class ImageHandle
+    {
+        public string State { get; private set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+
+        public void Show()
+        {
+            State = "image fade-in visible";
+        }
+
+        public void Hide()
+        {
+            State = "image fade-in hidden";
+        }
+    }
+}

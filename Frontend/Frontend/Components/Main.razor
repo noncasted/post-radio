@@ -1,0 +1,13 @@
+﻿@page "/"
+
+<PageTitle>Post radio</PageTitle>
+
+<ImagesView State="@_state"></ImagesView>
+<AudioPlayer State="@_state"></AudioPlayer>
+<SongDataView State="@_state"></SongDataView>
+<ControlsView State="@_state"></ControlsView>
+<StartWait State="@_state"></StartWait>
+
+@code {
+    private readonly SessionState _state = new();
+}
