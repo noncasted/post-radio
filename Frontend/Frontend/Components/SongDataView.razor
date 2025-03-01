@@ -1,7 +1,7 @@
 ﻿@using Extensions
 
 <MudText Style="position: fixed; left: 20px; bottom: 70px" Typo="Typo.h3">@State.CurrentSong.Value.Name</MudText>
-<MudText Style="position: fixed; left: 20px; bottom: 20px" Typo="Typo.h6">@State.CurrentSong.Value.Name</MudText>
+<MudText Style="position: fixed; left: 20px; bottom: 20px" Typo="Typo.h6">@State.CurrentSong.Value.Author</MudText>
 
 @code {
     [Parameter] public SessionState State { get; set; }
