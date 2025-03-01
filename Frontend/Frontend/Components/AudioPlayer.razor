@@ -12,12 +12,27 @@
             const audio_2 = document.getElementById("audio-2");
 
             audio_1.ontimeupdate = () => {
+                if (!isValidAudioTime(audio_1, "audio-1"))
+                    return;
+
+
                 dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-1", audio_1.currentTime, audio_1.duration);
             };
 
             audio_2.ontimeupdate = () => {
+                if (!isValidAudioTime(audio_2, "audio-2")) return;
+
                 dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-2", audio_2.currentTime, audio_2.duration);
             };
+
+            function isValidAudioTime(audioElement, audioId) {
+                if (audioElement.currentTime == null || isNaN(audioElement.currentTime) ||
+                    audioElement.duration == null || isNaN(audioElement.duration)) {
+                    console.warn(`Invalid time values for ${audioId}, skipping update.`);
+                    return false;
+                }
+                return true;
+            }
         },
     };
 
@@ -47,10 +62,10 @@
     private const double _startOverTime = 1;
 
     private int _audioIndex = Random.Shared.Next();
-    private string _audioUrl;
+    private string _audioUrl = string.Empty;
 
-    private TaskCompletionSource _audioCompletion;
-    private DotNetObjectReference<AudioPlayer> _dotNetRef;
+    private TaskCompletionSource _audioCompletion = new();
+    private DotNetObjectReference<AudioPlayer>? _dotNetRef;
 
     public bool IsAudioEven => _audioIndex % 2 == 0;
     public string CurrentSource => IsAudioEven ? "audio-1" : "audio-2";

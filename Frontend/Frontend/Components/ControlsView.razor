@@ -1,8 +1,9 @@
 ﻿@using Audio
 
-<MudItem style="position: fixed; bottom: 10px; right: 40px" xs="12" md="1">
+<MudItem style="position: fixed; bottom: 10px; right: 20px" xs="12" md="1">
     <MudRadioGroup
         Value="@State.Playlist.Value"
+        Class="playlist-selection"
         ValueChanged="@(EventCallback.Factory.Create<PlaylistType>(this, (value) => OnTargetPlaylistChanged(value)))">
         <MudRadio Color="Color.Primary" Value="@(PlaylistType.PostPunk)">P</MudRadio>
         <MudRadio Color="Color.Primary" Value="@(PlaylistType.Gay)">M</MudRadio>
@@ -30,6 +31,10 @@
         bottom: 250px;
         right: -60px;
         width: 200px;
+    }
+
+    .mud-grid-item-md-1 {
+        max-width: 10000px !important;
     }
 </style>
 
