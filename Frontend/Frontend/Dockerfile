@@ -12,7 +12,6 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Frontend/Frontend/Frontend.csproj", "Frontend/Frontend/"]
-COPY ["Frontend/Frontend.Client/Frontend.Client.csproj", "Frontend/Frontend.Client/"]
 RUN dotnet restore "Frontend/Frontend/Frontend.csproj"
 COPY . .
 WORKDIR "/src/Frontend/Frontend"
