@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.1"/>
+        <PackageReference Include="MudBlazor" Version="8.3.0" />
+        <PackageReference Include="Blazor.Bootstrap" Version="3.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="..\..\.dockerignore">
+        <Link>.dockerignore</Link>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Backend\Audio\Audio.csproj" />
+      <ProjectReference Include="..\..\Backend\Extensions\Extensions.csproj" />
+      <ProjectReference Include="..\..\Backend\Images\Images.csproj" />
+      <ProjectReference Include="..\..\Backend\Options\Options.csproj" />
+    </ItemGroup>
+
+</Project>
