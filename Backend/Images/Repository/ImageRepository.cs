@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Extensions;
+using Microsoft.Extensions.Logging;
 using Minio;
 using Minio.DataModel.Args;
 using Options;
@@ -36,6 +37,8 @@ public class ImageRepository : IImageRepository
 
         await foreach (var item in objects)
             _images.Add(item.Key);
+        
+        _images.Shuffle();
 
         _logger.ImageRefreshCompleted(_images.Count);
     }
