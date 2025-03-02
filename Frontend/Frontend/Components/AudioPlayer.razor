@@ -15,7 +15,6 @@
                 if (!isValidAudioTime(audio_1, "audio-1"))
                     return;
 
-
                 dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-1", audio_1.currentTime, audio_1.duration);
             };
 

@@ -95,6 +95,12 @@
     "Name": "Голая",
     "ShortName": "pepsiismywife-lol/gradusy-golaya-speed-up"
   },
+  "https://soundcloud.com/yanixofficial/molodoy-platon-poshlaya-molli-yanix-dont-play-bae-metal-version-by-mirascream-artur-matur-1": {
+    "Url": "https://soundcloud.com/yanixofficial/molodoy-platon-poshlaya-molli-yanix-dont-play-bae-metal-version-by-mirascream-artur-matur-1",
+    "Author": "",
+    "Name": "Молодой Платон & ПОШЛАЯ МОЛЛИ & Yanix — DON’T PLAY BAE [Metal Version by MIRASCREAM & Artur Matur]",
+    "ShortName": "yanixofficial/molodoy-platon-poshlaya-molli-yanix-dont-play-bae-metal-version-by-mirascream-artur-matur-1"
+  },
   "https://soundcloud.com/kar-tonw/liza-evans-revnuyu-speed-up": {
     "Url": "https://soundcloud.com/kar-tonw/liza-evans-revnuyu-speed-up",
     "Author": "Liza Evans",
@@ -591,7 +597,7 @@
     "Url": "https://soundcloud.com/whylovlyy/uliczy-speedup-feat-twoiks",
     "Author": "Whylovlyy, Twoiks",
     "Name": "Улицы",
-    "ShortName": "/uliczy-speedup-feat-twoiks"
+    "ShortName": "whylovlyy/uliczy-speedup-feat-twoiks"
   },
   "https://soundcloud.com/wirazh-151080249/cupsize-ya-sxozhu-s-uma-1": {
     "Url": "https://soundcloud.com/wirazh-151080249/cupsize-ya-sxozhu-s-uma-1",
@@ -1078,5 +1084,65 @@
     "Author": "PHARAOH",
     "Name": "Дико например",
     "ShortName": "doomer-radio/diko-naprimer-no-eto-postpank"
+  },
+  "https://soundcloud.com/doomer-radio/pepel-nahudi-uuu-nightcorebot": {
+    "Url": "https://soundcloud.com/doomer-radio/pepel-nahudi-uuu-nightcorebot",
+    "Author": "Pepel nahudi",
+    "Name": "Ууу",
+    "ShortName": "doomer-radio/pepel-nahudi-uuu-nightcorebot"
+  },
+  "https://soundcloud.com/doomer-radio/anacondaz-dubak-speed-up": {
+    "Url": "https://soundcloud.com/doomer-radio/anacondaz-dubak-speed-up",
+    "Author": "Дубак",
+    "Name": "Anacondaz",
+    "ShortName": "doomer-radio/anacondaz-dubak-speed-up"
+  },
+  "https://soundcloud.com/doomer-radio/sindrom-vosmiklassni-spasibo": {
+    "Url": "https://soundcloud.com/doomer-radio/sindrom-vosmiklassni-spasibo",
+    "Author": "Синдром восьмиклассни",
+    "Name": "Спасибо что живой",
+    "ShortName": "doomer-radio/sindrom-vosmiklassni-spasibo"
+  },
+  "https://soundcloud.com/doomer-radio/cupsize-ya-prostitutka": {
+    "Url": "https://soundcloud.com/doomer-radio/cupsize-ya-prostitutka",
+    "Author": "CUPSIZE",
+    "Name": "Я проститутка",
+    "ShortName": "doomer-radio/cupsize-ya-prostitutka"
+  },
+  "https://soundcloud.com/doomer-radio/yug-404-mama-anarxiya-speed-up": {
+    "Url": "https://soundcloud.com/doomer-radio/yug-404-mama-anarxiya-speed-up",
+    "Author": "Юг 404",
+    "Name": "Мама Анархия",
+    "ShortName": "doomer-radio/yug-404-mama-anarxiya-speed-up"
+  },
+  "https://soundcloud.com/doomer-radio/morphy-tipichnyi-suiczidalnyi": {
+    "Url": "https://soundcloud.com/doomer-radio/morphy-tipichnyi-suiczidalnyi",
+    "Author": "Morphy",
+    "Name": "Типичный суицидальный",
+    "ShortName": "doomer-radio/morphy-tipichnyi-suiczidalnyi"
+  },
+  "https://soundcloud.com/doomer-radio/yug-404-manyaki-nightcorebot": {
+    "Url": "https://soundcloud.com/doomer-radio/yug-404-manyaki-nightcorebot",
+    "Author": "Юг 404",
+    "Name": "Маньяки",
+    "ShortName": "doomer-radio/yug-404-manyaki-nightcorebot"
+  },
+  "https://soundcloud.com/doomer-radio/add-to-head-ebanutaya": {
+    "Url": "https://soundcloud.com/doomer-radio/add-to-head-ebanutaya",
+    "Author": "Add to Head",
+    "Name": "Ебанутая",
+    "ShortName": "doomer-radio/add-to-head-ebanutaya"
+  },
+  "https://soundcloud.com/doomer-radio/deadstarr999-yug-404-shiza": {
+    "Url": "https://soundcloud.com/doomer-radio/deadstarr999-yug-404-shiza",
+    "Author": "Юг 404",
+    "Name": "Шиза",
+    "ShortName": "doomer-radio/deadstarr999-yug-404-shiza"
+  },
+  "https://soundcloud.com/ktoto-chato/voruyu-alkogol-floki-zvse": {
+    "Url": "https://soundcloud.com/ktoto-chato/voruyu-alkogol-floki-zvse",
+    "Author": "Floki, Звсэ",
+    "Name": "Ворую алкоголь",
+    "ShortName": "ktoto-chato/voruyu-alkogol-floki-zvse"
   }
 }

@@ -46,4 +46,9 @@ public class SessionState
     {
         _currentSong.Set(song);
     }
+
+    public void Dispose()
+    {
+        _lifetime.Terminate();
+    }
 }
