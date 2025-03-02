@@ -38,6 +38,17 @@ public class SongsRepository : ISongsRepository
 
     public IReadOnlyDictionary<PlaylistType, IReadOnlyList<SongMetadata>> Playlists => _tracks;
 
+    public async Task Run()
+    {
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+
+            foreach (var (_, tracks) in _tracks)
+                ((List<SongMetadata>)tracks).Shuffle();
+        }
+    }
+
     public async Task Refresh()
     {
         _logger.AudioRefreshStarted();

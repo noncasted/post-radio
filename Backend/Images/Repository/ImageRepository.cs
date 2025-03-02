@@ -24,6 +24,15 @@ public class ImageRepository : IImageRepository
 
     private readonly List<string> _images = new();
 
+    public async Task Run()
+    {
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            _images.Shuffle();
+        }
+    }
+
     public async Task Refresh()
     {
         _logger.ImageRefreshStarted();

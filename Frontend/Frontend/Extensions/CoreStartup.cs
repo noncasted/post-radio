@@ -1,4 +1,5 @@
 ﻿using Audio;
+using Extensions;
 using Images;
 using SoundCloudExplode;
 
@@ -30,6 +31,9 @@ public class CoreStartup : IHostedService
         await _imageRepository.Refresh();
         
         await _audioPreloader.Execute();
+        
+        _songsRepository.Run().NoAwait();
+        _imageRepository.Run().NoAwait();
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
