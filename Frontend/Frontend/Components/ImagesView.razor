@@ -2,8 +2,13 @@
 @using Images
 
 <MudContainer MaxWidth="MaxWidth.False" Class="image-container">
-    <MudImage Src="@_first.Url" Class=@_first.State/>
-    <MudImage Src="@_second.Url" Class=@_second.State/>
+    <MudImage Style="position: fixed; left: 0; z-index: -1" Src="@_first.Url" Class=@($"{_first.State} blurry sub")/>
+    <MudImage Style="position: fixed; left: 50%; z-index: -1" Src="@_first.Url" Class=@($"{_first.State} blurry sub")/>
+    <MudImage Style="z-index: 1" Src="@_first.Url" Class=@($"{_first.State} main")/>
+    <MudImage Style="position: fixed; left: 0; z-index: -1" Src="@_second.Url" Class=@($"{_second.State} blurry sub")/>
+    <MudImage Style="position: fixed; left: 50%; z-index: -1" Src="@_second.Url"
+              Class=@($"{_second.State} blurry sub")/>
+    <MudImage Style="z-index: 1" Src="@_second.Url" Class=@($"{_second.State} main")/>
 </MudContainer>
 
 <style>
@@ -21,10 +26,17 @@
 
     .image {
         position: absolute;
-        width: 100%;
         object-fit: cover;
         object-position: center;
         transition: opacity 3.5s ease-in-out;
+    }
+
+    .sub {
+        height: 100%;
+    }
+
+    .main {
+        height: 110%;
     }
 
     .hidden {
@@ -33,6 +45,10 @@
 
     .visible {
         opacity: 1;
+    }
+
+    .blurry {
+        filter: blur(20px);
     }
 </style>
 
@@ -44,6 +60,8 @@
     private readonly ImageHandle _first = new();
     private readonly ImageHandle _second = new();
 
+    private readonly TimeSpan _switchTime = TimeSpan.FromSeconds(10);
+
     private int _imageIndex = Random.Shared.Next();
 
     protected override Task OnInitializedAsync()
@@ -51,7 +69,7 @@
         CycleImagesAsync().NoAwait();
         return Task.CompletedTask;
     }
-    
+
     private async Task CycleImagesAsync()
     {
         var current = _first;
@@ -66,13 +84,15 @@
 
             current.Hide();
             current = current == _first ? _second : _first;
+
             current.Url = data.Url;
+
             current.Show();
 
             await InvokeAsync(StateHasChanged);
 
             _imageIndex++;
-            await Task.Delay(10000);
+            await Task.Delay(_switchTime);
         }
     }
 
@@ -91,4 +111,5 @@
             State = "image fade-in hidden";
         }
     }
+
 }
