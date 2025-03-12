@@ -42,7 +42,7 @@ public class SongsRepository : ISongsRepository
     {
         while (true)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromHours(5));
 
             foreach (var (_, tracks) in _tracks)
                 ((List<SongMetadata>)tracks).Shuffle();

@@ -28,7 +28,7 @@ public class ImageRepository : IImageRepository
     {
         while (true)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromHours(1));
             _images.Shuffle();
         }
     }

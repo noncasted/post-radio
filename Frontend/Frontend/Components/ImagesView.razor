@@ -75,7 +75,7 @@
     {
         var current = _first;
 
-        while (true)
+        while (State.Lifetime.IsTerminated == false)
         {
             var data = await ImageApi.GetNext(new ImageRequest()
             {
