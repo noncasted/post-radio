@@ -6,7 +6,7 @@ namespace Frontend.Components;
 public class SessionState
 {
     private readonly ViewableProperty<PlaylistType> _playlist = new(PlaylistType.PostPunk);
-    private readonly ViewableProperty<double> _volume = new(75);
+    private readonly ViewableProperty<double> _volume = new(20);
     private readonly ViewableProperty<SongMetadata> _currentSong = new(SongMetadata.Empty);
 
     private readonly ViewableDelegate _started = new();
