@@ -35,6 +35,8 @@
       <_ContentIncludedByDefault Remove="Settings\Playlists\alternative-playlist-metadata.json" />
       <_ContentIncludedByDefault Remove="Settings\Playlists\dirty-molly-playlist-metadata.json" />
       <_ContentIncludedByDefault Remove="Settings\Playlists\original-playlist-metadata.json" />
+      <_ContentIncludedByDefault Remove="Settings\appsettings.minio.json" />
+      <_ContentIncludedByDefault Remove="Settings\appsettings.playlists.json" />
     </ItemGroup>
 
 </Project>
