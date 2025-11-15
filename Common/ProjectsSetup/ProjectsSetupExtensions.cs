@@ -72,6 +72,12 @@ public static class ProjectsSetupExtensions
                 {
                     client.Timeout = TimeSpan.FromMinutes(10); // Увеличиваем таймаут для больших файлов
                 });
+
+                clientBuilder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                });
             });
 
         builder.Services
@@ -79,7 +85,15 @@ public static class ProjectsSetupExtensions
             .AddRazorComponents()
             .AddInteractiveServerComponents();
 
-        builder.Services.AddSingleton<SoundCloudClient>();
+        // Create SoundCloudClient with custom HttpClient that accepts any SSL certificate
+        var soundCloudHttpHandler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        var soundCloudHttpClient = new HttpClient(soundCloudHttpHandler);
+        var soundCloudClient = new SoundCloudClient(soundCloudHttpClient);
+        builder.Services.AddSingleton(soundCloudClient);
 
         return builder;
     }
@@ -97,9 +111,27 @@ public static class ProjectsSetupExtensions
             .AddAudioServices()
             .AddMinIo();
 
-        builder.Services.AddHttpClient();
+        builder.Services.AddHttpClient()
+            .ConfigureHttpClientDefaults(clientBuilder =>
+            {
+                clientBuilder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                });
+            });
+
         builder.Services.AddMudServices();
-        builder.Services.AddSingleton<SoundCloudClient>();
+
+        // Create SoundCloudClient with custom HttpClient that accepts any SSL certificate
+        var soundCloudHttpHandler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        var soundCloudHttpClient = new HttpClient(soundCloudHttpHandler);
+        var soundCloudClient = new SoundCloudClient(soundCloudHttpClient);
+        builder.Services.AddSingleton(soundCloudClient);
         
         return builder;
     }
@@ -136,12 +168,21 @@ public static class ProjectsSetupExtensions
             SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRETKEY")!
         };
 
+        // Create HttpClient that accepts any SSL certificate (for development with self-signed certs)
+        var httpClientHandler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        var httpClient = new HttpClient(httpClientHandler);
+
         var clientBuilder = new MinioClient()
             .WithEndpoint(credentials.Endpoint)
-            .WithCredentials(credentials.AccessKey, credentials.SecretKey);
+            .WithCredentials(credentials.AccessKey, credentials.SecretKey)
+            .WithHttpClient(httpClient);
 
         // Check if we need SSL based on endpoint
-        if (!credentials.Endpoint.Contains(":") || credentials.Endpoint.Contains(":443"))
+        if (credentials.Endpoint.StartsWith("https://"))
         {
             clientBuilder = clientBuilder.WithSSL();
         }
