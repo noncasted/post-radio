@@ -2,9 +2,9 @@
 
 EXPOSE 80
 EXPOSE 22
+
 EXPOSE 7001
-EXPOSE 7002
-EXPOSE 7004
+EXPOSE 7001
 
 # Install SSH server, nginx, Docker, tmux, and essential tools
 RUN apt-get update && \
@@ -28,7 +28,10 @@ RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so
 
 RUN echo "export ASPIRE_TOKEN=\"${ASPIRE_TOKEN}\"" >> /etc/bash.bashrc
 RUN echo "export DB_CONNECTION_STRING=\"${DB_CONNECTION_STRING}\"" >> /etc/bash.bashrc
-RUN echo "export GAME_SERVER_URL=\"${GAME_SERVER_URL}\"" >> /etc/bash.bashrc
+RUN echo "export MINIO_ENDPOINT=\"${MINIO_ENDPOINT}\"" >> /etc/bash.bashrc
+RUN echo "export MINIO_ACCESSKEY=\"${MINIO_ACCESSKEY}\"" >> /etc/bash.bashrc
+RUN echo "export MINIO_SECRETKEY=\"${MINIO_SECRETKEY}\"" >> /etc/bash.bashrc
+RUN echo "export AUTH_TOKEN=\"${AUTH_TOKEN}\"" >> /etc/bash.bashrc
 
 ENV CONTAINER_PASSWORD=${CONTAINER_PASSWORD}
 # Set root password - use double quotes and sh -c to ensure variable expansion
@@ -98,27 +101,7 @@ server {\n\
         proxy_redirect off;\n\
     }\n\
 }\n\
-\n\
-server {\n\
-    listen 7004;\n\
-    listen [::]:7004;\n\
-    server_name _;\n\
-\n\
-    location / {\n\
-        proxy_pass https://localhost:7104;\n\
-        proxy_ssl_verify off;\n\
-        proxy_http_version 1.1;\n\
-        proxy_set_header Upgrade $http_upgrade;\n\
-        proxy_set_header Connection "upgrade";\n\
-        proxy_set_header Host $host;\n\
-        proxy_set_header X-Real-IP $remote_addr;\n\
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
-        proxy_set_header X-Forwarded-Proto https;\n\
-        proxy_set_header X-Forwarded-Host $host;\n\
-        proxy_cache_bypass $http_upgrade;\n\
-        proxy_redirect off;\n\
-    }\n\
-}' > /etc/nginx/sites-available/default && \
+' > /etc/nginx/sites-available/default && \
     ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/ 
     
 # Install .NET SDK using the official installer script
@@ -142,11 +125,11 @@ RUN dotnet dev-certs https --clean && \
     dotnet dev-certs https -ep /https/aspnetapp.pfx -p root
 
 # Clone the project
-RUN mkdir /mslead && \
-    cd /mslead && \
-    git clone https://github.com/noncasted/mines-leader.git
+RUN mkdir /post-radio && \
+    cd /post-radio && \
+    git clone https://github.com/noncasted/post-radio.git
 
-WORKDIR /mslead
+WORKDIR /post-radio
 
 # Create a startup script to run Docker, SSH, nginx, and Aspire
 RUN echo '#!/bin/bash\n\
@@ -171,12 +154,16 @@ for i in {1..30}; do\n\
 done\n\
 \n\
 # Export ASPIRE_TOKEN\n\
-export GAME_SERVER_URL="$GAME_SERVER_URL"\n\
+export MINIO_ENDPOINT="$MINIO_ENDPOINT"\n\
+export MINIO_ACCESSKEY="$MINIO_ACCESSKEY"\n\
+export MINIO_SECRETKEY="$MINIO_SECRETKEY"\n\
+export AUTH_TOKEN="$AUTH_TOKEN"\n\
+export DB_CONNECTION_STRING="DB_CONNECTION_STRING"\n\
 export ASPIRE_TOKEN="$ASPIRE_TOKEN"\n\
 echo "ASPIRE_TOKEN exported"\n\
 \n\
 # Navigate to project directory\n\
-cd /mslead/mines-leader/backend/Aspire/AppHost\n\
+cd /post-radio/post-radio/Aspire/AppHost\n\
 \n\
 # Clean the project\n\
 echo "Cleaning project..."\n\
