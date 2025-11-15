@@ -83,12 +83,12 @@ server {\n\
 }\n\
 \n\
 server {\n\
-    listen 80;\n\
-    listen [::]:80;\n\
+    listen 7002;\n\
+    listen [::]:7002;\n\
     server_name _;\n\
 \n\
     location / {\n\
-        proxy_pass https://localhost:7103;\n\
+        proxy_pass https://localhost:7102;\n\
         proxy_ssl_verify off;\n\
         proxy_http_version 1.1;\n\
         proxy_set_header Upgrade $http_upgrade;\n\
@@ -106,7 +106,6 @@ server {\n\
     ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/ 
     
 # Install .NET SDK using the official installer script
-RUN curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version latest --channel 9.0
 RUN curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version latest --channel 10.0
 
 # Set up .NET environment variables after installation (system-wide)
