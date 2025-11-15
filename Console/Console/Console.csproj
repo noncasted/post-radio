@@ -7,7 +7,6 @@
 
     <ItemGroup>
         <PackageReference Include="MudBlazor"/>
-        <PackageReference Include="Blazor.Bootstrap"/>
     </ItemGroup>
 
     <ItemGroup>

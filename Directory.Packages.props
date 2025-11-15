@@ -4,27 +4,27 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="9.0.6"/>
-        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10"/>
-        <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.10"/>
-        <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.10.0"/>
+        <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.0.1"/>
+        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0"/>
+        <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0"/>
+        <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0"/>
+        <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.0.0"/>
         <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.1"/>
-        <PackageVersion Include="MudBlazor" Version="8.13.0"/>
-        <PackageVersion Include="Blazor.Bootstrap" Version="3.0.0"/>
+        <PackageVersion Include="MudBlazor" Version="8.14.0"/>
+        <PackageVersion Include="Blazor.Bootstrap" Version="3.4.0"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageVersion Include="Npgsql" Version="9.0.4"/>
-        <PackageVersion Include="Aspire.Npgsql" Version="9.5.2"/>
-        <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.5.2"/>
-        <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="9.5.2"/>
-        <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.5.1"/>
+        <PackageVersion Include="Npgsql" Version="10.0.0-rc.1"/>
+        <PackageVersion Include="Aspire.Npgsql" Version="13.0.0"/>
+        <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.0.0"/>
+        <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
         <PackageVersion Include="Newtonsoft.Json" Version="13.0.4"/>
-        <PackageVersion Include="Minio" Version="6.0.3"/>
-        <PackageVersion Include="SoundCloudExplode" Version="1.6.5"/>
+        <PackageVersion Include="Minio" Version="7.0.0"/>
+        <PackageVersion Include="SoundCloudExplode" Version="1.6.7"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -38,10 +38,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.13.1"/>
-        <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.13.1"/>
-        <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.13.0"/>
-        <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.13.0"/>
-        <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.13.0"/>
+        <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.14.0"/>
+        <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0"/>
+        <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0"/>
+        <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.14.0"/>
+        <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0"/>
     </ItemGroup>
 </Project>
