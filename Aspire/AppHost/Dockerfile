@@ -3,8 +3,9 @@
 EXPOSE 80
 EXPOSE 22
 
+EXPOSE 7000
 EXPOSE 7001
-EXPOSE 7001
+EXPOSE 7002
 
 # Install SSH server, nginx, Docker, tmux, and essential tools
 RUN apt-get update && \
@@ -40,8 +41,8 @@ RUN sh -c 'echo "root:${CONTAINER_PASSWORD}" | chpasswd'
 # Configure nginx for HTTP only
 RUN rm /etc/nginx/sites-enabled/default
 RUN echo 'server {\n\
-    listen 80;\n\
-    listen [::]:80;\n\
+    listen 7000;\n\
+    listen [::]:7000;\n\
     server_name _;\n\
 \n\
     location / {\n\
@@ -82,12 +83,12 @@ server {\n\
 }\n\
 \n\
 server {\n\
-    listen 7002;\n\
-    listen [::]:7002;\n\
+    listen 80;\n\
+    listen [::]:80;\n\
     server_name _;\n\
 \n\
     location / {\n\
-        proxy_pass https://localhost:7102;\n\
+        proxy_pass https://localhost:7103;\n\
         proxy_ssl_verify off;\n\
         proxy_http_version 1.1;\n\
         proxy_set_header Upgrade $http_upgrade;\n\
@@ -105,7 +106,7 @@ server {\n\
     ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/ 
     
 # Install .NET SDK using the official installer script
-RUN curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version latest --channel 9.0
+RUN curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version latest --channel 10.0
 
 # Set up .NET environment variables after installation (system-wide)
 ENV PATH="/root/.dotnet:$PATH"
@@ -158,7 +159,7 @@ export MINIO_ENDPOINT="$MINIO_ENDPOINT"\n\
 export MINIO_ACCESSKEY="$MINIO_ACCESSKEY"\n\
 export MINIO_SECRETKEY="$MINIO_SECRETKEY"\n\
 export AUTH_TOKEN="$AUTH_TOKEN"\n\
-export DB_CONNECTION_STRING="DB_CONNECTION_STRING"\n\
+export DB_CONNECTION_STRING="$DB_CONNECTION_STRING"\n\
 export ASPIRE_TOKEN="$ASPIRE_TOKEN"\n\
 echo "ASPIRE_TOKEN exported"\n\
 \n\
