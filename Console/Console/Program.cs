@@ -7,12 +7,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.SetupConsole();
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
-
-builder.Services.AddHttpClient();
-
 // Add authentication service
 builder.Services.AddScoped<IAuthService, AuthService>();
 
@@ -26,9 +20,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
 app.UseAntiforgery();
-app.UseStaticFiles();
 app.MapStaticAssets();
 
 app.MapRazorComponents<App>()

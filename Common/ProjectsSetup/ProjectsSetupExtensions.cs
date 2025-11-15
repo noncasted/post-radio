@@ -64,7 +64,8 @@ public static class ProjectsSetupExtensions
             .AddMinIo()
             .AddCommonConsoleComponents();
 
-        builder.Services.AddHttpClient()
+        builder.Services
+            .AddHttpClient()
             .ConfigureHttpClientDefaults(clientBuilder =>
             {
                 clientBuilder.ConfigureHttpClient(client =>
@@ -73,7 +74,11 @@ public static class ProjectsSetupExtensions
                 });
             });
 
-        builder.Services.AddMudServices();
+        builder.Services
+            .AddMudServices()
+            .AddRazorComponents()
+            .AddInteractiveServerComponents();
+
         builder.Services.AddSingleton<SoundCloudClient>();
 
         return builder;

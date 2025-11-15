@@ -106,17 +106,19 @@ server {\n\
     ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/ 
     
 # Install .NET SDK using the official installer script
+RUN curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version latest --channel 9.0
 RUN curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version latest --channel 10.0
 
 # Set up .NET environment variables after installation (system-wide)
-ENV PATH="/root/.dotnet:$PATH"
+ENV PATH="/root/.dotnet:/root/.aspire:$PATH"
 ENV DOTNET_ROOT="/root/.dotnet"
-RUN echo 'export PATH="/root/.dotnet:$PATH"' >> /etc/bash.bashrc && \
+RUN echo 'export PATH="/root/.dotnet:/root/.aspire:$PATH"' >> /etc/bash.bashrc && \
     echo 'export DOTNET_ROOT="/root/.dotnet"' >> /etc/bash.bashrc
 
 # Install Aspire
-RUN curl -sSL https://aspire.dev/install.sh | bash && \
-    dotnet workload install aspire 
+#RUN curl -sSL https://aspire.dev/install.sh | bash && \
+RUN dotnet workload install aspire 
+RUN curl -sSL https://aspire.dev/install.sh | bash
 
 # Setup .NET dev certificates
 RUN dotnet dev-certs https --clean && \
