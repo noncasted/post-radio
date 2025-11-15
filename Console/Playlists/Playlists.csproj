@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <AssemblyName>Console.Playlists</AssemblyName>
+        <RootNamespace>Console</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.aspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MudBlazor" />
+        <PackageReference Include="Microsoft.Orleans.Client" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Audio\Playlists\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\Audio\Songs\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\Audio\Services\Collections\Collections.csproj" />
+        <ProjectReference Include="..\..\Common\Reactive\Reactive.csproj" />
+        <ProjectReference Include="..\Common\Common.csproj" />
+    </ItemGroup>
+
+
+</Project>

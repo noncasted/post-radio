@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    
+    <PropertyGroup>
+        <AssemblyName>Infrastructure.Orleans.Common</AssemblyName>
+        <RootNamespace>Infrastructure.Orleans</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Sdk" />
+        <PackageReference Include="Microsoft.Orleans.Transactions" />
+        <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" />
+        <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet"/>
+        <PackageReference Include="Microsoft.Orleans.Runtime"/>
+        <PackageReference Include="Microsoft.Orleans.Server"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Storage\GrainStorage\GrainStorage.csproj" />
+      <ProjectReference Include="..\Transactions\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\Transactions\Service\Service.csproj" />
+    </ItemGroup>
+
+</Project>

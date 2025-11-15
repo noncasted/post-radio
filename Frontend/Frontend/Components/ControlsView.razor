@@ -1,12 +1,13 @@
 ﻿@using Audio
-
 <MudItem style="position: fixed; bottom: 10px; right: 20px" xs="12" md="1">
-    <MudRadioGroup
-        Value="@State.Playlist.Value"
+    <MudRadioGroup T="Guid"
+        Value="@SelectedPlaylistId"
         Class="playlist-selection"
-        ValueChanged="@(EventCallback.Factory.Create<PlaylistType>(this, (value) => OnTargetPlaylistChanged(value)))">
-        <MudRadio Color="Color.Primary" Value="@(PlaylistType.PostPunk)">P</MudRadio>
-        <MudRadio Color="Color.Primary" Value="@(PlaylistType.Gay)">M</MudRadio>
+        ValueChanged="@(EventCallback.Factory.Create<Guid>(this, value => OnTargetPlaylistChanged(value)))">
+        @foreach (var playlist in Playlists.Values)
+        {
+            <MudRadio T="Guid" Color="Color.Primary" Value="@playlist.Id">@playlist.Name</MudRadio>
+        }
     </MudRadioGroup>
 </MudItem>
 
@@ -40,14 +41,32 @@
 
 @code {
     [Parameter] public SessionState State { get; set; }
+    [Inject] public IPlaylistsCollection Playlists { get; set; }
+
+    private Guid SelectedPlaylistId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        var firstPlaylist = Playlists.Values.FirstOrDefault()!;
+
+        SelectedPlaylistId = firstPlaylist.Id;
+        State.SetPlaylist(firstPlaylist);
+    }
 
     private void OnVolumeSlider(double value)
     {
         State.SetVolume(value);
     }
 
-    private async Task OnTargetPlaylistChanged(PlaylistType value)
+    private void OnTargetPlaylistChanged(Guid? playlistId)
     {
-        State.SetPlaylist(value);
+        if (Playlists.TryGetValue(playlistId!.Value, out var playlist))
+        {
+            SelectedPlaylistId = playlistId.Value;
+            State.SetPlaylist(playlist);
+        }
     }
+
 }

@@ -1,0 +1,17 @@
+<MudPaper Class="pa-1 mb-4 d-flex align-center justify-center" Style="max-width: 600px; margin: 0 auto;">
+    <MudIconButton
+        Icon="@Icons.Material.Filled.ArrowBack"
+        Color="Color.Inherit"
+        Edge="Edge.Start"
+        Class="px-6"
+        OnClick="@(() => @Navigation.NavigateTo("/"))"/>
+    <MudText Typo="Typo.h5" Class="px-6">@Title</MudText>
+</MudPaper>
+
+<HorizontalSeparator/>
+
+@code {
+    [Parameter] public string Title { get; set; }
+    
+    [Inject] private IConsoleNavigation Navigation { get; set; }
+}

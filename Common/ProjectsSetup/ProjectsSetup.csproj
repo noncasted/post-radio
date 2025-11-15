@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Common.ProjectsSetup</AssemblyName>
+        <RootNamespace>Common</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Npgsql"/>
+        <PackageReference Include="MudBlazor" />
+        <PackageReference Include="Npgsql"/>
+        <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet"/>
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
+        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI"/>
+        <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet"/>
+        <PackageReference Include="Microsoft.Orleans.Runtime"/>
+        <PackageReference Include="Microsoft.Orleans.Server"/>
+        <PackageReference Include="Microsoft.Orleans.Transactions"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Aspire\ServiceDefaults\ServiceDefaults.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Audio\Services\Extensions\Extensions.csproj" />
+        <ProjectReference Include="..\..\Console\Common\Common.csproj" />
+        <ProjectReference Include="..\..\Frontend\Extensions\Extensions.csproj" />
+        <ProjectReference Include="..\..\Frontend\Images\Images.csproj" />
+        <ProjectReference Include="..\..\Frontend\Options\Options.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Coordination\Features\Features.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Coordination\Startup\Startup.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Discovery\Environment\Environment.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Discovery\Services\Services.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Service\Service.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Orleans\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Orleans\Storage\GrainStorage\GrainStorage.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\TaskScheduling\Service\Service.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Grains\Grains.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Grains\Grains.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Interfaces\Interfaces.csproj"/>
+    </ItemGroup>
+
+</Project>

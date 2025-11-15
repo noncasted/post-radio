@@ -1,17 +1,30 @@
 ﻿@page "/"
+@using Audio
 
 <PageTitle>Post radio</PageTitle>
 
-<ImagesView State="@_state"></ImagesView>
-<AudioPlayer State="@_state"></AudioPlayer>
-<SongDataView State="@_state"></SongDataView>
-<ControlsView State="@_state"></ControlsView>
-<StartWait State="@_state"></StartWait>
+<ImagesView State="@State"></ImagesView>
+<AudioPlayer State="@State"></AudioPlayer>
+<SongDataView State="@State"></SongDataView>
+<ControlsView State="@State"></ControlsView>
+<StartWait State="@State"></StartWait>
 
 @code {
-    private readonly SessionState _state = new();
+    [Inject] private ISongsCollection SongsCollection { get; set; }
+
+    private SessionState _state;
+    
+    public SessionState State {
+        get
+        {
+            if (_state == null)
+                _state = new SessionState(SongsCollection);
+            
+            return _state;
+        }   
+    }
     
     public void Dispose() {
-        _state.Dispose();
+        State.Dispose();
     }
 }

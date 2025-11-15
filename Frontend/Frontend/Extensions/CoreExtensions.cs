@@ -1,44 +1,30 @@
-﻿using Extensions;
-using Minio;
-using Options;
+﻿using Minio;
 using SoundCloudExplode;
 
-namespace Core;
+namespace Frontend.Extensions;
 
 public static class EnvironmentExtensions
 {
     public static void AddCredentials(this IHostApplicationBuilder builder)
     {
-        if (builder.Environment.IsDevelopment() == true)
-            AddDev();
-        else
-            AddProd();
-
-        return;
-
-        void AddDev()
+        var minioCredentials = new MinioCredentials()
         {
-            builder.Configuration.AddJsonFile("Settings/secrets.json");
-            var options = builder.Configuration.GetSection("MinioCredentials").Get<MinioCredentials>()!;
-            builder.Services.AddSingleton(options);
-        }
+            Endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT")!,
+            AccessKey = Environment.GetEnvironmentVariable("MINIO_ACCESSKEY")!,
+            SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRETKEY")!
+        };
 
-        void AddProd()
-        {
-            var minioCredentials = new MinioCredentials()
-            {
-                Endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT")!,
-                AccessKey = Environment.GetEnvironmentVariable("MINIO_ACCESSKEY")!,
-                SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRETKEY")!
-            };
-
-            builder.Services.AddSingleton(minioCredentials);
-        }
+        builder.Services.AddSingleton(minioCredentials);
     }
 
     public static IHostApplicationBuilder AddDefaultServices(this IHostApplicationBuilder builder)
     {
-        var credentials = builder.GetMinioCredentials();
+        var credentials = new MinioCredentials()
+        {
+            Endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT")!,
+            AccessKey = Environment.GetEnvironmentVariable("MINIO_ACCESSKEY")!,
+            SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRETKEY")!
+        };
 
         var minioClient = new MinioClient()
             .WithEndpoint(credentials.Endpoint)
@@ -50,26 +36,7 @@ public static class EnvironmentExtensions
         var soundCloud = new SoundCloudClient();
         builder.Services.AddSingleton(soundCloud);
 
-        builder.AddOptionsFile("Settings/appsettings.minio.json");
-        builder.AddOptions<MinioOptions>("MinioOptions");
-
         return builder;
-    }
-
-    private static MinioCredentials GetMinioCredentials(this IHostApplicationBuilder builder)
-    {
-        if (builder.Environment.IsDevelopment() == true)
-        {
-            builder.Configuration.AddJsonFile("Settings/secrets.json");
-            return builder.Configuration.GetSection("MinioCredentials").Get<MinioCredentials>()!;
-        }
-
-        return new MinioCredentials()
-        {
-            Endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT")!,
-            AccessKey = Environment.GetEnvironmentVariable("MINIO_ACCESSKEY")!,
-            SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRETKEY")!
-        };
     }
 
     public static void ConfigureCors(this IHostApplicationBuilder builder)

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Infrastructure.StorableActions.Batchers.Grains</AssemblyName>
+        <RootNamespace>Infrastructure.StorableActions</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj" />
+      <ProjectReference Include="..\..\..\Orleans\Transactions\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\..\TaskScheduling\Service\Service.csproj" />
+      <ProjectReference Include="..\Interfaces\Interfaces.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Sdk Name="Aspire.AppHost.Sdk" Version="9.2.1"/>
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsAspireHost>true</IsAspireHost>
+        <UserSecretsId>2acdf813-97a1-4c19-92fd-618b39668cb5</UserSecretsId>
+
+        <AssemblyName>Aspire.AppHost</AssemblyName>
+        <RootNamespace>Aspire</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.AppHost"/>
+        <PackageReference Include="Aspire.Hosting.PostgreSQL"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Console\Console\Console.csproj" />
+        <ProjectReference Include="..\..\Frontend\Frontend\Frontend.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Coordination\Coordinator\Coordinator.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Orleans\Silo\Silo.csproj"/>
+        <ProjectReference Include="..\Startup\Startup.csproj"/>
+    </ItemGroup>
+    
+</Project>

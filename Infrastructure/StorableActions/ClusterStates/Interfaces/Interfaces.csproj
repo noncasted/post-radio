@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Infrastructure.StorableActions.ClusterStates.Interfaces</AssemblyName>
+        <RootNamespace>Infrastructure.StorableActions</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Messaging\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj" />
+    </ItemGroup>
+
+</Project>

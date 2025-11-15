@@ -1,5 +1,4 @@
 ﻿@using Audio
-@using Extensions
 @inject IJSRuntime _jsRuntime;
 
 <audio id="audio-1" src="@_audioUrl"></audio>
@@ -19,7 +18,7 @@
             };
 
             audio_2.ontimeupdate = () => {
-                if (!isValidAudioTime(audio_2, "audio-2")) 
+                if (!isValidAudioTime(audio_2, "audio-2"))
                     return;
 
                 dotnetHelper.invokeMethodAsync("OnAudioProgress", "audio-2", audio_2.currentTime, audio_2.duration);
@@ -57,7 +56,7 @@
 @code {
     [Parameter] public SessionState State { get; set; }
 
-    [Inject] private IAudioAPI AudioApi { get; set; }
+    [Inject] private ISongProvider SongProvider { get; set; }
 
     private const double _startOverTime = 1;
 
@@ -89,22 +88,30 @@
 
         while (State.Lifetime.IsTerminated == false)
         {
-            var audioData = await AudioApi.GetNext(new GetNextTrackRequest
+            try
             {
-                Index = _audioIndex,
-                TargetPlaylist = State.Playlist.Value
-            });
+                _audioCompletion = new TaskCompletionSource();
+                var songData = State.IncSongIndex();
 
-            State.SetCurrentSong(audioData.Metadata);
+                State.SetCurrentSong(songData);
 
-            _audioUrl = audioData.DownloadUrl;
-            _audioCompletion = new TaskCompletionSource();
+                _audioUrl = await SongProvider.GetUrl(songData);
 
-            _audioIndex++;
+                _audioIndex++;
 
-            await InvokeAsync(StateHasChanged);
-            await _jsRuntime.InvokeAsync<string>("play", CurrentSource);
-            await _audioCompletion.Task;
+                await InvokeAsync(StateHasChanged);
+                await _jsRuntime.InvokeAsync<string>("play", CurrentSource);
+
+
+                if (_audioCompletion.Task.IsCompleted == true)
+                    continue;
+
+                await _audioCompletion.Task;
+            }
+            catch
+            {
+                // Ignore
+            }
         }
     }
 

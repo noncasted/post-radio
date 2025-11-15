@@ -1,0 +1,17 @@
+﻿<MudItem xs="12" sm="3">
+    <MudButton
+        Variant="Variant.Filled"
+        Class="d-flex align-center justify-center mud-width-full py-8"
+        Style="height: 140px"
+        OnClick="@(() => Navigation.NavigateTo(Target))">
+        <MudText Typo="Typo.h3">@Name</MudText>
+    </MudButton>
+</MudItem>
+
+@code
+{
+    [Parameter] public required string Name { get; init; }
+    [Parameter] public required string Target { get; init; }
+
+    [Inject] public required IConsoleNavigation Navigation { get; init; }
+}

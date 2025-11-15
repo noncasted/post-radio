@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Infrastructure.Coordination.Common</AssemblyName>
+        <RootNamespace>Infrastructure.Coordination</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,7 +1,4 @@
-﻿@using Extensions
-@using Images
-
-<MudContainer MaxWidth="MaxWidth.False" Class="image-container">
+﻿<MudContainer MaxWidth="MaxWidth.False" Class="image-container">
     <MudImage Style="position: fixed; left: 0; z-index: -1" Src="@_first.Url" Class=@($"{_first.State} blurry sub")/>
     <MudImage Style="position: fixed; left: 50%; z-index: -1" Src="@_first.Url" Class=@($"{_first.State} blurry sub")/>
     <MudImage Style="z-index: 1" Src="@_first.Url" Class=@($"{_first.State} main")/>
@@ -80,7 +77,6 @@
             var data = await ImageApi.GetNext(new ImageRequest()
             {
                 Index = _imageIndex,
-                TargetPlaylist = State.Playlist.Value
             });
 
             current.Hide();

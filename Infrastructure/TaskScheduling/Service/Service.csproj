@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Infrastructure.TaskScheduling.Service</AssemblyName>
+        <RootNamespace>Infrastructure.TaskScheduling</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
+    </ItemGroup>
+
+
+</Project>

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Infrastructure.StorableActions.ClusterStates.Service</AssemblyName>
+        <RootNamespace>Infrastructure.StorableActions</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
+      <ProjectReference Include="..\..\..\Messaging\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj" />
+      <ProjectReference Include="..\Interfaces\Interfaces.csproj" />
+    </ItemGroup>
+
+</Project>

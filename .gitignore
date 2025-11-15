@@ -9,4 +9,4 @@
 **/obj/
 **/bin/
 
-sectrets.json
+**/appsettings.secrets.json

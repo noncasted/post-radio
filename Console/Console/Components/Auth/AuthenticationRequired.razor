@@ -1,0 +1,71 @@
+@using Console.Services
+@implements IDisposable
+
+@if (_isAuthenticated)
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Inject] private IAuthService AuthService { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    private bool _isAuthenticated = false;
+    private bool _isChecking = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckAuthentication();
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        _isChecking = true;
+        _isAuthenticated = await AuthService.IsAuthenticated();
+
+        if (!_isAuthenticated)
+        {
+            await ShowLoginDialog();
+        }
+
+        _isChecking = false;
+        StateHasChanged();
+    }
+
+    private IDialogReference? _dialogReference;
+
+    private async Task ShowLoginDialog()
+    {
+        var parameters = new DialogParameters<LoginDialog>
+        {
+            { x => x.OnLoginSuccess, EventCallback.Factory.Create<bool>(this, OnLoginSuccess) }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = false,
+            BackdropClick = false,
+            NoHeader = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        _dialogReference = await DialogService.ShowAsync<LoginDialog>("Login", parameters, options);
+    }
+
+    private void OnLoginSuccess(bool success)
+    {
+        _isAuthenticated = true;
+        _dialogReference?.Close();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        // Cleanup if needed
+    }
+}

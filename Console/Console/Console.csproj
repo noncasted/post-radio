@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <AssemblyName>Console</AssemblyName>
+        <RootNamespace>Console</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MudBlazor"/>
+        <PackageReference Include="Blazor.Bootstrap"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Audio\Playlists\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\Audio\Playlists\Services\Services.csproj" />
+      <ProjectReference Include="..\..\Audio\Services\Collections\Collections.csproj" />
+      <ProjectReference Include="..\..\Audio\Services\Extensions\Extensions.csproj" />
+      <ProjectReference Include="..\..\Audio\Songs\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\Audio\Songs\Services\Services.csproj" />
+      <ProjectReference Include="..\..\Common\ProjectsSetup\ProjectsSetup.csproj" />
+      <ProjectReference Include="..\..\Frontend\Extensions\Extensions.csproj" />
+      <ProjectReference Include="..\..\Frontend\Images\Images.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Grains\Grains.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Service\Service.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Grains\Grains.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Interfaces\Interfaces.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Service\Service.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Service\Service.csproj" />
+      <ProjectReference Include="..\Main\Main.csproj" />
+      <ProjectReference Include="..\Migrations\Migrations.csproj" />
+      <ProjectReference Include="..\Playlists\Playlists.csproj" />
+      <ProjectReference Include="..\Songs\Songs.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,8 @@
+docker run -d \
+     --name ml-pg \
+     -e POSTGRES_PASSWORD=postgres \
+     -e POSTGRES_USER=postgres \
+     -e POSTGRES_DB=minesdb \
+     -p 9432:5432 \
+     -v ml-pg-data:/var/lib/postgresql/data \
+     postgres:17

@@ -1,0 +1,212 @@
+@page "/songs"
+@using Audio
+@using Common
+@implements IDisposable
+
+<PageTitle>Songs</PageTitle>
+
+<PageHeader Title="Songs"/>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="px-4">
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Spacing="3">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">All Songs (@_songs.Count)</MudText>
+                <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                    <MudButton
+                        Color="@(_sortBy == SortBy.Name ? Color.Primary : Color.Default)"
+                        OnClick="@(() => SetSort(SortBy.Name))">
+                        Name
+                    </MudButton>
+                    <MudButton
+                        Color="@(_sortBy == SortBy.AddDate ? Color.Primary : Color.Default)"
+                        OnClick="@(() => SetSort(SortBy.AddDate))">
+                        Date Added
+                    </MudButton>
+                    <MudButton
+                        Color="@(_sortBy == SortBy.Invalid ? Color.Primary : Color.Default)"
+                        OnClick="@(() => SetSort(SortBy.Invalid))">
+                        Invalid
+                    </MudButton>
+                </MudButtonGroup>
+            </MudStack>
+
+            <HorizontalSeparator/>
+
+            @if (_songs.Count == 0)
+            {
+                <MudText Typo="Typo.body1" Align="Align.Center" Class="py-4">No songs yet</MudText>
+            }
+            else
+            {
+                @foreach (var (song, index) in _sortedSongs.Select((s, i) => (s, i + 1)))
+                {
+                    <MudPaper Class="pa-3 mb-2" Elevation="1">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2"
+                                          Class="cursor-pointer flex-grow-1"
+                                          @onclick="@(() => ToggleSongExpand(song.Id))">
+                                    <MudText Typo="Typo.body1">
+                                        <strong>@index.</strong> @song.Author - @song.Name
+                                    </MudText>
+                                </MudStack>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @GetAddDate(song)
+                                    </MudText>
+                                    <MudIconButton
+                                        Icon="@Icons.Material.Filled.OpenInNew"
+                                        Size="Size.Small"
+                                        Href="@song.Url"
+                                        Target="_blank"
+                                        Color="Color.Default"/>
+                                </MudStack>
+                            </MudStack>
+
+                            @if (_expandedSongId == song.Id)
+                            {
+                                <HorizontalSeparator/>
+                                <MudStack Spacing="2">
+                                    <MudTextField
+                                        @bind-Value="_editAuthor"
+                                        Label="Author"
+                                        Variant="Variant.Outlined"
+                                        Margin="Margin.Dense"/>
+                                    <MudTextField
+                                        @bind-Value="_editTitle"
+                                        Label="Title"
+                                        Variant="Variant.Outlined"
+                                        Margin="Margin.Dense"/>
+                                    <MudStack Row="true" Justify="Justify.FlexEnd">
+                                        <MudButton
+                                            Variant="Variant.Filled"
+                                            Color="Color.Primary"
+                                            Size="Size.Small"
+                                            OnClick="@(() => SaveSongData(song.Id))">
+                                            Submit
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+            }
+        </MudStack>
+    </MudPaper>
+
+</MudContainer>
+
+@code {
+    [Inject] private ISongsCollection SongsCollection { get; set; }
+    [Inject] private IClusterClient ClusterClient { get; set; }
+
+    private IReadOnlyList<SongData> _songs = new List<SongData>();
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    private enum SortBy
+    {
+        Name,
+        AddDate,
+        Invalid
+    }
+
+    private SortBy _sortBy = SortBy.AddDate;
+
+    private long? _expandedSongId;
+    private string _editAuthor = string.Empty;
+    private string _editTitle = string.Empty;
+
+    private IEnumerable<SongData> _sortedSongs => _sortBy switch
+    {
+        SortBy.Name => _songs.OrderBy(s => s.Name),
+        SortBy.AddDate => _songs.OrderByDescending(s => s.AddDate),
+        SortBy.Invalid => _songs.Where(s => string.IsNullOrWhiteSpace(s.Author)).OrderByDescending(s => s.AddDate),
+        _ => _songs
+    };
+
+    protected override void OnInitialized()
+    {
+        LoadSongs();
+
+        SongsCollection.Advise(_lifetime, () =>
+            {
+                InvokeAsync(() =>
+                    {
+                        LoadSongs();
+                        StateHasChanged();
+                    }
+                );
+            }
+        );
+    }
+
+    private void LoadSongs()
+    {
+        _songs = SongsCollection.Values.ToList();
+        StateHasChanged();
+    }
+
+    private void SetSort(SortBy sortBy)
+    {
+        _sortBy = sortBy;
+    }
+
+    private void ToggleSongExpand(long songId)
+    {
+        if (_expandedSongId == songId)
+        {
+            _expandedSongId = null;
+        }
+        else
+        {
+            _expandedSongId = songId;
+            var song = _songs.FirstOrDefault(s => s.Id == songId);
+            if (song != null)
+            {
+                _editAuthor = song.Author;
+                _editTitle = song.Name;
+            }
+        }
+    }
+
+    private async Task SaveSongData(long songId)
+    {
+        var song = _songs.FirstOrDefault(s => s.Id == songId);
+        if (song == null)
+            return;
+
+        var songGrain = ClusterClient.GetGrain<ISong>(songId);
+
+        var updatedData = new SongData
+        {
+            Id = song.Id,
+            Author = _editAuthor,
+            Name = _editTitle,
+            Url = song.Url,
+            Playlists = song.Playlists,
+            AddDate = song.AddDate,
+        };
+
+        await songGrain.UpdateData(updatedData);
+        await SongsCollection.Refresh();
+        _expandedSongId = null;
+    }
+
+    private string GetAddDate(SongData song)
+    {
+        if (song.AddDate == default)
+            return "Unknown";
+
+        return song.AddDate.ToString("dd.MM.yyyy HH:mm");
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Terminate();
+    }
+
+}

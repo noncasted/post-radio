@@ -1,0 +1,23 @@
+<Project>
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Remove="**\*.csproj.DotSettings" />
+    </ItemGroup>
+
+    <ItemGroup Condition="
+    !('$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Common\Extensions\Extensions.csproj')
+    and
+    !('$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Common\Reactive\Reactive.csproj')
+    and
+    !('$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Aspire\AppHost\AppHost.csproj')
+  ">
+        <ProjectReference Include="$(MSBuildThisFileDirectory)Common\Extensions\Extensions.csproj" />
+        <ProjectReference Include="$(MSBuildThisFileDirectory)Common\Reactive\Reactive.csproj" />
+    </ItemGroup>
+</Project>

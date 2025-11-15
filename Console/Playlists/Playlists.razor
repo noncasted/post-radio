@@ -1,0 +1,96 @@
+@page "/playlists"
+@using Audio
+
+<PageTitle>Playlists</PageTitle>
+
+<PageHeader Title="Playlists"/>
+
+<MudGrid Justify="Justify.Center" Class="align-items-stretch">
+    @foreach (var playlist in Collection.Values)
+    {
+        <MudItem xs="12" sm="3">
+            <MudButton
+                Variant="Variant.Filled"
+                Class="d-flex align-center justify-center mud-width-full py-8"
+                Style="height: 140px"
+                OnClick="@(() => NavigateToPlaylist(playlist.Id))">
+                <MudText Typo="Typo.h3">@playlist.Name</MudText>
+            </MudButton>
+        </MudItem>
+    }
+
+    <MudItem xs="12" sm="3">
+        <MudButton
+            Variant="Variant.Filled"
+            Color="Color.Primary"
+            Class="d-flex align-center justify-center mud-width-full py-8"
+            Style="height: 140px"
+            OnClick="OpenCreateDialog">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Large"/>
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudDialog @bind-Visible="_isDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Create New Playlist</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newUrl" Label="Playlist URL" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Class="mb-3"/>
+        <MudTextField @bind-Value="_newName" Label="Playlist Name" Variant="Variant.Outlined"
+                      Margin="Margin.Dense"/>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="CreatePlaylist" Disabled="@(!IsFormValid)">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private IPlaylistsCollection Collection { get; set; }
+    [Inject] private IPlaylistFactory Factory { get; set; }
+    [Inject] private IConsoleNavigation Navigation { get; set; }
+
+    private bool _isDialogOpen = false;
+    private string _newUrl = string.Empty;
+    private string _newName = string.Empty;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true
+    };
+
+    private bool IsFormValid => !string.IsNullOrWhiteSpace(_newUrl) && !string.IsNullOrWhiteSpace(_newName);
+
+    private void OpenCreateDialog()
+    {
+        _newUrl = string.Empty;
+        _newName = string.Empty;
+        _isDialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _isDialogOpen = false;
+    }
+
+    private async Task CreatePlaylist()
+    {
+        if (IsFormValid == false)
+            return;
+
+        await Factory.Create(_newUrl, _newName);
+        await Collection.Refresh();
+        CloseDialog();
+    }
+
+    private void NavigateToPlaylist(Guid playlistId)
+    {
+        Navigation.NavigateTo(string.Format(ConsoleConstants.Pages.PlaylistDetail, playlistId));
+    }
+
+}

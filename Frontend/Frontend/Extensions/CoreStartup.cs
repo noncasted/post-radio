@@ -1,38 +1,23 @@
-﻿using Audio;
-using Extensions;
-using Images;
-using SoundCloudExplode;
+﻿using SoundCloudExplode;
 
-namespace Core;
+namespace Frontend.Extensions;
 
 public class CoreStartup : IHostedService
 {
     public CoreStartup(
         SoundCloudClient soundCloud,
-        ISongsRepository songsRepository,
-        IImageRepository imageRepository,
-        IAudioPreloader audioPreloader)
+        IImageRepository imageRepository)
     {
         _soundCloud = soundCloud;
-        _songsRepository = songsRepository;
         _imageRepository = imageRepository;
-        _audioPreloader = audioPreloader;
     }
 
     private readonly SoundCloudClient _soundCloud;
-    private readonly ISongsRepository _songsRepository;
     private readonly IImageRepository _imageRepository;
-    private readonly IAudioPreloader _audioPreloader;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await _soundCloud.InitializeAsync(cancellationToken);
-        await _songsRepository.Refresh();
         await _imageRepository.Refresh();
-        
-        await _audioPreloader.Execute();
-        
-        _songsRepository.Run().NoAwait();
         _imageRepository.Run().NoAwait();
     }
 

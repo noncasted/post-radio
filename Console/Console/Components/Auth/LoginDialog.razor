@@ -1,0 +1,88 @@
+@using Console.Services
+
+<MudStack Spacing="3" Class="pa-4">
+    <MudText Typo="Typo.h6">Authentication Required</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary">
+        Please enter your access token to continue
+    </MudText>
+    <MudTextField
+        @bind-Value="_token"
+        Label="Access Token"
+        Variant="Variant.Outlined"
+        InputType="@_inputType"
+        Adornment="Adornment.End"
+        AdornmentIcon="@_passwordIcon"
+        OnAdornmentClick="TogglePasswordVisibility"
+        OnKeyDown="HandleKeyDown"
+        Immediate="true"
+        AutoFocus="true"/>
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    <MudButton
+        Variant="Variant.Filled"
+        Color="Color.Primary"
+        OnClick="Login"
+        Disabled="@(string.IsNullOrWhiteSpace(_token) || _isLoading)"
+        FullWidth="true">
+        @if (_isLoading)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+        }
+        else
+        {
+            <span>Login</span>
+        }
+    </MudButton>
+</MudStack>
+
+@code {
+    [Parameter] public EventCallback<bool> OnLoginSuccess { get; set; }
+    [Inject] private IAuthService AuthService { get; set; } = null!;
+
+    private string _token = string.Empty;
+    private string _errorMessage = string.Empty;
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+
+    private InputType _inputType => _showPassword ? InputType.Text : InputType.Password;
+    private string _passwordIcon => _showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_token))
+        {
+            await Login();
+        }
+    }
+
+    private async Task Login()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        StateHasChanged();
+
+        await Task.Delay(300); // Small delay for better UX
+
+        var isValid = await AuthService.ValidateToken(_token);
+
+        if (isValid)
+        {
+            await OnLoginSuccess.InvokeAsync(true);
+        }
+        else
+        {
+            _errorMessage = "Invalid access token. Please try again.";
+            _token = string.Empty;
+        }
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+}

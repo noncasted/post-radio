@@ -1,0 +1,140 @@
+@using Common
+@implements IDisposable
+
+<MudPaper Class="@($"pa-3 {Class}")" Elevation="2">
+    <MudStack Spacing="2">
+        <div class="d-flex align-center gap-3" Style="width: 100%;">
+            @if (_operation.Status.Value == OperationStatus.NotStarted)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           OnClick="@(() => Start())"
+                           Style="min-width: 70px;">
+                    Start
+                </MudButton>
+            }
+
+            @* Статус индикатор *@
+            <div Style="min-width: 32px; display: flex; justify-content: center;">
+                @switch (_operation.Status.Value)
+                {
+                    case OperationStatus.NotStarted:
+                        <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Default" Size="Size.Small"/>
+                        break;
+
+                    case OperationStatus.Preparing:
+                        <MudProgressCircular Color="Color.Warning" Size="Size.Small" Indeterminate="true"/>
+                        break;
+
+                    case OperationStatus.InProgress:
+                        <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true"/>
+                        break;
+
+                    case OperationStatus.Success:
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small"/>
+                        break;
+
+                    case OperationStatus.Failed:
+                        <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small"/>
+                        break;
+                }
+            </div>
+
+            @* Имя операции *@
+            <MudText Typo="Typo.subtitle1" Style="min-width: 150px; flex-shrink: 0;">
+                @Name
+            </MudText>
+
+            @* Progress bar *@
+            <MudProgressLinear
+                Class="flex-grow-1"
+                Value="@((double)(_operation.Progress.Value * 100))"
+                Color="@GetProgressColor()"
+                Size="Size.Large"
+                Rounded="true"/>
+
+            @* Процент и время *@
+            <div Style="min-width: 100px; text-align: right;">
+                <MudText Typo="Typo.body2">
+                    @($"{_operation.Progress.Value * 100:F0}%")
+                </MudText>
+                @if (_operation.StartTime != DateTime.MinValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @FormatDuration()
+                    </MudText>
+                }
+            </div>
+        </div>
+
+        @* Лог *@
+        @if (!string.IsNullOrEmpty(_operation.Message.Value))
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="pa-2">
+                <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-word;">
+                    @_operation.Message.Value
+                </MudText>
+            </MudAlert>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public Func<IOperationProgress, Task> StartCallback { get; set; } = null!;
+    [Parameter] public string? Class { get; set; }
+
+    private IOperationProgress _operation = new OperationProgress();
+    private Timer? _timer;
+    
+    private readonly ILifetime _lifetime = new Lifetime();
+    
+    protected override void OnInitialized() {
+        _timer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private Color GetProgressColor()
+    {
+        return _operation.Status.Value switch
+        {
+            OperationStatus.InProgress => Color.Primary,
+            OperationStatus.Success => Color.Success,
+            OperationStatus.Failed => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string FormatDuration()
+    {
+        if (_operation.StartTime == DateTime.MinValue)
+            return "00:00";
+
+        var duration = _operation.EndTime != DateTime.MinValue
+            ? _operation.EndTime - _operation.StartTime
+            : DateTime.UtcNow - _operation.StartTime;
+
+        return duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}"
+            : $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+    }
+
+    private void Start()
+    {
+        _operation = new OperationProgress();
+        _operation.SetStatus(OperationStatus.Preparing);
+
+        _operation.Progress.View(_lifetime, () => InvokeAsync(StateHasChanged));
+        _operation.Status.View(_lifetime, () => InvokeAsync(StateHasChanged));
+        _operation.Message.View(_lifetime, () => InvokeAsync(StateHasChanged));
+
+        StartCallback(_operation);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        _lifetime.Terminate();
+    }
+
+}

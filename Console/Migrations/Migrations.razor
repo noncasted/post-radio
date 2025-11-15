@@ -1,0 +1,39 @@
+@page "/migrations"
+@using Audio
+@using Common
+
+<PageTitle>Migrations</PageTitle>
+
+<PageHeader Title="Migrations"/>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="px-4">
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6">Available Migrations</MudText>
+
+            <HorizontalSeparator/>
+
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.subtitle1">Metadata Migration</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Updates song metadata (author and name) from JSON files in the Playlists folder
+                </MudText>
+                <OperationView Name="Run Metadata Migration" StartCallback="RunMetadataMigration"/>
+            </MudStack>
+
+        </MudStack>
+    </MudPaper>
+
+</MudContainer>
+
+@code {
+    [Inject] private ISongsCollection SongsCollection { get; set; }
+    [Inject] private IClusterClient ClusterClient { get; set; }
+
+    private async Task RunMetadataMigration(IOperationProgress progress)
+    {
+        var migration = new MetaDataMigration(SongsCollection, ClusterClient);
+        await migration.Execute(progress);
+    }
+}

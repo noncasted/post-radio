@@ -1,37 +1,29 @@
-using Audio;
-using Core;
+using Common;
+using Frontend;
 using Frontend.Components;
-using Images;
+using Frontend.Extensions;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.SetupFrontend();
+
 var services = builder.Services;
 
 services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddInteractiveWebAssemblyComponents();
+//    .AddInteractiveWebAssemblyComponents()
+    .AddInteractiveServerComponents();
 
-services
-    .AddMudServices();
+CorsExtensions.ConfigureCors(builder);
 
-services.AddEndpointsApiExplorer();
-services.AddHttpClient();
-
-builder.AddCredentials();
-builder.ConfigureCors();
-
-builder
-    .AddDefaultServices()
-    .AddAudioServices()
-    .AddImageServices();
-
+builder.AddImageServices();
 services.AddHostedService<CoreStartup>();
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseWebAssemblyDebugging();
+  //  app.UseWebAssemblyDebugging();
 }
 else
 {
@@ -46,7 +38,6 @@ app.MapStaticAssets();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
-    .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies();
 
 app.Run();
