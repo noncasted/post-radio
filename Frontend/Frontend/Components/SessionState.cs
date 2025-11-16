@@ -12,16 +12,16 @@ public class SessionState
         _imagesCollection = imagesCollection;
         _indexOffset = Random.Shared.Next(0, 200);
     }
-    
+
     private readonly ViewableProperty<PlaylistData> _playlist = new(null);
     private readonly ViewableProperty<double> _volume = new(20);
     private readonly ViewableProperty<SongData> _currentSong = new(null);
 
     private readonly ViewableDelegate _started = new();
     private readonly ViewableDelegate _skipRequested = new();
-    
+
     private readonly ILifetime _lifetime = new Lifetime();
-    
+
     private readonly ISongsCollection _songsCollection;
     private readonly IImagesCollection _imagesCollection;
 
@@ -30,15 +30,15 @@ public class SessionState
     private int _songIndex;
     private int _imageIndex;
     private bool _hasStarted;
-    
+
     public IViewableProperty<PlaylistData> Playlist => _playlist;
     public IViewableProperty<double> Volume => _volume;
     public IViewableProperty<SongData> CurrentSong => _currentSong;
     public IViewableDelegate SkipRequested => _skipRequested;
-    
+
     public IViewableDelegate Started => _started;
-    public ILifetime Lifetime => _lifetime; 
-    
+    public ILifetime Lifetime => _lifetime;
+
     public void SetPlaylist(PlaylistData playlist)
     {
         _playlist.Set(playlist);
@@ -52,7 +52,7 @@ public class SessionState
         _hasStarted = true;
         _started.Invoke();
     }
-    
+
     public void SetVolume(double volume)
     {
         _volume.Set(volume);
@@ -62,7 +62,7 @@ public class SessionState
     {
         _skipRequested.Invoke();
     }
-    
+
     public void SetCurrentSong(SongData song)
     {
         _currentSong.Set(song);
@@ -76,9 +76,12 @@ public class SessionState
     public SongData IncSongIndex()
     {
         _songIndex += _indexOffset;
-        return _songsCollection.ByPlaylist[_playlist.Value.Id][_songIndex % _songsCollection.Count];
+        var playlist = _songsCollection.ByPlaylist[_playlist.Value.Id];
+        var index = _songIndex % playlist.Count;
+        var data = playlist[index];
+        return data;
     }
-    
+
     public int IncImageIndex()
     {
         _imageIndex += _indexOffset;

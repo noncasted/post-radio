@@ -97,8 +97,6 @@ public class TaskBalancer : ITaskBalancer
                 continue;
             }
 
-            await executionLock.WaitAsync(lifetime.Token);
-
             await _entriesLock.WaitAsync();
 
             var entry = _entries[0];
@@ -115,6 +113,7 @@ public class TaskBalancer : ITaskBalancer
         {
             try
             {
+                await executionLock.WaitAsync(lifetime.Token);
                 await entry.Task.Execute();
 
                 await _entriesLock.WaitAsync();
@@ -125,7 +124,7 @@ public class TaskBalancer : ITaskBalancer
             {
                 await _entriesLock.WaitAsync();
 
-                entry.Score -= _exceptionPenalty;
+                entry.Score += _exceptionPenalty;
                 _entries.Add(entry);
 
                 _entriesLock.Release();
