@@ -38,7 +38,7 @@
         } catch (error) {
             if (error.name !== 'AbortError') {
                 console.error("Error playing audio:", error);
-                throw error;
+                dotnetHelper.invokeMethodAsync("OnSkipRequested");
             }
             // AbortError can be safely ignored when switching tracks
         }
@@ -67,8 +67,6 @@
 
     private string _audioUrl = string.Empty;
 
-    private TaskCompletionSource _audioCompletion = new();
-    private CancellationTokenSource _trackCancellation = new();
     private DotNetObjectReference<AudioPlayer>? _dotNetRef;
 
     protected override void OnInitialized()
@@ -90,31 +88,16 @@
 
         while (State.Lifetime.IsTerminated == false)
         {
-            _trackCancellation.Cancel();
-            _trackCancellation.Dispose();
-            _trackCancellation = new CancellationTokenSource();
-            _audioCompletion = new TaskCompletionSource();
-
             try
             {
-                var songData = State.IncSongIndex();
-
-                State.SetCurrentSong(songData);
-
                 await _jsRuntime.InvokeVoidAsync("stop");
-
-                _trackCancellation.Token.ThrowIfCancellationRequested();
-
-                _audioUrl = await SongsCollection.GetUrl(songData);
-
-                _trackCancellation.Token.ThrowIfCancellationRequested();
-
+                var url = _audioUrl;
                 await InvokeAsync(StateHasChanged);
-
-                await Task.Delay(100, _trackCancellation.Token);
+                await Task.Delay(100, State.Lifetime.Token);
                 await _jsRuntime.InvokeVoidAsync("play");
 
-                await _audioCompletion.Task;
+                while (_audioUrl == url)
+                    await Task.Delay(500, State.Lifetime.Token);
             }
             catch (OperationCanceledException)
             {
@@ -124,10 +107,10 @@
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                
+
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(5), _trackCancellation.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(5), State.Lifetime.Token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -139,14 +122,12 @@
 
     private void OnSkipRequested()
     {
-        _trackCancellation.Cancel();
-        _audioCompletion.TrySetCanceled();
+        SetNext().NoAwait();
     }
 
     private void OnPlaylistChanged()
     {
-        _trackCancellation.Cancel();
-        _audioCompletion.TrySetCanceled();
+        SetNext().NoAwait();
     }
 
     private async Task OnVolumeChanged(double value)
@@ -155,23 +136,26 @@
     }
 
     [JSInvokable]
-    public Task OnAudioProgress(double currentTime, double duration)
+    public void OnAudioProgress(double currentTime, double duration)
     {
         var difference = duration - currentTime;
 
         if (difference >= _startOverTime)
-            return Task.CompletedTask;
+            return;
 
-        _audioCompletion.TrySetCanceled();
-
-        return Task.CompletedTask;
+        SetNext().NoAwait();
     }
 
     public void Dispose()
     {
-        _trackCancellation?.Cancel();
-        _trackCancellation?.Dispose();
         _dotNetRef?.Dispose();
+    }
+
+    private async Task SetNext()
+    {
+        var songData = State.IncSongIndex();
+        State.SetCurrentSong(songData);
+        _audioUrl = await SongsCollection.GetUrl(songData);
     }
 
 }
