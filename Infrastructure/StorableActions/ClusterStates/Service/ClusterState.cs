@@ -1,11 +1,10 @@
 ﻿using Common;
+using Infrastructure.Loop;
 using Infrastructure.Messaging;
 using Infrastructure.Orleans;
-using Interfaces;
 using Microsoft.Extensions.Hosting;
-using ServiceLoop;
 
-namespace Service;
+namespace Infrastructure.StorableActions;
 
 public interface IClusterState<T> : IViewableProperty<T> where T : class, new()
 {

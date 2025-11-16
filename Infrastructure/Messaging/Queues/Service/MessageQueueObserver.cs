@@ -1,6 +1,4 @@
-﻿using Infrastructure.Messaging;
-
-namespace Service;
+﻿namespace Infrastructure.Messaging;
 
 public class MessageQueueObserver : IMessageQueueObserver
 {

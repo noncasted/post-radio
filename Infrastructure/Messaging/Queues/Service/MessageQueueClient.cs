@@ -1,9 +1,8 @@
 ﻿using Common;
-using Infrastructure.Messaging;
 using Infrastructure.Orleans;
 using Microsoft.Extensions.Logging;
 
-namespace Service;
+namespace Infrastructure.Messaging;
 
 public class MessageQueueClient : IMessageQueueClient
 {
@@ -15,7 +14,7 @@ public class MessageQueueClient : IMessageQueueClient
 
     private readonly IOrleans _orleans;
     private readonly ILogger<MessageQueueClient> _logger;
-    private readonly Dictionary<Type, object> _delegates = new();
+    private readonly Dictionary<string, object> _delegates = new();
     private readonly List<Func<Task>> _resubscribeActions = new();
     
     private readonly Dictionary<IMessageQueueId, MessageQueueObserver> _observers = new();
@@ -28,9 +27,9 @@ public class MessageQueueClient : IMessageQueueClient
 
     public IViewableDelegate<T> GetOrCreateConsumer<T>(IMessageQueueId id)
     {
-        var type = typeof(T);
-
-        if (_delegates.ContainsKey(type) == false)
+        var rawId = id.ToRaw();
+        
+        if (_delegates.ContainsKey(rawId) == false)
         {
             var source = new ViewableDelegate<T>();
 
@@ -53,7 +52,7 @@ public class MessageQueueClient : IMessageQueueClient
             Subscribe().NoAwait();
             _resubscribeActions.Add(Subscribe);
 
-            _delegates[type] = source;
+            _delegates[rawId] = source;
 
             Task Subscribe()
             {
@@ -64,14 +63,14 @@ public class MessageQueueClient : IMessageQueueClient
                 catch (Exception e)
                 {
                     _logger.LogError(e, "[Messaging] [Queue] Failed to rebind observer to queue {QueueId}",
-                        id.ToRaw()
+                        rawId
                     );
                     return Task.CompletedTask;
                 }
             }
         }
 
-        return (ViewableDelegate<T>)_delegates[type];
+        return (ViewableDelegate<T>)_delegates[rawId];
     }
 
     public Task PushTransactional(IMessageQueueId id, object message)

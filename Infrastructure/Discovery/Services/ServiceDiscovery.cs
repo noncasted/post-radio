@@ -1,10 +1,9 @@
 ﻿using Common;
-using Infrastructure.Discovery;
 using Infrastructure.Messaging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Services;
+namespace Infrastructure.Discovery;
 
 public interface IServiceDiscovery
 {
@@ -95,16 +94,6 @@ public class ServiceDiscovery : IServiceDiscovery
             },
             _ => throw new ArgumentOutOfRangeException()
         };
-        
-        string GetGameServerUrl()
-        {
-            var url = Environment.GetEnvironmentVariable("GAME_SERVER_URL");
-         
-            if (string.IsNullOrWhiteSpace(url))
-                return "http://localhost:5268";
-            
-            return url;
-        }
     }
 }
 

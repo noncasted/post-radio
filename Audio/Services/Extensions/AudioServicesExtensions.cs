@@ -1,6 +1,6 @@
 using Common;
+using Infrastructure.Loop;
 using Microsoft.Extensions.Hosting;
-using ServiceLoop;
 
 namespace Audio;
 
@@ -23,9 +23,6 @@ public static class AudioServicesExtensions
         services.Add<SongsCollection>()
             .As<ISongsCollection>()
             .As<ICoordinatorSetupCompleted>();
-
-        services.Add<SongProvider>()
-            .As<ISongProvider>();
 
         services.Add<AudioServicesStartup>()
             .As<ICoordinatorSetupCompleted>();

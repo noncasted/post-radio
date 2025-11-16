@@ -18,9 +18,6 @@
     <ItemGroup>
       <ProjectReference Include="..\..\..\Aspire\ServiceDefaults\ServiceDefaults.csproj" />
       <ProjectReference Include="..\..\..\Common\ProjectsSetup\ProjectsSetup.csproj" />
-      <ProjectReference Include="..\..\..\Frontend\Extensions\Extensions.csproj" />
-      <ProjectReference Include="..\..\..\Frontend\Images\Images.csproj" />
-      <ProjectReference Include="..\..\..\Frontend\Options\Options.csproj" />
       <ProjectReference Include="..\..\Discovery\Environment\Environment.csproj" />
       <ProjectReference Include="..\..\Discovery\Services\Services.csproj" />
       <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj" />

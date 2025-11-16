@@ -1,5 +1,4 @@
 ﻿using Common;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
@@ -17,6 +16,14 @@ public static class OrleansClientExtensions
                     clientBuilder.Configuration.GetConnectionString(ConnectionNames.Postgres)!;
 
                 clientBuilder.UseTransactions();
+                
+                clientBuilder.Configure<MessagingOptions>(options =>
+                    {
+                        options.ResponseTimeout = TimeSpan.FromSeconds(5);
+                        options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(5);
+                    }
+                );
+
 
                 if (builder.Environment.IsDevelopment() == true)
                 {
@@ -50,6 +57,12 @@ public static class OrleansClientExtensions
                 var npgsqlConnectionString = configuration.GetConnectionString(ConnectionNames.Postgres)!;
 
                 siloBuilder.UseTransactions();
+                siloBuilder.Configure<MessagingOptions>(options =>
+                    {
+                        options.ResponseTimeout = TimeSpan.FromSeconds(5);
+                        options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(5);
+                    }
+                );
 
                 if (builder.Environment.IsDevelopment() == true)
                 {

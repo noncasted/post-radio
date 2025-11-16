@@ -1,11 +1,10 @@
 ﻿using Common;
 using Infrastructure.Discovery;
+using Infrastructure.Loop;
 using Infrastructure.Messaging;
 using Infrastructure.TaskScheduling;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ServiceLoop;
-using Services;
 
 namespace Infrastructure.Coordination;
 

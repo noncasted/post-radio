@@ -1,0 +1,48 @@
+@page "/images"
+@using global::Images
+
+<PageTitle>Images</PageTitle>
+
+<PageHeader Title="Images"/>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="px-4">
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Spacing="3">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">All Images (@ImagesCollection.Count)</MudText>
+                <MudButton
+                    Variant="Variant.Filled"
+                    Color="Color.Primary"
+                    OnClick="RefreshImages"
+                    StartIcon="@Icons.Material.Filled.Refresh">
+                    Refresh
+                </MudButton>
+            </MudStack>
+
+            <HorizontalSeparator/>
+
+            @if (ImagesCollection.Count == 0)
+            {
+                <MudText Typo="Typo.body1" Align="Align.Center" Class="py-4">No images yet</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Total: @ImagesCollection.Count images
+                </MudText>
+            }
+        </MudStack>
+    </MudPaper>
+
+</MudContainer>
+
+@code {
+    [Inject] public required IImagesCollection ImagesCollection { get; set; }
+
+    private async Task RefreshImages()
+    {
+        await ImagesCollection.Refresh();
+        StateHasChanged();
+    }
+}

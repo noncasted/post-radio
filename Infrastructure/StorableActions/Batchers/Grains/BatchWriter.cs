@@ -11,6 +11,7 @@ public class BatchWriterTask<T> : IPriorityTask
 {
     public required string Id { get; init; }
     public required TaskPriority Priority { get; init; }
+    public TimeSpan Delay => TimeSpan.FromSeconds(1f);
     public required IBatchWriter<T> Batcher { get; init; }
 
     public Task Execute()
@@ -75,6 +76,7 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
         }
 
         list.Add(value);
+        _taskScheduler.Schedule(_task);
         return Task.CompletedTask;
     }
     

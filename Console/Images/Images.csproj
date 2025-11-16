@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
-        <AssemblyName>Console.Main</AssemblyName>
+        <AssemblyName>Console.Images</AssemblyName>
         <RootNamespace>Console</RootNamespace>
     </PropertyGroup>
 
@@ -14,8 +14,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Frontend\Services\Services.csproj" />
-      <ProjectReference Include="..\Common\Common.csproj" />
+        <ProjectReference Include="..\..\Images\Services\Services.csproj" />
+        <ProjectReference Include="..\Common\Common.csproj" />
     </ItemGroup>
 
 </Project>

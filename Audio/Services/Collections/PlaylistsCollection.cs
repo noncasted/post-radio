@@ -1,7 +1,8 @@
 using Common;
+using Infrastructure.Loop;
+using Infrastructure.Messaging;
 using Infrastructure.Orleans;
 using Microsoft.Extensions.Logging;
-using ServiceLoop;
 
 namespace Audio;
 
@@ -15,21 +16,30 @@ public class PlaylistsCollection :
     IPlaylistsCollection,
     ICoordinatorSetupCompleted
 {
-    private readonly IOrleans _orleans;
-    private readonly ILogger<PlaylistsCollection> _logger;
-
-    public PlaylistsCollection(IOrleans orleans, ILogger<PlaylistsCollection> logger)
+    public PlaylistsCollection(IOrleans orleans, IMessaging messaging, ILogger<PlaylistsCollection> logger)
     {
         _orleans = orleans;
+        _messaging = messaging;
         _logger = logger;
     }
 
+    private readonly IOrleans _orleans;
+    private readonly IMessaging _messaging;
+    private readonly ILogger<PlaylistsCollection> _logger;
+    private readonly MessageQueueId _refreshQueue = new("audio-playlists-refresh");
+
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
-        return Refresh();
+        _messaging.ListenQueue<RefreshPlaylistsPayload>(lifetime, _refreshQueue, _ => OnRefreshRequested().NoAwait());
+        return OnRefreshRequested( );
     }
 
-    public async Task Refresh()
+    public Task Refresh()
+    {
+        return _messaging.PushDirectQueue(_refreshQueue, new RefreshPlaylistsPayload());
+    }
+
+    private async Task OnRefreshRequested()
     {
         _logger.LogInformation("[Audio] [Collection] [Playlists] Refresh started");
 
@@ -37,7 +47,7 @@ public class PlaylistsCollection :
             .SelectID()
             .SelectPayload()
             .WhereType(States.Playlist);
-        
+
         var query = reader.Read();
 
         await foreach (var entry in query)
@@ -55,4 +65,10 @@ public class PlaylistsCollection :
 
         _logger.LogInformation("[Audio] [Collection] [Playlists] Refresh completed with {Count} playlists", Count);
     }
+}
+
+
+[GenerateSerializer]
+public class RefreshPlaylistsPayload
+{
 }

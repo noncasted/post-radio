@@ -1,6 +1,4 @@
-﻿using System.Collections.Concurrent;
-
-namespace Infrastructure.TaskScheduling;
+﻿namespace Infrastructure.TaskScheduling;
 
 public interface ITaskQueue
 {
@@ -10,20 +8,47 @@ public interface ITaskQueue
 
 public class TaskQueue : ITaskQueue
 {
-    private readonly ConcurrentBag<IPriorityTask> _queue = new();
-    
+    private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly Dictionary<string, Entry> _queue = new();
+
     public void Enqueue(IPriorityTask task)
     {
-        _queue.Add(task);
+        _lock.Wait();
+
+        _queue[task.Id] = new Entry()
+        {
+            Task = task,
+            ScheduleDate = DateTime.UtcNow + task.Delay,
+        };
+
+        _lock.Release();
     }
 
     public IReadOnlyList<IPriorityTask> Collect()
     {
         var tasks = new List<IPriorityTask>(_queue.Count);
 
-        while (_queue.TryTake(out var task))
-            tasks.Add(task);
-        
+        _lock.Wait();
+
+        foreach (var (_, entry) in _queue)
+        {
+            if (DateTime.UtcNow < entry.ScheduleDate)
+                continue;
+
+            tasks.Add(entry.Task);
+        }
+
+        foreach (var task in tasks)
+            _queue.Remove(task.Id);
+
+        _lock.Release();
+
         return tasks;
+    }
+
+    public class Entry
+    {
+        public required IPriorityTask Task { get; init; }
+        public required DateTime ScheduleDate { get; init; }
     }
 }

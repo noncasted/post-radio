@@ -1,31 +1,13 @@
 using Common;
-using Frontend;
 using Frontend.Components;
-using Frontend.Extensions;
-using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.SetupFrontend();
 
-var services = builder.Services;
-
-services.AddRazorComponents()
-//    .AddInteractiveWebAssemblyComponents()
-    .AddInteractiveServerComponents();
-
-CorsExtensions.ConfigureCors(builder);
-
-builder.AddImageServices();
-services.AddHostedService<CoreStartup>();
-
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-  //  app.UseWebAssemblyDebugging();
-}
-else
+if (app.Environment.IsDevelopment() == false)
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();

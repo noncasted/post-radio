@@ -1,0 +1,30 @@
+@using Frontend
+@using Common
+@implements IDisposable
+
+<MudItem xs="12" sm="3">
+    <MudPaper
+        Elevation="2"
+        Class="d-flex flex-column align-center justify-center mud-width-full py-8"
+        Style="height: 140px">
+        <MudText Typo="Typo.h3" Class="mb-4">@OnlineListener.Value</MudText>
+        <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Online</MudText>
+    </MudPaper>
+</MudItem>
+
+@code
+{
+    [Inject] public required IOnlineListener OnlineListener { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    protected override void OnInitialized()
+    {
+        OnlineListener.Advise(_lifetime, () => InvokeAsync(StateHasChanged));
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Terminate();
+    }
+}

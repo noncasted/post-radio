@@ -26,9 +26,8 @@
     <ItemGroup>
         <ProjectReference Include="..\..\Audio\Services\Extensions\Extensions.csproj" />
         <ProjectReference Include="..\..\Console\Common\Common.csproj" />
-        <ProjectReference Include="..\..\Frontend\Extensions\Extensions.csproj" />
-        <ProjectReference Include="..\..\Frontend\Images\Images.csproj" />
-        <ProjectReference Include="..\..\Frontend\Options\Options.csproj" />
+        <ProjectReference Include="..\..\Frontend\Services\Services.csproj" />
+        <ProjectReference Include="..\..\Images\Services\Services.csproj" />
         <ProjectReference Include="..\..\Infrastructure\Coordination\Features\Features.csproj"/>
         <ProjectReference Include="..\..\Infrastructure\Coordination\Startup\Startup.csproj"/>
         <ProjectReference Include="..\..\Infrastructure\Discovery\Environment\Environment.csproj"/>

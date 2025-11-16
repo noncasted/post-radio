@@ -131,6 +131,10 @@ RUN mkdir /post-radio && \
     cd /post-radio && \
     git clone https://github.com/noncasted/post-radio.git
 
+# Create directory for Data Protection keys
+RUN mkdir -p /var/data-protection-keys && \
+    chmod 755 /var/data-protection-keys
+
 WORKDIR /post-radio
 
 # Create a startup script to run Docker, SSH, nginx, and Aspire

@@ -1,6 +1,6 @@
 ﻿using Infrastructure.Orleans;
 
-namespace Interfaces;
+namespace Infrastructure.StorableActions;
 
 public interface IClusterStateStorage<T> : IGrainWithStringKey
 {

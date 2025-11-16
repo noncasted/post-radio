@@ -1,8 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Minio;
-using Minio.ApiEndpoints;
 using Minio.DataModel.Args;
-using Minio.Exceptions;
 
 namespace Common;
 
@@ -12,6 +10,7 @@ public interface IObjectStorage
     Task<HashSet<string>> ContainsMany(string bucket, IEnumerable<string> keys);
     Task Put(string bucket, string key, MemoryStream stream, string type);
     Task<string> GetUrl(string bucket, string key);
+    Task<IReadOnlyList<string>> GetAllKeys(string bucket);
 }
 
 public class ObjectStorage : IObjectStorage
@@ -117,6 +116,21 @@ public class ObjectStorage : IObjectStorage
         signedUrl = signedUrl.Replace("http://", "https://");
 
         return signedUrl;
+    }
+
+    public async Task<IReadOnlyList<string>> GetAllKeys(string bucket)
+    {
+        var listArgs = new ListObjectsArgs()
+            .WithBucket("images");
+        
+        var objects = _client.ListObjectsEnumAsync(listArgs);
+
+        var keys = new List<string>();
+
+        await foreach (var item in objects)
+            keys.Add(item.Key);
+
+        return keys;
     }
 }
 

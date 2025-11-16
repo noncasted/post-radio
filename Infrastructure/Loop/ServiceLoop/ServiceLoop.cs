@@ -1,6 +1,6 @@
 ﻿using Common;
 
-namespace ServiceLoop;
+namespace Infrastructure.Loop;
 
 public interface IServiceLoop
 {

@@ -1,5 +1,8 @@
 ﻿@page "/"
+@using System.Diagnostics.CodeAnalysis
 @using Audio
+@using Images
+@implements IDisposable
 
 <PageTitle>Post radio</PageTitle>
 
@@ -11,20 +14,27 @@
 
 @code {
     [Inject] private ISongsCollection SongsCollection { get; set; }
+    [Inject] private IImagesCollection ImagesCollection { get; set; }
+    [Inject] private IOnlineTracker Tracker { get; set; }
 
-    private SessionState _state;
-    
-    public SessionState State {
+    [field: AllowNull, MaybeNull]
+    private SessionState State
+    {
         get
         {
-            if (_state == null)
-                _state = new SessionState(SongsCollection);
-            
-            return _state;
-        }   
+            if (field == null)
+            {
+                field = new SessionState(SongsCollection, ImagesCollection);
+                Tracker.Track(field.Lifetime);
+            }
+
+            return field;
+        }
     }
-    
-    public void Dispose() {
+
+    public void Dispose()
+    {
         State.Dispose();
     }
+
 }

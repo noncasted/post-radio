@@ -1,6 +1,6 @@
 ﻿using Infrastructure.Messaging;
 
-namespace Interfaces;
+namespace Infrastructure.StorableActions;
 
 public class ClusterStateMessageQueueId<T> : IMessageQueueId
 {

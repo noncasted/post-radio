@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Frontend.Services</AssemblyName>
+        <RootNamespace>Frontend</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Sdk" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Infrastructure\Loop\ServiceLoop\ServiceLoop.csproj" />
+      <ProjectReference Include="..\..\Infrastructure\Messaging\Interfaces\Interfaces.csproj" />
+    </ItemGroup>
+    
+</Project>

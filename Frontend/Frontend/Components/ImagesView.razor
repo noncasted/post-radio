@@ -1,4 +1,6 @@
-﻿<MudContainer MaxWidth="MaxWidth.False" Class="image-container">
+﻿@using Common
+@using Images
+<MudContainer MaxWidth="MaxWidth.False" Class="image-container">
     <MudImage Style="position: fixed; left: 0; z-index: -1" Src="@_first.Url" Class=@($"{_first.State} blurry sub")/>
     <MudImage Style="position: fixed; left: 50%; z-index: -1" Src="@_first.Url" Class=@($"{_first.State} blurry sub")/>
     <MudImage Style="z-index: 1" Src="@_first.Url" Class=@($"{_first.State} main")/>
@@ -51,7 +53,7 @@
 </style>
 
 @code {
-    [Inject] private IImageAPI ImageApi { get; set; }
+    [Inject] private IImagesCollection Images { get; set; }
 
     [Parameter] public SessionState State { get; set; }
 
@@ -74,22 +76,25 @@
 
         while (State.Lifetime.IsTerminated == false)
         {
-            var data = await ImageApi.GetNext(new ImageRequest()
+            try
             {
-                Index = _imageIndex,
-            });
+                current.Hide();
+                current = current == _first ? _second : _first;
 
-            current.Hide();
-            current = current == _first ? _second : _first;
+                var index = State.IncImageIndex();
+                current.Url = await Images.GetUrl(index);
 
-            current.Url = data.Url;
+                current.Show();
 
-            current.Show();
+                await InvokeAsync(StateHasChanged);
 
-            await InvokeAsync(StateHasChanged);
-
-            _imageIndex++;
-            await Task.Delay(_switchTime);
+                _imageIndex++;
+                await Task.Delay(_switchTime);
+            }
+            catch (Exception e)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
         }
     }
 

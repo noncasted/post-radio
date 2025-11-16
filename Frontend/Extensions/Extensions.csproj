@@ -1,8 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <AssemblyName>Frontend1.Extensions</AssemblyName>
-        <RootNamespace>Frontend</RootNamespace>
-    </PropertyGroup>
-
-</Project>

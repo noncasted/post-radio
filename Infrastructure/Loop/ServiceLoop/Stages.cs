@@ -1,8 +1,7 @@
 ﻿using Common;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace ServiceLoop;
+namespace Infrastructure.Loop;
 
 public interface ILocalSetupCompleted
 {

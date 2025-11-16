@@ -15,10 +15,7 @@
       <ProjectReference Include="..\..\Audio\Services\Collections\Collections.csproj" />
       <ProjectReference Include="..\..\Audio\Services\Extensions\Extensions.csproj" />
       <ProjectReference Include="..\..\Audio\Songs\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\..\Audio\Songs\Services\Services.csproj" />
       <ProjectReference Include="..\..\Common\ProjectsSetup\ProjectsSetup.csproj" />
-      <ProjectReference Include="..\..\Frontend\Extensions\Extensions.csproj" />
-      <ProjectReference Include="..\..\Frontend\Images\Images.csproj" />
       <ProjectReference Include="..\..\Infrastructure\Messaging\Interfaces\Interfaces.csproj" />
       <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Grains\Grains.csproj" />
       <ProjectReference Include="..\..\Infrastructure\Messaging\Pipes\Interfaces\Interfaces.csproj" />
@@ -27,6 +24,7 @@
       <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Interfaces\Interfaces.csproj" />
       <ProjectReference Include="..\..\Infrastructure\Messaging\Queues\Service\Service.csproj" />
       <ProjectReference Include="..\..\Infrastructure\Messaging\Service\Service.csproj" />
+      <ProjectReference Include="..\Images\Images.csproj" />
       <ProjectReference Include="..\Main\Main.csproj" />
       <ProjectReference Include="..\Migrations\Migrations.csproj" />
       <ProjectReference Include="..\Playlists\Playlists.csproj" />

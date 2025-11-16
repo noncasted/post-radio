@@ -1,8 +1,7 @@
 ﻿using Common;
 using Infrastructure.Messaging;
-using Interfaces;
 
-namespace Grains;
+namespace Infrastructure.StorableActions;
 
 public class ClusterStateStorage<T> : Grain, IClusterStateStorage<T>
 {

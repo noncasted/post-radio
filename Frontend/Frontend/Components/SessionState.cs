@@ -1,18 +1,21 @@
 ﻿using Audio;
+using Common;
+using Images;
 
 namespace Frontend.Components;
 
 public class SessionState
 {
-    public SessionState(ISongsCollection songsCollection)
+    public SessionState(ISongsCollection songsCollection, IImagesCollection imagesCollection)
     {
         _songsCollection = songsCollection;
+        _imagesCollection = imagesCollection;
         _indexOffset = Random.Shared.Next(0, 200);
     }
     
-    private readonly ViewableProperty<PlaylistData> _playlist = new();
+    private readonly ViewableProperty<PlaylistData> _playlist = new(null);
     private readonly ViewableProperty<double> _volume = new(20);
-    private readonly ViewableProperty<SongData> _currentSong = new();
+    private readonly ViewableProperty<SongData> _currentSong = new(null);
 
     private readonly ViewableDelegate _started = new();
     private readonly ViewableDelegate _skipRequested = new();
@@ -20,11 +23,13 @@ public class SessionState
     private readonly ILifetime _lifetime = new Lifetime();
     
     private readonly ISongsCollection _songsCollection;
+    private readonly IImagesCollection _imagesCollection;
 
     private readonly int _indexOffset;
 
     private int _songIndex;
     private int _imageIndex;
+    private bool _hasStarted;
     
     public IViewableProperty<PlaylistData> Playlist => _playlist;
     public IViewableProperty<double> Volume => _volume;
@@ -41,6 +46,10 @@ public class SessionState
 
     public void InvokeStart()
     {
+        if (_hasStarted == true)
+            return;
+
+        _hasStarted = true;
         _started.Invoke();
     }
     
@@ -73,6 +82,6 @@ public class SessionState
     public int IncImageIndex()
     {
         _imageIndex += _indexOffset;
-        return _imageIndex % _songsCollection.Count;
+        return _imageIndex % _imagesCollection.Count;
     }
 }

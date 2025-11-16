@@ -1,5 +1,5 @@
 using Common;
-using ServiceLoop;
+using Infrastructure.Loop;
 using SoundCloudExplode;
 
 namespace Audio;

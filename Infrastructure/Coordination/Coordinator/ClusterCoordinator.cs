@@ -1,6 +1,6 @@
 ﻿using Common;
+using Infrastructure.Loop;
 using Infrastructure.Messaging;
-using ServiceLoop;
 
 namespace Infrastructure.Coordination;
 

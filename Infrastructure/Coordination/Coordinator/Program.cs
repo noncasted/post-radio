@@ -1,6 +1,6 @@
 using Common;
 using Infrastructure.Coordination;
-using ServiceLoop;
+using Infrastructure.Loop;
 
 var builder = WebApplication.CreateBuilder(args);
 
