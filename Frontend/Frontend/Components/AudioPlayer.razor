@@ -67,6 +67,8 @@
 
     private string _audioUrl = string.Empty;
 
+    private DateTime _lastTimeUpdate;
+
     private DotNetObjectReference<AudioPlayer>? _dotNetRef;
 
     protected override void OnInitialized()
@@ -82,6 +84,7 @@
     private async Task Loop()
     {
         _dotNetRef = DotNetObjectReference.Create(this);
+        var updateTimeSpan = TimeSpan.FromSeconds(5);
 
         await _jsRuntime.InvokeVoidAsync("audioHelper.setAudioElement", _dotNetRef);
         await OnVolumeChanged(State.Volume.Value);
@@ -96,13 +99,15 @@
                 await Task.Delay(100, State.Lifetime.Token);
                 await _jsRuntime.InvokeVoidAsync("play");
 
-                while (_audioUrl == url)
+                while (_audioUrl == url &&
+                       DateTime.UtcNow - _lastTimeUpdate < updateTimeSpan &&
+                       State.Lifetime.IsTerminated == false)
+                {
                     await Task.Delay(500, State.Lifetime.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                Console.WriteLine("Track playback cancelled");
-                // Continue to next track
+                }
+
+                if (_audioUrl == url)
+                    await SetNext();
             }
             catch (Exception e)
             {
@@ -111,10 +116,11 @@
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), State.Lifetime.Token);
+                    SetNext().NoAwait();
                 }
                 catch (OperationCanceledException)
                 {
-                    // Skip delay if cancelled
+                    // Ignored
                 }
             }
         }
@@ -139,6 +145,7 @@
     public void OnAudioProgress(double currentTime, double duration)
     {
         var difference = duration - currentTime;
+        _lastTimeUpdate = DateTime.UtcNow;
 
         if (difference >= _startOverTime)
             return;
