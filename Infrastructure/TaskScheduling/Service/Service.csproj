@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
+        <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj"/>
     </ItemGroup>
 
 

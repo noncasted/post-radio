@@ -6,14 +6,14 @@ namespace Console;
 
 public class MetaDataMigration
 {
-    private readonly ISongsCollection _songsCollection;
-    private readonly IClusterClient _clusterClient;
-
     public MetaDataMigration(ISongsCollection songsCollection, IClusterClient clusterClient)
     {
         _songsCollection = songsCollection;
         _clusterClient = clusterClient;
     }
+
+    private readonly IClusterClient _clusterClient;
+    private readonly ISongsCollection _songsCollection;
 
     public async Task Execute(IOperationProgress progress)
     {
@@ -23,7 +23,7 @@ public class MetaDataMigration
         // Получаем путь к папке с JSON файлами
         var playlistsFolder = Path.Combine(AppContext.BaseDirectory, "Playlists");
 
-        if (!Directory.Exists(playlistsFolder))
+        if (Directory.Exists(playlistsFolder) == false)
         {
             progress.Log($"Playlists folder not found: {playlistsFolder}");
             return;
@@ -73,7 +73,7 @@ public class MetaDataMigration
                 Name = entry.Name,
                 Url = song.Url,
                 Playlists = song.Playlists,
-                AddDate = song.AddDate,
+                AddDate = song.AddDate
             };
 
             await songGrain.UpdateData(updatedData);

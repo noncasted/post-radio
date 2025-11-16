@@ -5,18 +5,18 @@ namespace Infrastructure.Orleans;
 
 public class DbGrainReader
 {
-    private readonly string _table;
-
-    public readonly DbGrainReaderWhere Where = new();
-    public readonly DbGrainReaderSelect Select = new();
-
-    public IOrleans Orleans { get; }
-
     public DbGrainReader(IOrleans orleans, string table)
     {
         Orleans = orleans;
         _table = table;
     }
+
+    private readonly string _table;
+    public readonly DbGrainReaderSelect Select = new();
+
+    public readonly DbGrainReaderWhere Where = new();
+
+    public IOrleans Orleans { get; }
 
     public async Task<int> Count(CancellationToken cancellation = default)
     {

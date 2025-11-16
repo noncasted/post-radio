@@ -4,41 +4,47 @@ namespace Common;
 
 public static class ContainerExtensions
 {
+    extension(Registration registration)
+    {
+        public Registration As<T>() where T : class
+        {
+            registration.Collection.AddSingleton(sp => (T)sp.GetRequiredService(registration.Type));
+            return registration;
+        }
+    }
+
     public class Registration
     {
         public required Type Type { get; init; }
         public required IServiceCollection Collection { get; init; }
     }
 
-    public static Registration Add<TInterface, TImplementation>(this IServiceCollection builder)
-        where TInterface : class
-        where TImplementation : class, TInterface
+    extension(IServiceCollection builder)
     {
-        builder.AddSingleton<TImplementation>();
-        builder.AddSingleton<TInterface>(sp => sp.GetRequiredService<TImplementation>());
-
-        return new Registration
+        public Registration Add<TInterface, TImplementation>()
+            where TInterface : class
+            where TImplementation : class, TInterface
         {
-            Collection = builder,
-            Type = typeof(TImplementation)
-        };
-    }
+            builder.AddSingleton<TImplementation>();
+            builder.AddSingleton<TInterface>(sp => sp.GetRequiredService<TImplementation>());
 
-    public static Registration Add<TImplementation>(this IServiceCollection builder)
-        where TImplementation : class
-    {
-        builder.AddSingleton<TImplementation>();
+            return new Registration
+            {
+                Collection = builder,
+                Type = typeof(TImplementation)
+            };
+        }
 
-        return new Registration
+        public Registration Add<TImplementation>()
+            where TImplementation : class
         {
-            Collection = builder,
-            Type = typeof(TImplementation)
-        };
-    }
+            builder.AddSingleton<TImplementation>();
 
-    public static Registration As<T>(this Registration registration) where T : class
-    {
-        registration.Collection.AddSingleton(sp => (T)sp.GetRequiredService(registration.Type));
-        return registration;
+            return new Registration
+            {
+                Collection = builder,
+                Type = typeof(TImplementation)
+            };
+        }
     }
 }

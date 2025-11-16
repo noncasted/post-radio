@@ -9,7 +9,7 @@ public static class States
     public const string Playlist = "Playlist";
 
     public const string Config = "Config";
-    
+
     public const string Messaging_Queue = "Messaging_Queue";
     public const string ClusterState = "ClusterState";
 
@@ -17,17 +17,19 @@ public static class States
     [
         Song,
         Playlist,
-        Config, 
+        Config,
         Messaging_Queue,
         ClusterState
     ];
 
     public class SongAttribute() : PersistentStateAttribute(Song, Song);
+
     public class PlaylistAttribute() : PersistentStateAttribute(Playlist, Playlist);
 
     public class ConfigStorageAttribute() : PersistentStateAttribute(Config, Config);
-    
+
     public class MessageQueueAttribute() : PersistentStateAttribute(Messaging_Queue, Messaging_Queue);
+
     public class ClusterStateAttribute() : PersistentStateAttribute(ClusterState, ClusterState);
 }
 

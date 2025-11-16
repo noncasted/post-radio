@@ -11,8 +11,9 @@ public class ClusterStateStorage<T> : Grain, IClusterStateStorage<T>
         _messaging = messaging;
     }
 
-    private readonly IPersistentState<T> _state;
     private readonly IMessaging _messaging;
+
+    private readonly IPersistentState<T> _state;
 
     public Task Set(T value)
     {

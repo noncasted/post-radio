@@ -87,10 +87,11 @@
 
     private IOperationProgress _operation = new OperationProgress();
     private Timer? _timer;
-    
+
     private readonly ILifetime _lifetime = new Lifetime();
-    
-    protected override void OnInitialized() {
+
+    protected override void OnInitialized()
+    {
         _timer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 

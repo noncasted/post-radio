@@ -15,13 +15,14 @@ public class TransactionRunner : ITransactionRunner
         _serializer = serializer;
     }
 
-    private readonly ITransactionResolver _transactionResolver;
     private readonly Serializer<OrleansTransactionAbortedException> _serializer;
+
+    private readonly ITransactionResolver _transactionResolver;
 
     public async Task Run(TransactionRunOptions options)
     {
         var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
-        var transactionInfo = await _transactionResolver.StartTransaction(readOnly: false, transactionTimeout);
+        var transactionInfo = await _transactionResolver.StartTransaction(false, transactionTimeout);
 
         TransactionContextOverrides.SetTransactionInfo(transactionInfo);
 
@@ -59,9 +60,7 @@ public class TransactionRunner : ITransactionRunner
         }
 
         if (transactionException != null)
-        {
             // Transaction failed - bubble up exception
             ExceptionDispatchInfo.Throw(transactionException);
-        }
     }
 }

@@ -6,10 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Sdk" />
-        <PackageReference Include="Microsoft.Orleans.Transactions" />
-        <PackageReference Include="Minio" />
-        <PackageReference Include="Npgsql" />
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
+        <PackageReference Include="Microsoft.Orleans.Transactions"/>
+        <PackageReference Include="Minio"/>
+        <PackageReference Include="Npgsql"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -17,7 +17,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Reactive\Reactive.csproj" />
+        <ProjectReference Include="..\Reactive\Reactive.csproj"/>
     </ItemGroup>
 
 </Project>

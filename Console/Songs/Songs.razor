@@ -132,7 +132,9 @@
     {
         LoadSongs();
 
-        SongsCollection.Advise(_lifetime, () =>
+        SongsCollection.Advise(
+            _lifetime,
+            () =>
             {
                 InvokeAsync(() =>
                     {
@@ -188,7 +190,7 @@
             Name = _editTitle,
             Url = song.Url,
             Playlists = song.Playlists,
-            AddDate = song.AddDate,
+            AddDate = song.AddDate
         };
 
         await songGrain.UpdateData(updatedData);

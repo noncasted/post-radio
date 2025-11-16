@@ -17,11 +17,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\Console\Console\Console.csproj" />
-        <ProjectReference Include="..\..\Frontend\Frontend\Frontend.csproj" />
-        <ProjectReference Include="..\..\Infrastructure\Coordination\Coordinator\Coordinator.csproj" />
+        <ProjectReference Include="..\..\Console\Console\Console.csproj"/>
+        <ProjectReference Include="..\..\Frontend\Frontend\Frontend.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Coordination\Coordinator\Coordinator.csproj"/>
         <ProjectReference Include="..\..\Infrastructure\Orleans\Silo\Silo.csproj"/>
         <ProjectReference Include="..\Startup\Startup.csproj"/>
     </ItemGroup>
-    
+
 </Project>

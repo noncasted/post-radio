@@ -4,12 +4,12 @@ namespace Audio;
 
 public class Song : Grain, ISong
 {
-    private readonly IPersistentState<SongState> _state;
-
     public Song([States.Song] IPersistentState<SongState> state)
     {
         _state = state;
     }
+
+    private readonly IPersistentState<SongState> _state;
 
     public Task UpdateData(SongData data)
     {
@@ -36,7 +36,7 @@ public class Song : Grain, ISong
             Name = state.Name,
             Url = state.Url,
             Playlists = state.Playlists,
-            AddDate = state.AddDate,
+            AddDate = state.AddDate
         };
 
         return Task.FromResult(data);

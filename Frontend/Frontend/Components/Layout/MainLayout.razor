@@ -1,9 +1,9 @@
 ﻿@inherits LayoutComponentBase
 
-<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
 <MudLayout>
     <MudMainContent>
         @Body
@@ -17,14 +17,14 @@
 </div>
 
 @code {
-    private bool _isDarkMode = true;
-    private MudTheme? _theme = null;
+    private readonly bool _isDarkMode = true;
+    private MudTheme? _theme;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
 
-        _theme = new()
+        _theme = new MudTheme
         {
             PaletteLight = _lightPalette,
             PaletteDark = _darkPalette,
@@ -39,7 +39,7 @@
         AppbarBackground = "rgba(255,255,255,0.8)",
         DrawerBackground = "#ffffff",
         GrayLight = "#e8e8e8",
-        GrayLighter = "#f9f9f9",
+        GrayLighter = "#f9f9f9"
     };
 
     private readonly PaletteDark _darkPalette = new()
@@ -68,6 +68,7 @@
         LinesDefault = "#33323e",
         TableLines = "#33323e",
         Divider = "#292838",
-        OverlayLight = "#1e1e2d80",
+        OverlayLight = "#1e1e2d80"
     };
+
 }

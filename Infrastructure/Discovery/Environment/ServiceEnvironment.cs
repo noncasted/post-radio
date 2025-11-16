@@ -22,23 +22,21 @@ public static class EnvironmentExtensions
     public static IHostApplicationBuilder AddEnvironment(this IHostApplicationBuilder builder, ServiceTag tag)
     {
         if (builder.Environment.IsDevelopment() == true)
-        {
-            builder.Services.AddSingleton<IServiceEnvironment>(new ServiceEnvironment
+            builder.Services.AddSingleton<IServiceEnvironment>(
+                new ServiceEnvironment
                 {
                     IsDevelopment = true,
                     Tag = tag
                 }
             );
-        }
         else
-        {
-            builder.Services.AddSingleton<IServiceEnvironment>(new ServiceEnvironment
+            builder.Services.AddSingleton<IServiceEnvironment>(
+                new ServiceEnvironment
                 {
                     IsDevelopment = false,
                     Tag = tag
                 }
             );
-        }
 
         return builder;
     }

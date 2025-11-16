@@ -10,7 +10,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MudBlazor" />
+        <PackageReference Include="MudBlazor"/>
     </ItemGroup>
 
 </Project>

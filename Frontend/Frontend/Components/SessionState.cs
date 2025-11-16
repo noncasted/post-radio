@@ -13,23 +13,22 @@ public class SessionState
         _indexOffset = Random.Shared.Next(0, 200);
     }
 
-    private readonly ViewableProperty<PlaylistData> _playlist = new(null);
-    private readonly ViewableProperty<double> _volume = new(20);
     private readonly ViewableProperty<SongData> _currentSong = new(null);
-
-    private readonly ViewableDelegate _started = new();
-    private readonly ViewableDelegate _skipRequested = new();
-
-    private readonly ILifetime _lifetime = new Lifetime();
-
-    private readonly ISongsCollection _songsCollection;
     private readonly IImagesCollection _imagesCollection;
 
     private readonly int _indexOffset;
 
-    private int _songIndex;
-    private int _imageIndex;
+    private readonly ViewableProperty<PlaylistData> _playlist = new(null);
+    private readonly ViewableDelegate _skipRequested = new();
+
+    private readonly ISongsCollection _songsCollection;
+
+    private readonly ViewableDelegate _started = new();
+    private readonly ViewableProperty<double> _volume = new(20);
     private bool _hasStarted;
+    private int _imageIndex;
+
+    private int _songIndex;
 
     public IViewableProperty<PlaylistData> Playlist => _playlist;
     public IViewableProperty<double> Volume => _volume;
@@ -37,7 +36,7 @@ public class SessionState
     public IViewableDelegate SkipRequested => _skipRequested;
 
     public IViewableDelegate Started => _started;
-    public ILifetime Lifetime => _lifetime;
+    public ILifetime Lifetime { get; } = new Lifetime();
 
     public void SetPlaylist(PlaylistData playlist)
     {
@@ -70,7 +69,7 @@ public class SessionState
 
     public void Dispose()
     {
-        _lifetime.Terminate();
+        Lifetime.Terminate();
     }
 
     public SongData IncSongIndex()

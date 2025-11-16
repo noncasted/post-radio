@@ -18,8 +18,9 @@ public class ServiceLoop : IServiceLoop
         _coordinator = coordinator;
     }
 
-    private readonly IEnumerable<ILocalSetupCompleted> _local;
     private readonly IEnumerable<ICoordinatorSetupCompleted> _coordinator;
+
+    private readonly IEnumerable<ILocalSetupCompleted> _local;
 
     public Task OnLocalSetupCompleted(IReadOnlyLifetime lifetime)
     {

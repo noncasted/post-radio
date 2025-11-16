@@ -13,16 +13,16 @@ public class TransactionRunBuilder
 
 public class TransactionRunOptions
 {
+    public static readonly TransactionRunOptions Empty = new()
+    {
+        Action = () => Task.CompletedTask,
+        SuccessAction = null,
+        FailureAction = null
+    };
+
     public required Func<Task> Action { get; init; }
     public Func<Task>? SuccessAction { get; set; }
     public Func<Task>? FailureAction { get; set; }
-    
-     public static readonly TransactionRunOptions Empty = new TransactionRunOptions
-     {
-         Action = () => Task.CompletedTask,
-         SuccessAction = null,
-         FailureAction = null,
-     };
 }
 
 public static class TransactionRunnerExtensions
@@ -34,27 +34,30 @@ public static class TransactionRunnerExtensions
             Runner = runner,
             Options = new TransactionRunOptions
             {
-                Action = action,
-            },
+                Action = action
+            }
         };
 
         return builder;
     }
 
-    public static TransactionRunBuilder WithSuccessAction(this TransactionRunBuilder builder, Func<Task> successAction)
+    extension(TransactionRunBuilder builder)
     {
-        builder.Options.SuccessAction = successAction;
-        return builder;
-    }
+        public TransactionRunBuilder WithSuccessAction(Func<Task> successAction)
+        {
+            builder.Options.SuccessAction = successAction;
+            return builder;
+        }
 
-    public static TransactionRunBuilder WithFailureAction(this TransactionRunBuilder builder, Func<Task> failureAction)
-    {
-        builder.Options.FailureAction = failureAction;
-        return builder;
-    }
-    
-    public static Task Start(this TransactionRunBuilder builder)
-    {
-        return builder.Runner.Run(builder.Options);
+        public TransactionRunBuilder WithFailureAction(Func<Task> failureAction)
+        {
+            builder.Options.FailureAction = failureAction;
+            return builder;
+        }
+
+        public Task Start()
+        {
+            return builder.Runner.Run(builder.Options);
+        }
     }
 }

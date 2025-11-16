@@ -7,13 +7,13 @@ namespace Infrastructure.Orleans;
 
 public class WriteCommiter
 {
-    private readonly ILogger _logger;
-    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
-
     public WriteCommiter(ILogger logger)
     {
         _logger = logger;
     }
+
+    private readonly ILogger _logger;
+    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 
     public async Task<(TransactionalStatus, Exception?)> Execute(
         TransactionParticipants participants,
@@ -51,26 +51,28 @@ public class WriteCommiter
         }
         catch (TimeoutException ex)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("{TotalMilliseconds} timeout {TransactionId} on CommitReadWriteTransaction",
-                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId
+            if (_logger.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug(
+                    "{TotalMilliseconds} timeout {TransactionId} on CommitReadWriteTransaction",
+                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                    info.TransactionId
                 );
-            }
 
             status = TransactionalStatus.TMResponseTimeout;
             exception = ex;
         }
         catch (Exception ex)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("{TotalMilliseconds} failure {TransactionId} CommitReadWriteTransaction",
-                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId
+            if (_logger.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug(
+                    "{TotalMilliseconds} failure {TransactionId} CommitReadWriteTransaction",
+                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                    info.TransactionId
                 );
-            }
 
-            _logger.LogWarning(ex, "Unknown error while committing transaction {TransactionId}",
+            _logger.LogWarning(
+                ex,
+                "Unknown error while committing transaction {TransactionId}",
                 info.TransactionId
             );
 
@@ -81,12 +83,12 @@ public class WriteCommiter
         if (status != TransactionalStatus.Ok)
             await Cancel();
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("{TotalMilliseconds} finish {TransactionId}",
-                _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId
+        if (_logger.IsEnabled(LogLevel.Trace) == true)
+            _logger.LogTrace(
+                "{TotalMilliseconds} finish {TransactionId}",
+                _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                info.TransactionId
             );
-        }
 
         return (status, exception);
 
@@ -107,22 +109,22 @@ public class WriteCommiter
         {
             try
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("{TotalMilliseconds} failed {TransactionId} with status={Status}",
-                        _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId, status
+                if (_logger.IsEnabled(LogLevel.Debug) == true)
+                    _logger.LogDebug(
+                        "{TotalMilliseconds} failed {TransactionId} with status={Status}",
+                        _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                        info.TransactionId,
+                        status
                     );
-                }
 
                 // notify participants
                 if (status.DefinitelyAborted() == true)
-                {
-                    await Task.WhenAll(participants.Write
-                        .Where(p => !p.Equals(manager.Key))
-                        .Select(p => p.AsResource().Cancel(p.Name, info.TransactionId, info.TimeStamp, status)
-                        )
+                    await Task.WhenAll(
+                        participants.Write
+                            .Where(p => p.Equals(manager.Key) == false)
+                            .Select(p => p.AsResource().Cancel(p.Name, info.TransactionId, info.TimeStamp, status)
+                            )
                     );
-                }
 
                 if (options.FailureAction != null)
                     await options.FailureAction();
@@ -130,14 +132,15 @@ public class WriteCommiter
             catch (Exception ex)
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
-                {
                     _logger.LogDebug(
                         "{TotalMilliseconds} failure aborting {TransactionId} CommitReadWriteTransaction",
-                        _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId
+                        _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                        info.TransactionId
                     );
-                }
 
-                _logger.LogWarning(ex, "Failed to abort transaction {TransactionId}",
+                _logger.LogWarning(
+                    ex,
+                    "Failed to abort transaction {TransactionId}",
                     info.TransactionId
                 );
             }

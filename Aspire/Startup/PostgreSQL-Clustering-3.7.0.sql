@@ -1,7 +1,5 @@
 INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-    (
-        'CleanupDefunctSiloEntriesKey','
+VALUES ('CleanupDefunctSiloEntriesKey', '
     DELETE FROM OrleansMembershipTable
     WHERE DeploymentId = @DeploymentId
         AND @DeploymentId IS NOT NULL

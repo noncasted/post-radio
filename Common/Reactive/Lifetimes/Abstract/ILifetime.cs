@@ -1,7 +1,6 @@
-﻿namespace Common
+﻿namespace Common;
+
+public interface ILifetime : IReadOnlyLifetime
 {
-    public interface ILifetime : IReadOnlyLifetime
-    {
-        void Terminate();
-    }
+    void Terminate();
 }

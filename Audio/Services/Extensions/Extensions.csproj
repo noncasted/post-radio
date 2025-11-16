@@ -6,11 +6,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\Infrastructure\Loop\ServiceLoop\ServiceLoop.csproj" />
-      <ProjectReference Include="..\..\Playlists\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\..\Playlists\Services\Services.csproj" />
-      <ProjectReference Include="..\..\Songs\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\Collections\Collections.csproj" />
+        <ProjectReference Include="..\..\..\Infrastructure\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\Playlists\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\Playlists\Services\Services.csproj"/>
+        <ProjectReference Include="..\..\Songs\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Collections\Collections.csproj"/>
     </ItemGroup>
 
 </Project>

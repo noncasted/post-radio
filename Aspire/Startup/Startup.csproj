@@ -37,10 +37,10 @@
         <Content Include="PostgreSQL-Persistence.sql">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
-        <None Remove="NamedGrainStorageWrite.sql" />
-        <None Remove="NamedGrainStorage.sql" />
+        <None Remove="NamedGrainStorageWrite.sql"/>
+        <None Remove="NamedGrainStorage.sql"/>
         <Content Include="NamedGrainStorage.sql">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
 

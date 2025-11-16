@@ -6,10 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj" />
-      <ProjectReference Include="..\..\..\Orleans\Transactions\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\..\..\TaskScheduling\Service\Service.csproj" />
-      <ProjectReference Include="..\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\..\Orleans\Transactions\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\..\TaskScheduling\Service\Service.csproj"/>
+        <ProjectReference Include="..\Interfaces\Interfaces.csproj"/>
     </ItemGroup>
 
 </Project>

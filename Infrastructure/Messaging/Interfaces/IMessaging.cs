@@ -70,52 +70,52 @@ public interface IMessaging
 
 public static class MessagingExtensions
 {
-    public static Task PushTransactionalQueue(this IMessaging messaging, IMessageQueueId id, object message)
+    extension(IMessaging messaging)
     {
-        return messaging.Queue.PushTransactional(id, message);
-    }
+        public Task PushTransactionalQueue(IMessageQueueId id, object message)
+        {
+            return messaging.Queue.PushTransactional(id, message);
+        }
 
-    public static Task PushDirectQueue(this IMessaging messaging, IMessageQueueId id, object message)
-    {
-        return messaging.Queue.PushDirect(id, message);
-    }
+        public Task PushDirectQueue(IMessageQueueId id, object message)
+        {
+            return messaging.Queue.PushDirect(id, message);
+        }
 
-    public static void ListenQueue<T>(
-        this IMessaging messaging,
-        IReadOnlyLifetime lifetime,
-        IMessageQueueId id,
-        Action<T> listener)
-    {
-        var consumer = messaging.Queue.GetOrCreateConsumer<T>(id);
-        consumer.Advise(lifetime, listener);
-    }
+        public void ListenQueue<T>(
+            IReadOnlyLifetime lifetime,
+            IMessageQueueId id,
+            Action<T> listener)
+        {
+            var consumer = messaging.Queue.GetOrCreateConsumer<T>(id);
+            consumer.Advise(lifetime, listener);
+        }
 
-    public static async Task ListenPipe<T>(
-        this IMessaging messaging,
-        IReadOnlyLifetime lifetime,
-        IMessagePipeId id,
-        Action<T> listener)
-    {
-        var consumer = await messaging.Pipe.GetOrCreateConsumer<T>(id);
-        consumer.Advise(lifetime, listener);
-    }
+        public async Task ListenPipe<T>(
+            IReadOnlyLifetime lifetime,
+            IMessagePipeId id,
+            Action<T> listener)
+        {
+            var consumer = await messaging.Pipe.GetOrCreateConsumer<T>(id);
+            consumer.Advise(lifetime, listener);
+        }
 
-    public static Task AddPipeRequestHandler<TRequest, TResponse>(
-        this IMessaging messaging,
-        IReadOnlyLifetime lifetime,
-        IMessagePipeId id,
-        Func<TRequest, Task<TResponse>> listener)
-    {
-        return messaging.Pipe.AddHandler(lifetime, id, listener);
-    }
+        public Task AddPipeRequestHandler<TRequest, TResponse>(
+            IReadOnlyLifetime lifetime,
+            IMessagePipeId id,
+            Func<TRequest, Task<TResponse>> listener)
+        {
+            return messaging.Pipe.AddHandler(lifetime, id, listener);
+        }
 
-    public static Task SendPipe(this IMessaging messaging, IMessagePipeId id, object message)
-    {
-        return messaging.Pipe.Send(id, message);
-    }
+        public Task SendPipe(IMessagePipeId id, object message)
+        {
+            return messaging.Pipe.Send(id, message);
+        }
 
-    public static Task<TResponse> SendPipe<TResponse>(this IMessaging messaging, IMessagePipeId id, object message)
-    {
-        return messaging.Pipe.Send<TResponse>(id, message);
+        public Task<TResponse> SendPipe<TResponse>(IMessagePipeId id, object message)
+        {
+            return messaging.Pipe.Send<TResponse>(id, message);
+        }
     }
 }

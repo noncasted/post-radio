@@ -7,7 +7,7 @@ public static class ParticipantsExtensions
 {
     public static ITransactionalResourceExtension AsResource(this ParticipantId participant)
     {
-        if (!participant.SupportsRoles(ParticipantId.Role.Resource))
+        if (participant.SupportsRoles(ParticipantId.Role.Resource) == false)
             throw new InvalidOperationException($"Participant {participant} does not support Resource role");
 
         return participant.Reference.AsReference<ITransactionalResourceExtension>();

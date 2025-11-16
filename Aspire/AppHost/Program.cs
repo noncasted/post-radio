@@ -74,14 +74,12 @@ void SetupAuthToken()
 
     if (authToken == null)
     {
-        builder.Configuration.AddJsonFile("appsettings.secrets.json", optional: true);
+        builder.Configuration.AddJsonFile("appsettings.secrets.json", true);
         authToken = builder.Configuration.GetSection("AuthToken").Get<string>();
     }
 
     if (!string.IsNullOrEmpty(authToken))
-    {
         console.WithEnvironment(context => context.EnvironmentVariables["AuthToken"] = authToken);
-    }
 }
 
 void SetDashboardToken()
@@ -91,9 +89,10 @@ void SetDashboardToken()
     if (token == null)
         return;
 
-    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+    builder.Configuration.AddInMemoryCollection(
+        new Dictionary<string, string?>
         {
-            ["AppHost:BrowserToken"] = token,
+            ["AppHost:BrowserToken"] = token
         }
     );
 }

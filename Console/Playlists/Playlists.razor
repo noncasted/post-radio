@@ -52,7 +52,7 @@
     [Inject] private IPlaylistFactory Factory { get; set; }
     [Inject] private IConsoleNavigation Navigation { get; set; }
 
-    private bool _isDialogOpen = false;
+    private bool _isDialogOpen;
     private string _newUrl = string.Empty;
     private string _newName = string.Empty;
 

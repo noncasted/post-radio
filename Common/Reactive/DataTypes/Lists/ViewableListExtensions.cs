@@ -1,8 +1,10 @@
-﻿namespace Common
+﻿namespace Common;
+
+public static class ViewableListExtensions
 {
-    public static class ViewableListExtensions
+    extension<T>(IViewableList<T> list)
     {
-        public static void View<T>(this IViewableList<T> list, IReadOnlyLifetime lifetime, Action<T> listener)
+        public void View(IReadOnlyLifetime lifetime, Action<T> listener)
         {
             list.Advise(lifetime, (_, value) => listener.Invoke(value));
 
@@ -10,8 +12,7 @@
                 listener.Invoke(entry);
         }
 
-        public static void View<T>(
-            this IViewableList<T> list,
+        public void View(
             IReadOnlyLifetime lifetime,
             Action<IReadOnlyLifetime, T> listener)
         {

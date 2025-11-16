@@ -23,15 +23,16 @@ public class PlaylistsCollection :
         _logger = logger;
     }
 
-    private readonly IOrleans _orleans;
-    private readonly IMessaging _messaging;
     private readonly ILogger<PlaylistsCollection> _logger;
+    private readonly IMessaging _messaging;
+
+    private readonly IOrleans _orleans;
     private readonly MessageQueueId _refreshQueue = new("audio-playlists-refresh");
 
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
         _messaging.ListenQueue<RefreshPlaylistsPayload>(lifetime, _refreshQueue, _ => OnRefreshRequested().NoAwait());
-        return OnRefreshRequested( );
+        return OnRefreshRequested();
     }
 
     public Task Refresh()
@@ -66,7 +67,6 @@ public class PlaylistsCollection :
         _logger.LogInformation("[Audio] [Collection] [Playlists] Refresh completed with {Count} playlists", Count);
     }
 }
-
 
 [GenerateSerializer]
 public class RefreshPlaylistsPayload

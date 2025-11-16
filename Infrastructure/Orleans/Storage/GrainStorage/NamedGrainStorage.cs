@@ -25,18 +25,6 @@ public static class NamedGrainStorageFactory
 
 public class NamedGrainStorage : IGrainStorage
 {
-    private readonly IActivatorProvider _activatorProvider;
-    private readonly IHasher _hasher;
-    private readonly IGrainStorageSerializer _serializer;
-    private readonly GrainTypeExtractor _typeExtractor;
-
-    private readonly string _name;
-
-    private readonly ILogger _logger;
-
-    private readonly GrainStorageQueries _queries;
-    private readonly IRelationalStorage _storage;
-
     public NamedGrainStorage(
         IActivatorProvider activatorProvider,
         ILogger<NamedGrainStorage> logger,
@@ -63,8 +51,21 @@ public class NamedGrainStorage : IGrainStorage
         );
     }
 
+    private readonly IActivatorProvider _activatorProvider;
+    private readonly IHasher _hasher;
+
+    private readonly ILogger _logger;
+
+    private readonly string _name;
+
+    private readonly GrainStorageQueries _queries;
+    private readonly IGrainStorageSerializer _serializer;
+    private readonly IRelationalStorage _storage;
+    private readonly GrainTypeExtractor _typeExtractor;
+
     /// <summary>Clear state data function for this storage provider.</summary>
-    /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
+    /// <see cref="IGrainStorage.ClearStateAsync{T}" />
+    /// .
     public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
         var grainKey = grainId.ToKey();
@@ -129,12 +130,13 @@ public class NamedGrainStorage : IGrainStorage
     }
 
     /// <summary> Read state data function for this storage provider.</summary>
-    /// <see cref="IGrainStorage.ReadStateAsync{T}"/>.
+    /// <see cref="IGrainStorage.ReadStateAsync{T}" />
+    /// .
     public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
         var grainKey = grainId.ToKey();
         var baseGrainType = _typeExtractor.Extract(grainType);
-        
+
         _logger.LogTraceReadingGrainState(_name, baseGrainType, grainKey, grainState.ETag);
 
         try
@@ -203,7 +205,7 @@ public class NamedGrainStorage : IGrainStorage
     }
 
     /// <summary> Write state data function for this storage provider.</summary>
-    /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
+    /// <see cref="IGrainStorage.WriteStateAsync{T}" />
     public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
         var grainKey = grainId.ToKey();
@@ -260,11 +262,14 @@ public class NamedGrainStorage : IGrainStorage
         }
     }
 
-    private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
+    private T CreateInstance<T>()
+    {
+        return _activatorProvider.GetActivator<T>().Create();
+    }
 
     private int? ParseETag<T>(IGrainState<T> state)
     {
-        if (string.IsNullOrWhiteSpace(state.ETag) == false)
+        if (!string.IsNullOrWhiteSpace(state.ETag))
             return int.Parse(state.ETag, CultureInfo.InvariantCulture);
 
         return null;

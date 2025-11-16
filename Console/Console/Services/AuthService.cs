@@ -12,27 +12,24 @@ public interface IAuthService
 
 public class AuthService : IAuthService
 {
-    private readonly IJSRuntime _jsRuntime;
-    private readonly string _validToken;
-    private string? _currentToken;
-    private bool _isInitialized;
-
     public AuthService(IJSRuntime jsRuntime, IConfiguration configuration)
     {
         _jsRuntime = jsRuntime;
 
         // Получаем токен из переменной окружения, либо из конфигурации
-        _validToken = Environment.GetEnvironmentVariable("AuthToken")
-                      ?? configuration["AuthToken"]
-                      ?? "default-secret-token";
+        _validToken = Environment.GetEnvironmentVariable("AuthToken") ??
+                      configuration["AuthToken"] ?? "default-secret-token";
     }
+
+    private readonly IJSRuntime _jsRuntime;
+    private readonly string _validToken;
+    private string? _currentToken;
+    private bool _isInitialized;
 
     public async Task<bool> IsAuthenticated()
     {
-        if (!_isInitialized)
-        {
+        if (_isInitialized == false)
             await InitializeAsync();
-        }
 
         return !string.IsNullOrEmpty(_currentToken);
     }

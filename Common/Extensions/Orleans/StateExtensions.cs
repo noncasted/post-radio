@@ -4,22 +4,26 @@ namespace Common;
 
 public static class StateExtensions
 {
-    public static Task<T> Update<T>(this ITransactionalState<T> state, Action<T> action) where T : class, new()
+    extension<T>(ITransactionalState<T> state) where T : class, new()
     {
-        return state.PerformUpdate(s =>
+        public Task<T> Update(Action<T> action)
         {
-            action(s);
-            return s;
-        });
-    }
-    
-    public static Task Write<T>(this ITransactionalState<T> state, Action<T> action) where T : class, new()
-    {
-        return state.PerformUpdate(action);
-    }
+            return state.PerformUpdate(s =>
+                {
+                    action(s);
+                    return s;
+                }
+            );
+        }
 
-    public static Task<T> Read<T>(this ITransactionalState<T> state) where T : class, new()
-    {
-        return state.PerformRead(s => s);
+        public Task Write(Action<T> action)
+        {
+            return state.PerformUpdate(action);
+        }
+
+        public Task<T> Read()
+        {
+            return state.PerformRead(s => s);
+        }
     }
 }

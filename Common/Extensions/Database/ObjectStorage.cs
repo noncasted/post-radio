@@ -28,9 +28,10 @@ public class ObjectStorage : IObjectStorage
     {
         try
         {
-            await _client.StatObjectAsync(new StatObjectArgs()
-                .WithBucket(bucket)
-                .WithObject(key)
+            await _client.StatObjectAsync(
+                new StatObjectArgs()
+                    .WithBucket(bucket)
+                    .WithObject(key)
             );
         }
         catch
@@ -59,7 +60,7 @@ public class ObjectStorage : IObjectStorage
 
             await foreach (var item in enumerable)
             {
-                if (keysSet.Contains(item.Key))
+                if (keysSet.Contains(item.Key) == true)
                     existingKeys.Add(item.Key);
 
                 // Early exit if we found all keys
@@ -81,7 +82,7 @@ public class ObjectStorage : IObjectStorage
         try
         {
             stream.Seek(0, SeekOrigin.Begin);
-            
+
             var args = new PutObjectArgs()
                 .WithBucket(bucket)
                 .WithObject(key)
@@ -93,9 +94,13 @@ public class ObjectStorage : IObjectStorage
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
+            _logger.LogError(
+                ex,
                 "[ObjectStorage] Failed to upload object '{Key}' to bucket '{Bucket}'. Size: {Size} bytes. Exception type: {ExceptionType}",
-                key, bucket, stream.Length, ex.GetType().Name
+                key,
+                bucket,
+                stream.Length,
+                ex.GetType().Name
             );
 
             throw new InvalidOperationException(
@@ -122,7 +127,7 @@ public class ObjectStorage : IObjectStorage
     {
         var listArgs = new ListObjectsArgs()
             .WithBucket("images");
-        
+
         var objects = _client.ListObjectsEnumAsync(listArgs);
 
         var keys = new List<string>();

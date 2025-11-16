@@ -1,8 +1,7 @@
-﻿namespace Common
+﻿namespace Common;
+
+public interface ILifetimedValue<T> : IEventSource<IReadOnlyLifetime, T>
 {
-    public interface ILifetimedValue<T> : IEventSource<IReadOnlyLifetime, T>
-    {
-        T Value { get; }
-		IReadOnlyLifetime ValueLifetime { get; }
-    }
+    T Value { get; }
+    IReadOnlyLifetime ValueLifetime { get; }
 }

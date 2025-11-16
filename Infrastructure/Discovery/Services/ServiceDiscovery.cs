@@ -9,7 +9,7 @@ public interface IServiceDiscovery
 {
     IServiceOverview Self { get; }
     IReadOnlyDictionary<Guid, IServiceOverview> Entries { get; }
-    
+
     Task Start(IReadOnlyLifetime lifetime);
 }
 
@@ -24,20 +24,20 @@ public class ServiceDiscovery : IServiceDiscovery
         _environment = environment;
         _logger = logger;
 
-        _self = CreateOverview();
+        Self = CreateOverview();
     }
 
-    private readonly IMessaging _messaging;
+    private readonly Dictionary<Guid, IServiceOverview> _entries = new();
     private readonly IServiceEnvironment _environment;
     private readonly ILogger<ServiceDiscovery> _logger;
-    private readonly Dictionary<Guid, IServiceOverview> _entries = new();
+
+    private readonly IMessaging _messaging;
     private readonly IMessageQueueId _queueId = new MessageQueueId("service-discovery");
 
-    private IServiceOverview _self;
+    public IServiceOverview Self { get; private set; }
 
-    public IServiceOverview Self => _self;
     public IReadOnlyDictionary<Guid, IServiceOverview> Entries => _entries;
-    
+
     public Task Start(IReadOnlyLifetime lifetime)
     {
         _messaging.ListenQueue<IServiceOverview>(lifetime, _queueId, service => _entries[service.Id] = service);
@@ -49,11 +49,11 @@ public class ServiceDiscovery : IServiceDiscovery
     {
         while (lifetime.IsTerminated == false)
         {
-            _self = CreateOverview();
+            Self = CreateOverview();
 
             try
             {
-                await _messaging.PushDirectQueue(_queueId, _self);
+                await _messaging.PushDirectQueue(_queueId, Self);
             }
             catch (Exception e)
             {
@@ -68,29 +68,29 @@ public class ServiceDiscovery : IServiceDiscovery
     {
         return _environment.Tag switch
         {
-            ServiceTag.Silo => new ServiceOverview()
+            ServiceTag.Silo => new ServiceOverview
             {
                 Id = _environment.ServiceId,
                 Tag = ServiceTag.Silo,
-                UpdateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow
             },
-            ServiceTag.Console => new ServiceOverview()
+            ServiceTag.Console => new ServiceOverview
             {
                 Id = _environment.ServiceId,
                 Tag = ServiceTag.Console,
-                UpdateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow
             },
-            ServiceTag.Frontend => new ServiceOverview()
+            ServiceTag.Frontend => new ServiceOverview
             {
                 Id = _environment.ServiceId,
                 Tag = ServiceTag.Frontend,
-                UpdateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow
             },
-            ServiceTag.Coordinator => new ServiceOverview()
+            ServiceTag.Coordinator => new ServiceOverview
             {
                 Id = _environment.ServiceId,
                 Tag = ServiceTag.Coordinator,
-                UpdateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow
             },
             _ => throw new ArgumentOutOfRangeException()
         };

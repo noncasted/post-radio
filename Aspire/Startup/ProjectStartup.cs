@@ -8,10 +8,6 @@ namespace Aspire;
 
 public class ProjectStartup : BackgroundService
 {
-    private readonly IHostApplicationLifetime _applicationLifetime;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<ProjectStartup> _logger;
-
     public ProjectStartup(
         IHostApplicationLifetime applicationLifetime,
         IConfiguration configuration,
@@ -21,6 +17,10 @@ public class ProjectStartup : BackgroundService
         _configuration = configuration;
         _logger = logger;
     }
+
+    private readonly IHostApplicationLifetime _applicationLifetime;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<ProjectStartup> _logger;
 
     protected override async Task ExecuteAsync(CancellationToken cancellation)
     {
@@ -66,7 +66,7 @@ public class ProjectStartup : BackgroundService
 
         _logger.LogInformation("[Startup] Startup completed");
         _applicationLifetime.StopApplication();
-        
+
         return;
 
         async Task<NpgsqlConnection> GetConnection()
@@ -118,10 +118,10 @@ public class ProjectStartup : BackgroundService
 
             await using var checkTableCommand = new NpgsqlCommand(checkTableQuery, connection);
             var result = await checkTableCommand.ExecuteScalarAsync(cancellation);
-            
+
             if (result is not bool tableExists)
                 throw new Exception("Failed to check if table exists");
-            
+
             return tableExists;
         }
     }

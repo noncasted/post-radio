@@ -37,12 +37,14 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
     {
         while (lifetime.IsTerminated == false)
         {
-            await _messaging.PushDirectQueue(_queueId, new OnlineTrackerPayload
+            await _messaging.PushDirectQueue(
+                _queueId,
+                new OnlineTrackerPayload
                 {
                     Value = _count
                 }
             );
-            
+
             await Task.Delay(TimeSpan.FromSeconds(1));
         }
     }

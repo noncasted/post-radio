@@ -1,7 +1,4 @@
-﻿@using Audio
-@using Common
-@using Images
-@inject IJSRuntime _jsRuntime;
+﻿@inject IJSRuntime _jsRuntime;
 
 <audio id="audio" src="@_audioUrl"></audio>
 
@@ -55,7 +52,8 @@
     }
 
 </script>
-
+@using Audio
+@using Common
 @implements IDisposable
 
 @code {
@@ -89,7 +87,7 @@
         await _jsRuntime.InvokeVoidAsync("audioHelper.setAudioElement", _dotNetRef);
         await OnVolumeChanged(State.Volume.Value);
 
-        while (State.Lifetime.IsTerminated == false)
+        while (!State.Lifetime.IsTerminated)
         {
             try
             {
@@ -104,8 +102,8 @@
 
                 if (_audioUrl == url)
                     await SetNext();
-                
-                continue;;
+
+                continue;
 
                 bool CheckCondition()
                 {
@@ -114,19 +112,19 @@
                         Console.WriteLine("Audio URL changed, moving to next track.");
                         return false;
                     }
-                    
+
                     if (DateTime.UtcNow - _lastTimeUpdate >= updateTimeSpan)
                     {
                         Console.WriteLine("No audio progress update received, moving to next track.");
                         return false;
                     }
-                    
+
                     if (State.Lifetime.IsTerminated)
                     {
                         Console.WriteLine("Session terminated, exiting audio loop.");
                         return false;
                     }
-                    
+
                     return true;
                 }
             }

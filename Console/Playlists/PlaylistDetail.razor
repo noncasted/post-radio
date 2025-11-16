@@ -164,7 +164,9 @@
 
         LoadSongs();
 
-        SongsCollection.Advise(_lifetime, () =>
+        SongsCollection.Advise(
+            _lifetime,
+            () =>
             {
                 InvokeAsync(() =>
                     {
@@ -218,7 +220,7 @@
             return;
 
         var songGrain = ClusterClient.GetGrain<ISong>(songId);
-        
+
         var updatedData = new SongData
         {
             Id = song.Id,
@@ -226,7 +228,7 @@
             Name = _editTitle,
             Url = song.Url,
             Playlists = song.Playlists,
-            AddDate = song.AddDate,
+            AddDate = song.AddDate
         };
 
         await songGrain.UpdateData(updatedData);

@@ -11,13 +11,6 @@ public interface ITransactionResolver : ITransactionAgent
 
 public class TransactionResolver : ITransactionResolver
 {
-    private readonly ILogger _logger;
-    private readonly CausalClock _clock;
-    private readonly ITransactionAgentStatistics _statistics;
-    private readonly ITransactionOverloadDetector _overloadDetector;
-    private readonly ReadCommiter _readCommiter;
-    private readonly WriteCommiter _writeCommiter;
-
     public TransactionResolver(
         IClock clock,
         ITransactionAgentStatistics statistics,
@@ -31,6 +24,13 @@ public class TransactionResolver : ITransactionResolver
         _readCommiter = new ReadCommiter(logger);
         _writeCommiter = new WriteCommiter(logger);
     }
+
+    private readonly CausalClock _clock;
+    private readonly ILogger _logger;
+    private readonly ITransactionOverloadDetector _overloadDetector;
+    private readonly ReadCommiter _readCommiter;
+    private readonly ITransactionAgentStatistics _statistics;
+    private readonly WriteCommiter _writeCommiter;
 
     public Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
     {
@@ -95,15 +95,16 @@ public class TransactionResolver : ITransactionResolver
 
         var participants = transactionInfo.Participants.Keys.ToList();
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("Abort {TransactionInfo} {Participants}", transactionInfo,
+        if (_logger.IsEnabled(LogLevel.Trace) == true)
+            _logger.LogTrace(
+                "Abort {TransactionInfo} {Participants}",
+                transactionInfo,
                 string.Join(",", participants.Select(p => p.ToString()))
             );
-        }
 
         // send one-way abort messages to release the locks and roll back any updates
-        await Task.WhenAll(participants.Select(p =>
+        await Task.WhenAll(
+            participants.Select(p =>
                 {
                     var resourceExtension = p.AsResource();
                     return resourceExtension

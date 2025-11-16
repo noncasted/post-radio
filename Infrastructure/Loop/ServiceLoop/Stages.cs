@@ -21,15 +21,14 @@ public static class LoopExtensions
             .As<IServiceLoopObserver>()
             .As<ILifecycleParticipant<IClusterClientLifecycle>>()
             .As<ILifecycleParticipant<ISiloLifecycle>>();
-        
+
         builder.Services.Add<ServiceLoop>()
             .As<IServiceLoop>();
-        
+
         return builder;
     }
 
-    public static ContainerExtensions.Registration AsSetupLoopStage(
-        this ContainerExtensions.Registration registration)
+    public static ContainerExtensions.Registration AsSetupLoopStage(this ContainerExtensions.Registration registration)
     {
         return registration
             .As<ILocalSetupCompleted>();

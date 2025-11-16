@@ -10,14 +10,14 @@ public static class OptionsExtensions
     {
         var rootPath = AppDomain.CurrentDomain.BaseDirectory;
         var path = Path.Combine(rootPath, GetFileName());
-        builder.Configuration.AddJsonFile(path, optional: false);
+        builder.Configuration.AddJsonFile(path, false);
 
         var section = builder.Configuration.GetSection(typeof(T).Name);
         builder.Services.Configure<T>(section);
 
         string GetFileName()
         {
-            if (builder.Environment.IsDevelopment())
+            if (builder.Environment.IsDevelopment() == true)
                 return $"{filePath}.Development.json";
 
             return $"{filePath}.json";

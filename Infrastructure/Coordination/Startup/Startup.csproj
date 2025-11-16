@@ -6,12 +6,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Discovery\Environment\Environment.csproj" />
-      <ProjectReference Include="..\..\Discovery\Services\Services.csproj" />
-      <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
-      <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\..\TaskScheduling\Service\Service.csproj" />
-      <ProjectReference Include="..\Common\Common.csproj" />
+        <ProjectReference Include="..\..\Discovery\Environment\Environment.csproj"/>
+        <ProjectReference Include="..\..\Discovery\Services\Services.csproj"/>
+        <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\TaskScheduling\Service\Service.csproj"/>
+        <ProjectReference Include="..\Common\Common.csproj"/>
     </ItemGroup>
 
 </Project>

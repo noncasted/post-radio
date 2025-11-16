@@ -19,8 +19,15 @@ public class ClusterState<T> : ViewableProperty<T>, ILocalSetupCompleted, IClust
         _messaging = messaging;
     }
 
-    private readonly IOrleans _orleans;
     private readonly IMessaging _messaging;
+
+    private readonly IOrleans _orleans;
+
+    public Task SetValue(T value)
+    {
+        Set(value);
+        return _orleans.SetClusterState(value);
+    }
 
     public async Task OnLocalSetupCompleted(IReadOnlyLifetime lifetime)
     {
@@ -37,13 +44,9 @@ public class ClusterState<T> : ViewableProperty<T>, ILocalSetupCompleted, IClust
         Set(value);
     }
 
-    public Task SetValue(T value)
+    protected virtual void OnSetup(IReadOnlyLifetime lifetime)
     {
-        Set(value);
-        return _orleans.SetClusterState(value);
     }
-
-    protected virtual void OnSetup(IReadOnlyLifetime lifetime){}
 }
 
 public static class ClusterStateExtensions

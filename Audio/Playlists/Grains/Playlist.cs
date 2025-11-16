@@ -4,12 +4,12 @@ namespace Audio;
 
 public class Playlist : Grain, IPlaylist
 {
-    private readonly IPersistentState<PlaylistState> _state;
-
     public Playlist([States.Playlist] IPersistentState<PlaylistState> state)
     {
         _state = state;
     }
+
+    private readonly IPersistentState<PlaylistState> _state;
 
     public Task Setup(string url)
     {

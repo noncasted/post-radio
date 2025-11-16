@@ -5,7 +5,7 @@ namespace Infrastructure.Orleans;
 public static class GrainStorageVersionGuard
 {
     /// <summary>
-    /// Checks for version inconsistency as defined in the database scripts.
+    ///     Checks for version inconsistency as defined in the database scripts.
     /// </summary>
     /// <param name="operation">The operation attempted.</param>
     /// <param name="storageVersion">The version from storage.</param>
@@ -14,8 +14,11 @@ public static class GrainStorageVersionGuard
     /// <param name="normalizedGrainType">Grain type without generics information.</param>
     /// <param name="grainId">The grain ID.</param>
     /// <returns>An exception for throwing or <em>null</em> if no violation was detected.</returns>
-    /// <remarks>This means that the version was not updated in the database or the version storage version was something else than null
-    /// when the grain version was null, meaning effectively a double activation and save.</remarks>
+    /// <remarks>
+    ///     This means that the version was not updated in the database or the version storage version was something else than
+    ///     null
+    ///     when the grain version was null, meaning effectively a double activation and save.
+    /// </remarks>
     public static void Check(
         string operation,
         string providerName,
@@ -31,11 +34,9 @@ public static class GrainStorageVersionGuard
         //
         //NOTE: the storage could return also the new and old ETag (Version), but currently it doesn't.
         if (storageVersion == grainVersion || storageVersion == string.Empty)
-        {
             //TODO: Note that this error message should be canonical across back-ends.
             throw new InconsistentStateException(
                 $"Version conflict ({operation}): ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={grainVersion}."
             );
-        }
     }
 }

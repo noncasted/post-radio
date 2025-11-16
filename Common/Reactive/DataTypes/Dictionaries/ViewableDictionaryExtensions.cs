@@ -1,9 +1,23 @@
-﻿namespace Common
+﻿namespace Common;
+
+public static class ViewableDictionaryExtensions
 {
-    public static class ViewableDictionaryExtensions
+    public static void AddLifetimed<TKey, TSource, TView>(
+        this ViewableDictionary<TKey, TSource, TView> dictionary,
+        IReadOnlyLifetime lifetime,
+        TKey key,
+        TSource value)
+        where TKey : notnull
+        where TView : class
+        where TSource : class, TView
     {
-        public static void Advise<TKey, TValue>(
-            this IViewableDictionary<TKey, TValue> dictionary,
+        dictionary.Add(key, value);
+        lifetime.Listen(() => dictionary.Remove(key));
+    }
+
+    extension<TKey, TValue>(IViewableDictionary<TKey, TValue> dictionary)
+    {
+        public void Advise(
             IReadOnlyLifetime lifetime,
             Action<TKey, TValue> listener)
         {
@@ -13,8 +27,7 @@
                 listener.Invoke(key, value);
         }
 
-        public static void View<TKey, TValue>(
-            this IViewableDictionary<TKey, TValue> dictionary,
+        public void View(
             IReadOnlyLifetime lifetime,
             Action<IReadOnlyLifetime, TKey, TValue> listener)
         {
@@ -24,8 +37,7 @@
                 listener.Invoke(dictionary.GetLifetime(key), key, value);
         }
 
-        public static void View<TKey, TValue>(
-            this IViewableDictionary<TKey, TValue> dictionary,
+        public void View(
             IReadOnlyLifetime lifetime,
             Action<IReadOnlyLifetime, TValue> listener)
         {
@@ -35,8 +47,7 @@
                 listener.Invoke(dictionary.GetLifetime(key), value);
         }
 
-        public static void View<TKey, TValue>(
-            this IViewableDictionary<TKey, TValue> dictionary,
+        public void View(
             IReadOnlyLifetime lifetime,
             Action<TValue> listener)
         {
@@ -44,19 +55,6 @@
 
             foreach (var (_, value) in dictionary)
                 listener.Invoke(value);
-        }
-
-        
-        public static void AddLifetimed<TKey, TSource, TView>(
-            this ViewableDictionary<TKey, TSource, TView> dictionary,
-            IReadOnlyLifetime lifetime,
-            TKey key, TSource value)
-            where TKey : notnull
-            where TView : class
-            where TSource : class, TView
-        {
-            dictionary.Add(key, value);
-            lifetime.Listen(() => dictionary.Remove(key));
         }
     }
 }

@@ -17,21 +17,19 @@ public class TaskQueue : ITaskQueue
     }
 
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly Dictionary<string, Entry> _queue = new();
     private readonly ILogger<TaskQueue> _logger;
+    private readonly Dictionary<string, Entry> _queue = new();
 
     public void Enqueue(IPriorityTask task)
     {
         _lock.Wait();
 
         if (_queue.ContainsKey(task.Id) == false)
-        {
-            _queue[task.Id] = new Entry()
+            _queue[task.Id] = new Entry
             {
                 Task = task,
-                ScheduleDate = DateTime.UtcNow + task.Delay,
+                ScheduleDate = DateTime.UtcNow + task.Delay
             };
-        }
 
         _lock.Release();
     }

@@ -5,18 +5,6 @@ namespace Infrastructure.Orleans;
 
 public class GrainKey
 {
-    public long Id_0 { get; }
-
-    public long Id_1 { get; }
-
-    public string StringKey { get; }
-
-    public bool IsLongKey { get; }
-
-    public bool IsGuidKey { get; }
-
-    public bool IsStringKey { get; }
-
     public GrainKey(long key, string keyExtension)
     {
         Id_0 = 0;
@@ -51,18 +39,26 @@ public class GrainKey
         IsStringKey = true;
     }
 
+    public long Id_0 { get; }
+
+    public long Id_1 { get; }
+
+    public string StringKey { get; }
+
+    public bool IsLongKey { get; }
+
+    public bool IsGuidKey { get; }
+
+    public bool IsStringKey { get; }
+
     public byte[] GetHashBytes()
     {
         byte[] bytes = null;
 
         if (IsLongKey)
-        {
             bytes = BitConverter.GetBytes(Id_1);
-        }
         else if (IsGuidKey)
-        {
             bytes = ToGuidKey(Id_0, Id_1).ToByteArray();
-        }
 
         if (bytes != null && StringKey != null)
         {
@@ -85,7 +81,7 @@ public class GrainKey
     {
         string primaryKey;
         string keyExtension = null;
-        
+
         if (IsLongKey)
         {
             primaryKey = Id_1.ToString(CultureInfo.InvariantCulture);
@@ -109,9 +105,18 @@ public class GrainKey
 
     private static Guid ToGuidKey(long n0Key, long n1Key)
     {
-        return new Guid((uint)(n0Key & 0xffffffff), (ushort)(n0Key >> 32), (ushort)(n0Key >> 48), (byte)n1Key,
-            (byte)(n1Key >> 8), (byte)(n1Key >> 16), (byte)(n1Key >> 24), (byte)(n1Key >> 32), (byte)(n1Key >> 40),
-            (byte)(n1Key >> 48), (byte)(n1Key >> 56)
+        return new Guid(
+            (uint)(n0Key & 0xffffffff),
+            (ushort)(n0Key >> 32),
+            (ushort)(n0Key >> 48),
+            (byte)n1Key,
+            (byte)(n1Key >> 8),
+            (byte)(n1Key >> 16),
+            (byte)(n1Key >> 24),
+            (byte)(n1Key >> 32),
+            (byte)(n1Key >> 40),
+            (byte)(n1Key >> 48),
+            (byte)(n1Key >> 56)
         );
     }
 }

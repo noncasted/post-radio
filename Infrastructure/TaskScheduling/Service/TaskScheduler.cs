@@ -13,7 +13,7 @@ public class TaskScheduler : ITaskScheduler
     }
 
     private readonly ITaskQueue _queue;
-    
+
     public void Schedule(IPriorityTask task)
     {
         _queue.Enqueue(task);

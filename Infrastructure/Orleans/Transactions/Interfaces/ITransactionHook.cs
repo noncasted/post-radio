@@ -17,7 +17,7 @@ public static class TransactionHookExtensions
         var handle = grains.GetGrain<ITransactionHandle>(transactionId);
         return handle.AddListener(hook);
     }
-    
+
     public static Task AsTransactionHook<T>(this T grain) where T : ITransactionHook, ICommonGrain
     {
         var transactionId = TransactionContext.GetRequiredTransactionInfo().TransactionId;

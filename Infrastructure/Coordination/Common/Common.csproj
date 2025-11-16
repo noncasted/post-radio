@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj"/>
     </ItemGroup>
 
 </Project>

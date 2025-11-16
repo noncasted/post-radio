@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Sdk" />
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
     </ItemGroup>
-    
+
 </Project>

@@ -26,12 +26,13 @@ public class ClusterParticipantStartup : BackgroundService
         _logger = logger;
     }
 
-    private readonly ITaskBalancer _taskBalancer;
     private readonly IServiceDiscovery _discovery;
-    private readonly IServiceLoopObserver _loopObserver;
-    private readonly IServiceLoop _loop;
-    private readonly IMessaging _messaging;
     private readonly ILogger<ClusterParticipantStartup> _logger;
+    private readonly IServiceLoop _loop;
+    private readonly IServiceLoopObserver _loopObserver;
+    private readonly IMessaging _messaging;
+
+    private readonly ITaskBalancer _taskBalancer;
 
     protected override async Task ExecuteAsync(CancellationToken cancellation)
     {
@@ -98,7 +99,7 @@ public class ClusterParticipantStartup : BackgroundService
                 ServiceTag.Coordinator,
                 ServiceTag.Console,
                 ServiceTag.Frontend,
-                ServiceTag.Silo,
+                ServiceTag.Silo
             };
 
             while (lifetime.IsTerminated == false && AllServicesFound() == false)
@@ -121,7 +122,8 @@ public class ClusterParticipantStartup : BackgroundService
                 if (servicesToAwait.Count == 0)
                     return true;
 
-                _logger.LogWarning("[Startup] {Service} waiting for services: {RequiredServices}",
+                _logger.LogWarning(
+                    "[Startup] {Service} waiting for services: {RequiredServices}",
                     serviceName,
                     string.Join(", ", servicesToAwait)
                 );

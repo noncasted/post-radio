@@ -1,0 +1,7 @@
+root = true
+
+[*.cs]
+# Не заменять == false на !
+csharp_style_prefer_negated_null_check_over_null_equality = false:none
+dotnet_diagnostic.IDE0083.severity = none
+dotnet_diagnostic.IDE0084.severity = none

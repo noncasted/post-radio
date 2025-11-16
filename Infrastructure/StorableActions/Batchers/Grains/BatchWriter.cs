@@ -9,10 +9,10 @@ namespace Infrastructure.StorableActions;
 
 public class BatchWriterTask<T> : IPriorityTask
 {
+    public required IBatchWriter<T> Batcher { get; init; }
     public required string Id { get; init; }
     public required TaskPriority Priority { get; init; }
-    public TimeSpan Delay => TimeSpan.FromSeconds(1f);
-    public required IBatchWriter<T> Batcher { get; init; }
+    public TimeSpan Delay { get; set; }
 
     public Task Execute()
     {
@@ -46,12 +46,12 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
 
     private readonly ILogger<BatchWriter<TState, TEntry>> _logger;
     private readonly IOrleans _orleans;
-    private readonly ITaskScheduler _taskScheduler;
-
-    private readonly IPersistentState<TState> _state;
     private readonly Dictionary<Guid, List<TEntry>> _pending = new();
 
-    private readonly IPriorityTask _task;
+    private readonly IPersistentState<TState> _state;
+
+    private readonly BatchWriterTask<TEntry> _task;
+    private readonly ITaskScheduler _taskScheduler;
 
     protected abstract BatchWriterOptions Options { get; }
 
@@ -61,55 +61,6 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
             return Task.CompletedTask;
 
         _taskScheduler.Schedule(_task);
-        return Task.CompletedTask;
-    }
-
-    public Task WriteTransactional(TEntry value)
-    {
-        this.AsTransactionHook();
-
-        var transactionId = TransactionContext.GetRequiredTransactionInfo().TransactionId;
-        if (_pending.TryGetValue(transactionId, out var list) == false)
-        {
-            list = new List<TEntry>();
-            _pending[transactionId] = list;
-        }
-
-        list.Add(value);
-        _taskScheduler.Schedule(_task);
-        
-        _logger.LogTrace("[BatchWriter] WriteTransactional {writerName} {batchType} {transactionId}",
-            this.GetPrimaryKeyString(),
-            typeof(TEntry).Name,
-            transactionId
-        );
-        
-        return Task.CompletedTask;
-    }
-
-    public async Task WriteDirect(TEntry value)
-    {
-        _state.State.Entries.Add(value);
-        await _state.WriteStateAsync();
-        _taskScheduler.Schedule(_task);
-
-        _logger.LogTrace("[BatchWriter] WriteDirect {writerName} {batchType}",
-            this.GetPrimaryKeyString(),
-            typeof(TEntry).Name
-        );
-    }
-
-    public async Task OnSuccess(Guid transactionId)
-    {
-        _state.State.Entries.AddRange(_pending[transactionId]);
-        _pending.Remove(transactionId);
-        await _state.WriteStateAsync();
-        _taskScheduler.Schedule(_task);
-    }
-
-    public Task OnFailure(Guid transactionId)
-    {
-        _pending.Remove(transactionId);
         return Task.CompletedTask;
     }
 
@@ -143,7 +94,9 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "[BatchWriter] Process failed {writerName} {batchType}",
+            _logger.LogError(
+                e,
+                "[BatchWriter] Process failed {writerName} {batchType}",
                 this.GetPrimaryKeyString(),
                 typeof(TEntry).Name
             );
@@ -154,6 +107,63 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
 
         if (state.Entries.Count > 0)
             _taskScheduler.Schedule(_task);
+    }
+
+    public async Task OnSuccess(Guid transactionId)
+    {
+        _state.State.Entries.AddRange(_pending[transactionId]);
+        _pending.Remove(transactionId);
+        await _state.WriteStateAsync();
+        _taskScheduler.Schedule(_task);
+    }
+
+    public Task OnFailure(Guid transactionId)
+    {
+        _pending.Remove(transactionId);
+        return Task.CompletedTask;
+    }
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        _task.Delay = Options.Delay;
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    public Task WriteTransactional(TEntry value)
+    {
+        this.AsTransactionHook();
+
+        var transactionId = TransactionContext.GetRequiredTransactionInfo().TransactionId;
+        if (_pending.TryGetValue(transactionId, out var list) == false)
+        {
+            list = new List<TEntry>();
+            _pending[transactionId] = list;
+        }
+
+        list.Add(value);
+        _taskScheduler.Schedule(_task);
+
+        _logger.LogTrace(
+            "[BatchWriter] WriteTransactional {writerName} {batchType} {transactionId}",
+            this.GetPrimaryKeyString(),
+            typeof(TEntry).Name,
+            transactionId
+        );
+
+        return Task.CompletedTask;
+    }
+
+    public async Task WriteDirect(TEntry value)
+    {
+        _state.State.Entries.Add(value);
+        await _state.WriteStateAsync();
+        _taskScheduler.Schedule(_task);
+
+        _logger.LogTrace(
+            "[BatchWriter] WriteDirect {writerName} {batchType}",
+            this.GetPrimaryKeyString(),
+            typeof(TEntry).Name
+        );
     }
 
     protected abstract Task Process(IReadOnlyList<TEntry> entries);

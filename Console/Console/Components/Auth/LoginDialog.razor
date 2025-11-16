@@ -27,7 +27,7 @@
         FullWidth="true">
         @if (_isLoading)
         {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
         }
         else
         {
@@ -42,8 +42,8 @@
 
     private string _token = string.Empty;
     private string _errorMessage = string.Empty;
-    private bool _isLoading = false;
-    private bool _showPassword = false;
+    private bool _isLoading;
+    private bool _showPassword;
 
     private InputType _inputType => _showPassword ? InputType.Text : InputType.Password;
     private string _passwordIcon => _showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
@@ -84,4 +84,5 @@
         _isLoading = false;
         StateHasChanged();
     }
+
 }

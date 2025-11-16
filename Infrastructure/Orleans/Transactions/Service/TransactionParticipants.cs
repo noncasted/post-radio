@@ -10,14 +10,13 @@ public class TransactionParticipants
         Info = info;
     }
 
-    private KeyValuePair<ParticipantId, AccessCounter> _manager;
-
     private readonly List<KeyValuePair<ParticipantId, AccessCounter>> _resources = new();
 
     public readonly TransactionInfo Info;
     public readonly List<ParticipantId> Write = new();
 
-    public KeyValuePair<ParticipantId, AccessCounter> Manager => _manager;
+    public KeyValuePair<ParticipantId, AccessCounter> Manager { get; private set; }
+
     public IReadOnlyList<KeyValuePair<ParticipantId, AccessCounter>> Resources => _resources;
 
     public void Collect()
@@ -33,18 +32,19 @@ public class TransactionParticipants
             {
                 if (priorityManager == null)
                 {
-                    _manager = participant;
-                    priorityManager = _manager;
+                    Manager = participant;
+                    priorityManager = Manager;
                 }
                 else
                 {
-                    throw new ArgumentOutOfRangeException(nameof(Info.Participants),
+                    throw new ArgumentOutOfRangeException(
+                        nameof(Info.Participants),
                         "Only one priority transaction manager allowed in transaction"
                     );
                 }
             }
 
-            if (id.IsResource())
+            if (id.IsResource() == true)
             {
                 _resources.Add(participant);
 
@@ -55,7 +55,7 @@ public class TransactionParticipants
             if (manager == null && id.IsManager() == true && participant.Value.Writes > 0)
             {
                 manager = participant;
-                _manager = participant;
+                Manager = participant;
             }
         }
     }

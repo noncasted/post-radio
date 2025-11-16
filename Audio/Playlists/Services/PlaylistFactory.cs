@@ -11,9 +11,10 @@ public class PlaylistFactory : IPlaylistFactory
         _collection = collection;
     }
 
-    private readonly IOrleans _orleans;
-    private readonly IPlaylistLoader _loader;
     private readonly IPlaylistsCollection _collection;
+    private readonly IPlaylistLoader _loader;
+
+    private readonly IOrleans _orleans;
 
     public async Task Create(string url, string name)
     {

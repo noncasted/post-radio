@@ -1,9 +1,9 @@
 ﻿@using Audio
 <MudItem style="position: fixed; bottom: 10px; right: 20px" xs="12" md="1">
     <MudRadioGroup T="Guid"
-        Value="@SelectedPlaylistId"
-        Class="playlist-selection"
-        ValueChanged="@(EventCallback.Factory.Create<Guid>(this, value => OnTargetPlaylistChanged(value)))">
+                   Value="@SelectedPlaylistId"
+                   Class="playlist-selection"
+                   ValueChanged="@(EventCallback.Factory.Create<Guid>(this, value => OnTargetPlaylistChanged(value)))">
         @foreach (var playlist in Playlists.Values)
         {
             <MudRadio T="Guid" Color="Color.Primary" Value="@playlist.Id">@playlist.Name</MudRadio>
@@ -16,7 +16,7 @@
     Value="@State.Volume.Value"
     Vertical="true"
     Class="slider-bottom-left"
-    ValueChanged="@(EventCallback.Factory.Create<double>(this, (value) => OnVolumeSlider(value)))">
+    ValueChanged="@(EventCallback.Factory.Create<double>(this, value => OnVolumeSlider(value)))">
 </MudSlider>
 
 <MudFab

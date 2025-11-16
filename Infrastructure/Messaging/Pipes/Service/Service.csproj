@@ -6,16 +6,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Sdk" />
-        <PackageReference Include="Microsoft.Orleans.Transactions" />
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
+        <PackageReference Include="Microsoft.Orleans.Transactions"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\Discovery\Services\Services.csproj" />
-      <ProjectReference Include="..\..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
-      <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj" />
-      <ProjectReference Include="..\..\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\..\Discovery\Services\Services.csproj"/>
+        <ProjectReference Include="..\..\..\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\..\Orleans\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Interfaces\Interfaces.csproj"/>
     </ItemGroup>
 
 </Project>

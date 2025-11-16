@@ -16,11 +16,9 @@ public class DbConnectionFactory
         var connection = NpgsqlFactory.Instance.CreateConnection();
 
         if (connection == null)
-        {
             throw new InvalidOperationException(
                 $"Database provider factory: '{invariantName}' did not return a connection object."
             );
-        }
 
         connection.ConnectionString = connectionString;
         return connection;

@@ -19,6 +19,11 @@ public class TaskBalancer : ITaskBalancer
         _logger = logger;
     }
 
+    private readonly TimeSpan _emptyDelay = TimeSpan.FromMilliseconds(500);
+
+    private readonly ILogger<TaskBalancer> _logger;
+    private readonly TimeSpan _nextDelay = TimeSpan.FromMilliseconds(100);
+
     private readonly IReadOnlyDictionary<TaskPriority, int> _priorityToScore = new Dictionary<TaskPriority, int>
     {
         [TaskPriority.Low] = 10,
@@ -27,16 +32,12 @@ public class TaskBalancer : ITaskBalancer
         [TaskPriority.Critical] = 40
     };
 
+    private readonly ITaskQueue _queue;
+
+    private readonly ConcurrentDictionary<string, TaskEntry> _scheduled = new();
     private const int _iterationScore = 1;
     private const int _exceptionPenalty = 50;
     private const int _concurrentTasks = 10;
-
-    private readonly ILogger<TaskBalancer> _logger;
-    private readonly ITaskQueue _queue;
-    private readonly TimeSpan _emptyDelay = TimeSpan.FromMilliseconds(500);
-    private readonly TimeSpan _nextDelay = TimeSpan.FromMilliseconds(100);
-
-    private readonly ConcurrentDictionary<string, TaskEntry> _scheduled = new();
 
     public Task Run(IReadOnlyLifetime lifetime)
     {
@@ -125,10 +126,12 @@ public class TaskBalancer : ITaskBalancer
 
             try
             {
-                _logger.LogTrace("[TaskBalancer] Executing task, free handles: {count} {taskId}",
-                    executionLock.CurrentCount, entry.Task.Id
+                _logger.LogTrace(
+                    "[TaskBalancer] Executing task, free handles: {count} {taskId}",
+                    executionLock.CurrentCount,
+                    entry.Task.Id
                 );
-                
+
                 await entry.Task.Execute();
             }
             catch (Exception e)
@@ -137,8 +140,11 @@ public class TaskBalancer : ITaskBalancer
                 entry.Score -= _exceptionPenalty;
                 _scheduled.AddOrUpdate(entry.Key, _ => entry, (_, _) => entry);
 
-                _logger.LogError(e, "[TaskBalancer] Task execution failed in {time} {taskId}",
-                    stopwatch.Elapsed, entry.Task.Id
+                _logger.LogError(
+                    e,
+                    "[TaskBalancer] Task execution failed in {time} {taskId}",
+                    stopwatch.Elapsed,
+                    entry.Task.Id
                 );
             }
             finally
@@ -147,9 +153,11 @@ public class TaskBalancer : ITaskBalancer
             }
 
             stopwatch.Stop();
-            
-            _logger.LogTrace("[TaskBalancer] Task execution completed in {time} {taskId}",
-                stopwatch.Elapsed, entry.Task.Id
+
+            _logger.LogTrace(
+                "[TaskBalancer] Task execution completed in {time} {taskId}",
+                stopwatch.Elapsed,
+                entry.Task.Id
             );
         }
     }
@@ -159,10 +167,8 @@ public class TaskBalancer : ITaskBalancer
         maxEntry = null;
 
         foreach (var (_, entry) in _scheduled)
-        {
             if (maxEntry == null || entry.Score > maxEntry.Score)
                 maxEntry = entry;
-        }
 
         if (maxEntry == null)
             return false;

@@ -20,11 +20,11 @@ public class ImagesCollection : IImagesCollection, ICoordinatorSetupCompleted
         _messaging = messaging;
     }
 
-    private IReadOnlyList<string> _entries = new List<string>();
-    private readonly IObjectStorage _objectStorage;
     private readonly IMessaging _messaging;
+    private readonly IObjectStorage _objectStorage;
     private readonly MessageQueueId _refreshQueue = new("images-collection-refresh");
 
+    private IReadOnlyList<string> _entries = new List<string>();
     public int Count => _entries.Count;
 
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)

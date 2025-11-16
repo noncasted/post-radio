@@ -6,18 +6,18 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Sdk" />
-        <PackageReference Include="Microsoft.Orleans.Transactions" />
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
+        <PackageReference Include="Microsoft.Orleans.Transactions"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
-      <ProjectReference Include="..\..\Orleans\Common\Common.csproj" />
-      <ProjectReference Include="..\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\Queues\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\Queues\Service\Service.csproj" />
-      <ProjectReference Include="..\Pipes\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\Pipes\Service\Service.csproj" />
+        <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\Orleans\Common\Common.csproj"/>
+        <ProjectReference Include="..\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Queues\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Queues\Service\Service.csproj"/>
+        <ProjectReference Include="..\Pipes\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Pipes\Service\Service.csproj"/>
     </ItemGroup>
 
 </Project>

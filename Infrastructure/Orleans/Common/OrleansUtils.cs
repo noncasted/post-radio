@@ -9,7 +9,6 @@ namespace Infrastructure.Orleans;
 public interface IOrleans
 {
     IClusterClient Client { get; }
-    IGrainFactory Grains { get; }
     ITransactions Transactions { get; }
     IDbSource DbSource { get; }
     OrleansJsonSerializer Serializer { get; }
@@ -34,8 +33,9 @@ public class OrleansUtils : IOrleans
         Client = client;
     }
 
-    public IClusterClient Client { get; }
     public IGrainFactory Grains { get; }
+
+    public IClusterClient Client { get; }
     public ITransactions Transactions { get; }
     public IDbSource DbSource { get; }
     public OrleansJsonSerializer Serializer { get; }
@@ -58,37 +58,6 @@ public static class OrleansUtilsExtensions
         return builder;
     }
 
-    public static T GetGrain<T>(this IOrleans orleans, string key) where T : IGrainWithStringKey
-    {
-        return orleans.Grains.GetGrain<T>(key);
-    }
-
-    public static T GetGrain<T>(this IOrleans orleans, long key) where T : IGrainWithIntegerKey
-    {
-        return orleans.Grains.GetGrain<T>(key);
-    }
-    
-    public static T GetGrain<T>(this IOrleans orleans, Guid key) where T : IGrainWithGuidKey
-    {
-        return orleans.Grains.GetGrain<T>(key);
-    }
-
-    public static T GetGrain<T>(this IOrleans orleans) where T : IGrainWithGuidKey
-    {
-        return orleans.Grains.GetGrain<T>(Guid.Empty);
-    }
-
-    public static IReadOnlyList<T> GetGrains<T>(this IOrleans orleans, IReadOnlyList<Guid> ids)
-        where T : IGrainWithGuidKey
-    {
-        var grains = new T[ids.Count];
-
-        for (var i = 0; i < ids.Count; i++)
-            grains[i] = orleans.Grains.GetGrain<T>(ids[i]);
-
-        return grains;
-    }
-
     public static Task Iterate<T>(this IReadOnlyList<T> grains, Func<T, Task> action)
         where T : IGrainWithGuidKey
     {
@@ -96,13 +65,52 @@ public static class OrleansUtilsExtensions
         return Task.WhenAll(tasks);
     }
 
-    public static Task InTransaction(this IOrleans orleans, Func<Task> action)
+    extension(IOrleans orleans)
     {
-        return orleans.Transactions.Client.RunTransaction(TransactionOption.CreateOrJoin, action);
+        public IGrainFactory Grains => orleans.Client;
+
+        public T GetGrain<T>(string key) where T : IGrainWithStringKey
+        {
+            return orleans.Grains.GetGrain<T>(key);
+        }
+
+        public T GetGrain<T>(long key) where T : IGrainWithIntegerKey
+        {
+            return orleans.Grains.GetGrain<T>(key);
+        }
+
+        public T GetGrain<T>(Guid key) where T : IGrainWithGuidKey
+        {
+            return orleans.Grains.GetGrain<T>(key);
+        }
+
+        public T GetGrain<T>() where T : IGrainWithGuidKey
+        {
+            return orleans.Grains.GetGrain<T>(Guid.Empty);
+        }
+
+        public IReadOnlyList<T> GetGrains<T>(IReadOnlyList<Guid> ids)
+            where T : IGrainWithGuidKey
+        {
+            var grains = new T[ids.Count];
+
+            for (var i = 0; i < ids.Count; i++)
+                grains[i] = orleans.Grains.GetGrain<T>(ids[i]);
+
+            return grains;
+        }
     }
 
-    public static TransactionRunBuilder Transaction(this IOrleans orleans, Func<Task> action)
+    extension(IOrleans orleans)
     {
-        return orleans.Transactions.Runner.Create(action);
+        public Task InTransaction(Func<Task> action)
+        {
+            return orleans.Transactions.Client.RunTransaction(TransactionOption.CreateOrJoin, action);
+        }
+
+        public TransactionRunBuilder Transaction(Func<Task> action)
+        {
+            return orleans.Transactions.Runner.Create(action);
+        }
     }
 }

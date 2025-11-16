@@ -1,61 +1,60 @@
 ﻿using System.Collections;
 
-namespace Common
+namespace Common;
+
+public class ModifiableList<T> : IEnumerable<T>
 {
-    public class ModifiableList<T> : IEnumerable<T>
+    private readonly List<T> _add = new(0);
+    private readonly List<T> _list = new();
+    private readonly List<T> _remove = new(0);
+
+    private bool _isIterated;
+
+    public int Count => _list.Count;
+
+    public IEnumerator<T> GetEnumerator()
     {
-        private readonly List<T> _list = new();
-        private readonly List<T> _add = new(0);
-        private readonly List<T> _remove = new(0);
+        _isIterated = true;
 
-        private bool _isIterated;
-        
-        public int Count => _list.Count;
-        
-        public void Add(T value)
-        {
-            if (_isIterated == true)
-                _add.Add(value);
-            else
-                _list.Add(value);
-        }
+        foreach (var value in _list)
+            yield return value;
 
-        public void Remove(T value)
-        {
-            if (_isIterated == true)
-                _remove.Add(value);
-            else
-                _list.Remove(value);
-        }
+        _isIterated = false;
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            _isIterated = true;
+        foreach (var add in _add)
+            _list.Add(add);
 
-            foreach (var value in _list)
-                yield return value;
+        foreach (var remove in _remove)
+            _list.Remove(remove);
 
-            _isIterated = false;
+        _add.Clear();
+        _remove.Clear();
+    }
 
-            foreach (var add in _add)
-                _list.Add(add);
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 
-            foreach (var remove in _remove)
-                _list.Remove(remove);
-            
-            _add.Clear();
-            _remove.Clear();
-        }
+    public void Add(T value)
+    {
+        if (_isIterated == true)
+            _add.Add(value);
+        else
+            _list.Add(value);
+    }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+    public void Remove(T value)
+    {
+        if (_isIterated == true)
+            _remove.Add(value);
+        else
+            _list.Remove(value);
+    }
 
-        public void Clear()
-        {
-            _list.Clear();
-            _list.TrimExcess();
-        }
+    public void Clear()
+    {
+        _list.Clear();
+        _list.TrimExcess();
     }
 }

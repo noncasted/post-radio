@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Messaging;
 
-public class MessagePipeClient : IMessagePipeClient 
+public class MessagePipeClient : IMessagePipeClient
 {
     public MessagePipeClient(
         IOrleans orleans,
@@ -14,12 +14,13 @@ public class MessagePipeClient : IMessagePipeClient
         _logger = logger;
     }
 
-    private readonly Dictionary<IMessagePipeId, object> _oneWayDelegates = new();
+    private readonly ILogger<MessagePipeClient> _logger;
     private readonly Dictionary<IMessagePipeId, MessagePipeObserver> _observers = new();
-    private readonly Dictionary<IMessagePipeId, IMessagePipeObserver> _references = new();
+
+    private readonly Dictionary<IMessagePipeId, object> _oneWayDelegates = new();
 
     private readonly IOrleans _orleans;
-    private readonly ILogger<MessagePipeClient> _logger;
+    private readonly Dictionary<IMessagePipeId, IMessagePipeObserver> _references = new();
 
     private readonly List<Func<Task>> _resubscribeActions = new();
 
@@ -98,9 +99,9 @@ public class MessagePipeClient : IMessagePipeClient
         _resubscribeActions.Add(Subscribe);
         _observers[id] = observer;
         _references[id] = observerReference;
-        
+
         await Subscribe();
-        
+
         return observer;
 
         Task Subscribe()
@@ -111,7 +112,9 @@ public class MessagePipeClient : IMessagePipeClient
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "[Messaging] [Queue] Failed to rebind observer to queue {QueueId}",
+                _logger.LogError(
+                    e,
+                    "[Messaging] [Queue] Failed to rebind observer to queue {QueueId}",
                     id.ToRaw()
                 );
                 return Task.CompletedTask;

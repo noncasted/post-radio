@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Remove="**\*.csproj.DotSettings" />
+        <None Remove="**\*.csproj.DotSettings"/>
     </ItemGroup>
 
     <ItemGroup Condition="
@@ -17,7 +17,7 @@
     and
     !('$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Aspire\AppHost\AppHost.csproj')
   ">
-        <ProjectReference Include="$(MSBuildThisFileDirectory)Common\Extensions\Extensions.csproj" />
-        <ProjectReference Include="$(MSBuildThisFileDirectory)Common\Reactive\Reactive.csproj" />
+        <ProjectReference Include="$(MSBuildThisFileDirectory)Common\Extensions\Extensions.csproj"/>
+        <ProjectReference Include="$(MSBuildThisFileDirectory)Common\Reactive\Reactive.csproj"/>
     </ItemGroup>
 </Project>

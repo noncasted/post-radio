@@ -25,12 +25,13 @@ public class PlaylistLoader : IPlaylistLoader
         _logger = logger;
     }
 
-    private readonly IOrleans _orleans;
-    private readonly SoundCloudClient _soundCloud;
-    private readonly ISongsCollection _songs;
-    private readonly IObjectStorage _objectStorage;
     private readonly HttpClient _http;
     private readonly ILogger<PlaylistLoader> _logger;
+    private readonly IObjectStorage _objectStorage;
+
+    private readonly IOrleans _orleans;
+    private readonly ISongsCollection _songs;
+    private readonly SoundCloudClient _soundCloud;
 
     public async Task Load(PlaylistData playlist, IOperationProgress progress)
     {
@@ -69,7 +70,7 @@ public class PlaylistLoader : IPlaylistLoader
                 },
                 Author = author,
                 Name = name,
-                AddDate = DateTime.UtcNow,
+                AddDate = DateTime.UtcNow
             };
 
             toSetup.Add(data);
@@ -81,7 +82,7 @@ public class PlaylistLoader : IPlaylistLoader
         var existingSongs = await _objectStorage.ContainsMany("audio", songKeys);
 
         var toDownload = allSongs
-            .Where(song => !existingSongs.Contains(song.Id.ToString()))
+            .Where(song => existingSongs.Contains(song.Id.ToString()) == false)
             .ToList();
 
         progress.Log($"Downloading {toDownload.Count}");
@@ -102,9 +103,12 @@ public class PlaylistLoader : IPlaylistLoader
             }
             catch (Exception e)
             {
-                _logger.LogError(e,
+                _logger.LogError(
+                    e,
                     "[Audio] [Playlist] Failed to download track {Author} - {Name} from playlist {PlaylistId}",
-                    song.Author, song.Name, playlist.Id
+                    song.Author,
+                    song.Name,
+                    playlist.Id
                 );
             }
 
@@ -172,8 +176,7 @@ public class PlaylistLoader : IPlaylistLoader
             HttpCompletionOption.ResponseHeadersRead
         );
 
-        if (!response.IsSuccessStatusCode)
-        {
+        if (response.IsSuccessStatusCode == false)
             throw new HttpRequestException(
                 $"Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode})." +
                 Environment.NewLine +
@@ -181,7 +184,6 @@ public class PlaylistLoader : IPlaylistLoader
                 Environment.NewLine +
                 request
             );
-        }
 
         var stream = await response.Content.ReadAsStreamAsync();
 

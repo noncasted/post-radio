@@ -1,25 +1,40 @@
-﻿namespace Common
+﻿namespace Common;
+
+public static class LifetimedValueExtensions
 {
-    public static class LifetimedValueExtensions
+    public static void View<T>(
+        this ILifetimedValue<T> property,
+        IReadOnlyLifetime lifetime,
+        Action<IReadOnlyLifetime, T> listener)
     {
-        public static void View<T>(this ILifetimedValue<T> property, IReadOnlyLifetime lifetime, Action listener)
+        property.Advise(lifetime, listener.Invoke);
+        listener.Invoke(property.ValueLifetime, property.Value);
+    }
+
+    extension<T>(ILifetimedValue<T> property)
+    {
+        public void View(IReadOnlyLifetime lifetime, Action listener)
         {
             property.Advise(lifetime, (_, _) => listener.Invoke());
             listener.Invoke();
         }
 
-        public static void View<T>(this ILifetimedValue<T> property, IReadOnlyLifetime lifetime, Action<T> listener)
+        public void View(IReadOnlyLifetime lifetime, Action<T> listener)
         {
             property.Advise(lifetime, (_, value) => listener.Invoke(value));
             listener.Invoke(property.Value);
         }
+    }
 
-        public static void ViewNotNull<T>(
-            this ILifetimedValue<T?> property,
+    extension<T>(ILifetimedValue<T?> property) where T : class
+    {
+        public void ViewNotNull(
             IReadOnlyLifetime lifetime,
-            Action<T> listener) where T : class
+            Action<T> listener)
         {
-            property.Advise(lifetime, (_, value) =>
+            property.Advise(
+                lifetime,
+                (_, value) =>
                 {
                     if (value != null)
                         listener.Invoke(value);
@@ -30,12 +45,13 @@
                 listener.Invoke(property.Value);
         }
 
-        public static void ViewNotNull<T>(
-            this ILifetimedValue<T?> property,
+        public void ViewNotNull(
             IReadOnlyLifetime lifetime,
-            Action<IReadOnlyLifetime, T> listener) where T : class
+            Action<IReadOnlyLifetime, T> listener)
         {
-            property.Advise(lifetime, (valueLifetime, value) =>
+            property.Advise(
+                lifetime,
+                (valueLifetime, value) =>
                 {
                     if (value != null)
                         listener.Invoke(valueLifetime, value);
@@ -45,19 +61,11 @@
             if (property.Value != null)
                 listener.Invoke(property.ValueLifetime, property.Value);
         }
+    }
 
-
-        public static void View<T>(
-            this ILifetimedValue<T> property,
-            IReadOnlyLifetime lifetime,
-            Action<IReadOnlyLifetime, T> listener)
-        {
-            property.Advise(lifetime, listener.Invoke);
-            listener.Invoke(property.ValueLifetime, property.Value);
-        }
-
-        public static void AdviseTrue(
-            this ILifetimedValue<bool> property,
+    extension(ILifetimedValue<bool> property)
+    {
+        public void AdviseTrue(
             IReadOnlyLifetime lifetime,
             Action listener)
         {
@@ -72,7 +80,7 @@
             }
         }
 
-        public static Task WaitFalse(this ILifetimedValue<bool> property, IReadOnlyLifetime lifetime)
+        public Task WaitFalse(IReadOnlyLifetime lifetime)
         {
             if (property.Value == false)
                 return Task.CompletedTask;
@@ -95,8 +103,8 @@
                 throw new Exception();
             }
         }
-        
-        public static Task WaitTrue(this ILifetimedValue<bool> property, IReadOnlyLifetime lifetime)
+
+        public Task WaitTrue(IReadOnlyLifetime lifetime)
         {
             if (property.Value == true)
                 return Task.CompletedTask;

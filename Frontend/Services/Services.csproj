@@ -6,12 +6,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Sdk" />
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Infrastructure\Loop\ServiceLoop\ServiceLoop.csproj" />
-      <ProjectReference Include="..\..\Infrastructure\Messaging\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Messaging\Interfaces\Interfaces.csproj"/>
     </ItemGroup>
-    
+
 </Project>

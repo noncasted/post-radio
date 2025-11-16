@@ -28,20 +28,21 @@ public class SongsCollection : ViewableDictionary<long, SongData>, ISongsCollect
         _logger = logger;
     }
 
-    private readonly IOrleans _orleans;
+    private readonly Dictionary<Guid, IReadOnlyList<SongData>> _byPlaylist = new();
+    private readonly ILogger<SongsCollection> _logger;
     private readonly IMessaging _messaging;
     private readonly IObjectStorage _objectStorage;
-    private readonly ILogger<SongsCollection> _logger;
-    private readonly Dictionary<Guid, IReadOnlyList<SongData>> _byPlaylist = new();
-    private readonly MessageQueueId _refreshQueue = new("audio-songs-refresh");
 
-    public IReadOnlyDictionary<Guid, IReadOnlyList<SongData>> ByPlaylist => _byPlaylist;
+    private readonly IOrleans _orleans;
+    private readonly MessageQueueId _refreshQueue = new("audio-songs-refresh");
 
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
         _messaging.ListenQueue<RefreshSongsPayload>(lifetime, _refreshQueue, _ => OnRefreshRequested().NoAwait());
         return OnRefreshRequested();
     }
+
+    public IReadOnlyDictionary<Guid, IReadOnlyList<SongData>> ByPlaylist => _byPlaylist;
 
     public Task Refresh()
     {
@@ -84,17 +85,17 @@ public class SongsCollection : ViewableDictionary<long, SongData>, ISongsCollect
                 Url = state.Url,
                 Author = state.Author,
                 Name = state.Name,
-                AddDate = state.AddDate,
+                AddDate = state.AddDate
             };
 
             processed++;
 
             if (processed % 100 == 0)
-            {
-                _logger.LogInformation("[Audio] [Collection] [Songs] Processed {Processed}/{Total} songs...",
-                    processed, count
+                _logger.LogInformation(
+                    "[Audio] [Collection] [Songs] Processed {Processed}/{Total} songs...",
+                    processed,
+                    count
                 );
-            }
         }
 
         _logger.LogInformation("[Audio] [Collection] [Songs] Refresh completed");
@@ -102,14 +103,12 @@ public class SongsCollection : ViewableDictionary<long, SongData>, ISongsCollect
         _byPlaylist.Clear();
 
         foreach (var song in Values)
+        foreach (var playlistId in song.Playlists)
         {
-            foreach (var playlistId in song.Playlists)
-            {
-                if (!_byPlaylist.ContainsKey(playlistId))
-                    _byPlaylist[playlistId] = new List<SongData>();
+            if (_byPlaylist.ContainsKey(playlistId) == false)
+                _byPlaylist[playlistId] = new List<SongData>();
 
-                ((List<SongData>)_byPlaylist[playlistId]).Add(song);
-            }
+            ((List<SongData>)_byPlaylist[playlistId]).Add(song);
         }
     }
 }

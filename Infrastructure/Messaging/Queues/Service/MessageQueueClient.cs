@@ -12,12 +12,13 @@ public class MessageQueueClient : IMessageQueueClient
         _logger = logger;
     }
 
-    private readonly IOrleans _orleans;
-    private readonly ILogger<MessageQueueClient> _logger;
     private readonly Dictionary<string, object> _delegates = new();
-    private readonly List<Func<Task>> _resubscribeActions = new();
-    
+    private readonly ILogger<MessageQueueClient> _logger;
+
     private readonly Dictionary<IMessageQueueId, MessageQueueObserver> _observers = new();
+
+    private readonly IOrleans _orleans;
+    private readonly List<Func<Task>> _resubscribeActions = new();
 
     public Task Start(IReadOnlyLifetime lifetime)
     {
@@ -28,7 +29,7 @@ public class MessageQueueClient : IMessageQueueClient
     public IViewableDelegate<T> GetOrCreateConsumer<T>(IMessageQueueId id)
     {
         var rawId = id.ToRaw();
-        
+
         if (_delegates.ContainsKey(rawId) == false)
         {
             var source = new ViewableDelegate<T>();
@@ -41,7 +42,7 @@ public class MessageQueueClient : IMessageQueueClient
                     source.Invoke(castedMessage);
                 }
             );
-            
+
             _observers[id] = observer;
 
             var observerReference = _orleans.Client.CreateObjectReference<IMessageQueueObserver>(observer);
@@ -62,7 +63,9 @@ public class MessageQueueClient : IMessageQueueClient
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError(e, "[Messaging] [Queue] Failed to rebind observer to queue {QueueId}",
+                    _logger.LogError(
+                        e,
+                        "[Messaging] [Queue] Failed to rebind observer to queue {QueueId}",
                         rawId
                     );
                     return Task.CompletedTask;

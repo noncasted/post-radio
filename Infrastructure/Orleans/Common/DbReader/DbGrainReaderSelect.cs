@@ -5,8 +5,9 @@ public class DbGrainReaderSelect
     public bool Id { get; set; }
     public bool Payload { get; set; }
     public bool Extension { get; set; }
-    
-    public string FormQuery() {
+
+    public string FormQuery()
+    {
         var entries = new List<string>();
 
         if (Id == true)
@@ -17,7 +18,7 @@ public class DbGrainReaderSelect
 
         if (Extension == true)
             entries.Add("extension");
-        
+
         if (entries.Count == 0)
             entries.Add("*");
 

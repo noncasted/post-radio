@@ -2,18 +2,20 @@
 
 public static class TaskExtensions
 {
-    private static readonly Action<Task> _noAwaitContinuation = (t =>
+    private static readonly Action<Task> _noAwaitContinuation = t =>
     {
-        if (t.Exception == null || t.Exception.IsOperationCanceled())
+        if (t.Exception == null || t.Exception.IsOperationCanceled() == true)
             return;
 
         throw t.Exception;
-    });
+    };
 
     public static void NoAwait(this Task? task)
     {
-        task?.ContinueWith(_noAwaitContinuation,
-            TaskContinuationOptions.NotOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+        task?.ContinueWith(
+            _noAwaitContinuation,
+            TaskContinuationOptions.NotOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously
+        );
     }
 
     public static bool IsOperationCanceled(this Exception? exception)
@@ -27,11 +29,9 @@ public static class TaskExtensions
             case AggregateException aggregateException:
                 if (aggregateException.InnerExceptions.Count == 0)
                     return false;
-                foreach (Exception innerException in aggregateException.InnerExceptions)
-                {
-                    if (!innerException.IsOperationCanceled())
+                foreach (var innerException in aggregateException.InnerExceptions)
+                    if (innerException.IsOperationCanceled() == false)
                         return false;
-                }
 
                 return true;
             default:

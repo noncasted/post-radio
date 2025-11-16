@@ -25,17 +25,20 @@ public static class ClusterStateStorageExtensions
     {
         return orleans.Grains.GetClusterState<T>();
     }
-    
-    public static ValueTask<T> GetClusterState<T>(this IGrainFactory grains)
+
+    extension(IGrainFactory grains)
     {
-        var grain = grains.GetClusterStateGrain<T>();
-        return grain.Get();
-    }
-    
-    private static IClusterStateStorage<T> GetClusterStateGrain<T>(this IGrainFactory grains)
-    {
-        var type = typeof(T);
-        var grainId = type.FullName!;
-        return grains.GetGrain<IClusterStateStorage<T>>(grainId);
+        public ValueTask<T> GetClusterState<T>()
+        {
+            var grain = grains.GetClusterStateGrain<T>();
+            return grain.Get();
+        }
+
+        private IClusterStateStorage<T> GetClusterStateGrain<T>()
+        {
+            var type = typeof(T);
+            var grainId = type.FullName!;
+            return grains.GetGrain<IClusterStateStorage<T>>(grainId);
+        }
     }
 }

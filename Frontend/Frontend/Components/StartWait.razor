@@ -1,4 +1,4 @@
-﻿@if (_isStarted == false)
+﻿@if (!_isStarted)
 {
     <MudButton
         Style="position: fixed; left: 50%; bottom: 50%; height: 70px; width: 300px; font-size: 2rem; transform: translate(-50%, -50%)"
@@ -21,4 +21,5 @@
 
         await InvokeAsync(StateHasChanged);
     }
+
 }

@@ -10,12 +10,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MudBlazor" />
+        <PackageReference Include="MudBlazor"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Frontend\Services\Services.csproj" />
-      <ProjectReference Include="..\Common\Common.csproj" />
+        <ProjectReference Include="..\..\Frontend\Services\Services.csproj"/>
+        <ProjectReference Include="..\Common\Common.csproj"/>
     </ItemGroup>
 
 </Project>

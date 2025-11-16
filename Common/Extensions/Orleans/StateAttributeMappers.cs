@@ -25,20 +25,17 @@ public class GenericPersistentStateAttributeMapper<TAttribute> : IAttributeToFac
         IPersistentStateConfiguration config = attribute;
 
         if (string.IsNullOrEmpty(config.StateName) == true)
-        {
-            config = new PersistentStateConfiguration()
+            config = new PersistentStateConfiguration
                 { StateName = parameter.Name!, StorageName = attribute.StorageName };
-        }
 
         var parameterType = parameter.ParameterType;
 
-        if (!parameterType.IsGenericType || typeof(IPersistentState<>) != parameterType.GetGenericTypeDefinition())
-        {
+        if (parameterType.IsGenericType == false || typeof(IPersistentState<>) != parameterType.GetGenericTypeDefinition())
             throw new ArgumentException(
-                $"Parameter '{parameter.Name}' on the constructor for '{parameter.Member.DeclaringType}' has an unsupported type, '{parameterType}'. "
-                + $"It must be an instance of generic type '{typeof(IPersistentState<>)}' because it has an associated [PersistentState(...)] attribute.",
-                parameter.Name);
-        }
+                $"Parameter '{parameter.Name}' on the constructor for '{parameter.Member.DeclaringType}' has an unsupported type, '{parameterType}'. " +
+                $"It must be an instance of generic type '{typeof(IPersistentState<>)}' because it has an associated [PersistentState(...)] attribute.",
+                parameter.Name
+            );
 
         var genericCreate = _createMethodInfo.MakeGenericMethod(parameterType.GetGenericArguments());
         return context => Create(context, genericCreate, config);

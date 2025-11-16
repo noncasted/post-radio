@@ -4,7 +4,7 @@
         Color="Color.Inherit"
         Edge="Edge.Start"
         Class="px-6"
-        OnClick="@(() => @Navigation.NavigateTo("/"))"/>
+        OnClick="@(() => Navigation.NavigateTo("/"))"/>
     <MudText Typo="Typo.h5" Class="px-6">@Title</MudText>
 </MudPaper>
 
@@ -12,6 +12,6 @@
 
 @code {
     [Parameter] public string Title { get; set; }
-    
+
     [Inject] private IConsoleNavigation Navigation { get; set; }
 }

@@ -1,41 +1,43 @@
-﻿namespace Common
+﻿namespace Common;
+
+public static class ViewablePropertyExtensions
 {
-    public static class ViewablePropertyExtensions
+    public static bool IsZero(this IViewableProperty<int> property)
     {
-        public static int Increase(this ViewableProperty<int> property)
+        return property.Value == 0;
+    }
+
+    extension(ViewableProperty<int> property)
+    {
+        public int Increase()
         {
             var value = property.Value + 1;
             property.Set(value);
             return value;
         }
-        
-        public static int Decrease(this ViewableProperty<int> property)
+
+        public int Decrease()
         {
             var value = property.Value - 1;
             property.Set(value);
             return value;
         }
-        
-        public static bool IsZero(this ViewableProperty<int> property)
+
+        public bool IsZero()
         {
             return property.Value == 0;
         }
-        
-        public static void Add(this ViewableProperty<int> property, int amount)
+
+        public void Add(int amount)
         {
             var currentValue = property.Value;
             property.Set(currentValue + amount);
         }
-        
-        public static void Remove(this ViewableProperty<int> property, int amount)
+
+        public void Remove(int amount)
         {
             var currentValue = property.Value;
             property.Set(currentValue - amount);
-        }
-        
-        public static bool IsZero(this IViewableProperty<int> property)
-        {
-            return property.Value == 0;
         }
     }
 }

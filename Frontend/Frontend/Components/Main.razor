@@ -17,7 +17,7 @@
     [Inject] private IImagesCollection ImagesCollection { get; set; }
     [Inject] private IOnlineTracker Tracker { get; set; }
 
-    [field: AllowNull, MaybeNull]
+    [field: AllowNull] [field: MaybeNull]
     private SessionState State
     {
         get

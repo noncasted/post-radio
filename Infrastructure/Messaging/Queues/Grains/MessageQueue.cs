@@ -13,24 +13,14 @@ public class MessageQueue : BatchWriter<MessageQueueState, object>, IMessageQueu
         _logger = logger;
     }
 
-    private readonly Dictionary<Guid, ObserverData> _observers = new();
     private readonly ILogger<MessageQueue> _logger;
+
+    private readonly Dictionary<Guid, ObserverData> _observers = new();
 
     protected override BatchWriterOptions Options { get; } = new()
     {
         RequiresTransaction = false
     };
-
-    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
-    {
-        var latestUpdate = _observers.Values.Max(t => t.UpdateDate);
-        var timeSinceLastUpdate = DateTime.UtcNow - latestUpdate;
-
-        if (timeSinceLastUpdate > TimeSpan.FromMinutes(3))
-            return;
-
-        throw new Exception("[Messaging] [Queue] Keeping queue alive because observer was recently set");
-    }
 
     public Task AddObserver(Guid id, IMessageQueueObserver observer)
     {
@@ -62,11 +52,23 @@ public class MessageQueue : BatchWriter<MessageQueueState, object>, IMessageQueu
         return WriteTransactional(message);
     }
 
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        var latestUpdate = _observers.Values.Max(t => t.UpdateDate);
+        var timeSinceLastUpdate = DateTime.UtcNow - latestUpdate;
+
+        if (timeSinceLastUpdate > TimeSpan.FromMinutes(3))
+            return;
+
+        throw new Exception("[Messaging] [Queue] Keeping queue alive because observer was recently set");
+    }
+
     protected override async Task Process(IReadOnlyList<object> entries)
     {
         var toRemove = new List<Guid>();
 
-        await Task.WhenAll(_observers.Values.Select(data =>
+        await Task.WhenAll(
+            _observers.Values.Select(data =>
                 {
                     var observer = data.Observer;
 
@@ -78,7 +80,8 @@ public class MessageQueue : BatchWriter<MessageQueueState, object>, IMessageQueu
                     {
                         toRemove.Add(data.Id);
 
-                        _logger.LogError(e,
+                        _logger.LogError(
+                            e,
                             "[Messaging] [Queue] Delevering message from {QueueName} to observer failed",
                             StringId
                         );

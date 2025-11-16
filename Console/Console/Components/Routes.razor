@@ -1,5 +1,6 @@
 ﻿@using Console.Components.Layout
-<Router AppAssembly="typeof(Program).Assembly" AdditionalAssemblies="new []{typeof(Main).Assembly, typeof(Playlists).Assembly, typeof(Songs).Assembly, typeof(Images).Assembly, typeof(Migrations).Assembly}">
+<Router AppAssembly="typeof(Program).Assembly"
+        AdditionalAssemblies="new []{typeof(Main).Assembly, typeof(Playlists).Assembly, typeof(Songs).Assembly, typeof(Images).Assembly, typeof(Migrations).Assembly}">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)"/>
         <FocusOnNavigate RouteData="routeData" Selector="h1"/>

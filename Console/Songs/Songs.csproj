@@ -10,13 +10,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MudBlazor" />
+        <PackageReference Include="MudBlazor"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\Audio\Services\Collections\Collections.csproj" />
-        <ProjectReference Include="..\..\Audio\Songs\Interfaces\Interfaces.csproj" />
-        <ProjectReference Include="..\Common\Common.csproj" />
+        <ProjectReference Include="..\..\Audio\Services\Collections\Collections.csproj"/>
+        <ProjectReference Include="..\..\Audio\Songs\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Common\Common.csproj"/>
     </ItemGroup>
 
 </Project>

@@ -6,15 +6,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Sdk" />
-        <PackageReference Include="Microsoft.Orleans.Transactions" />
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
+        <PackageReference Include="Microsoft.Orleans.Transactions"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\StorableActions\Batchers\Grains\Grains.csproj" />
-      <ProjectReference Include="..\..\..\StorableActions\Batchers\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\..\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\Interfaces\Interfaces.csproj" />
+        <ProjectReference Include="..\..\..\StorableActions\Batchers\Grains\Grains.csproj"/>
+        <ProjectReference Include="..\..\..\StorableActions\Batchers\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\Interfaces\Interfaces.csproj"/>
     </ItemGroup>
 
 </Project>

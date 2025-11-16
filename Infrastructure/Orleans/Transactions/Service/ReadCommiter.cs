@@ -7,13 +7,13 @@ namespace Infrastructure.Orleans;
 
 public class ReadCommiter
 {
-    private readonly ILogger _logger;
-    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
-
     public ReadCommiter(ILogger logger)
     {
         _logger = logger;
     }
+
+    private readonly ILogger _logger;
+    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 
     public async Task<(TransactionalStatus, Exception?)> Execute(TransactionParticipants participants)
     {
@@ -28,23 +28,20 @@ public class ReadCommiter
 
             // examine the return status
             foreach (var commitStatus in commitResults)
-            {
                 if (commitStatus != TransactionalStatus.Ok)
                 {
                     status = commitStatus;
 
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
+                    if (_logger.IsEnabled(LogLevel.Debug) == true)
                         _logger.LogDebug(
                             "{TotalMilliseconds} fail {TransactionId} prepare response status={status}",
-                            _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId,
+                            _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                            info.TransactionId,
                             status
                         );
-                    }
 
                     break;
                 }
-            }
 
             exception = null;
         }
@@ -60,14 +57,12 @@ public class ReadCommiter
         if (status != TransactionalStatus.Ok)
             await Cancel();
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
+        if (_logger.IsEnabled(LogLevel.Trace) == true)
             _logger.LogTrace(
                 "{ElapsedMilliseconds} finish (reads only) {TransactionId}",
                 info.TransactionId,
                 _stopwatch.Elapsed.TotalMilliseconds.ToString("f2")
             );
-        }
 
         return (status, exception);
 
@@ -79,7 +74,8 @@ public class ReadCommiter
             {
                 var resourceExtension = resource.Key.Reference.AsReference<ITransactionalResourceExtension>();
 
-                tasks.Add(resourceExtension.CommitReadOnly(
+                tasks.Add(
+                    resourceExtension.CommitReadOnly(
                         resource.Key.Name,
                         info.TransactionId,
                         resource.Value,
@@ -95,12 +91,12 @@ public class ReadCommiter
 
         void HandleTimeoutException(TimeoutException timeoutException)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("{TotalMilliseconds} timeout {TransactionId} on CommitReadOnly",
-                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId
+            if (_logger.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug(
+                    "{TotalMilliseconds} timeout {TransactionId} on CommitReadOnly",
+                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                    info.TransactionId
                 );
-            }
 
             status = TransactionalStatus.ParticipantResponseTimeout;
             exception = timeoutException;
@@ -108,14 +104,16 @@ public class ReadCommiter
 
         void HandleGenericException(Exception e)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("{TotalMilliseconds} failure {TransactionId} CommitReadOnly",
-                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), info.TransactionId
+            if (_logger.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug(
+                    "{TotalMilliseconds} failure {TransactionId} CommitReadOnly",
+                    _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
+                    info.TransactionId
                 );
-            }
 
-            _logger.LogWarning(e, "Unknown error while commiting readonly transaction {TransactionId}",
+            _logger.LogWarning(
+                e,
+                "Unknown error while commiting readonly transaction {TransactionId}",
                 info.TransactionId
             );
 
@@ -127,7 +125,8 @@ public class ReadCommiter
         {
             try
             {
-                await Task.WhenAll(participants.Resources.Select((resource) =>
+                await Task.WhenAll(
+                    participants.Resources.Select(resource =>
                         {
                             var id = resource.Key;
                             var resourceExtension = id.Reference.AsReference<ITransactionalResourceExtension>();
@@ -138,15 +137,13 @@ public class ReadCommiter
             }
             catch (Exception ex)
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
+                if (_logger.IsEnabled(LogLevel.Debug) == true)
                     _logger.LogDebug(
                         ex,
                         "{TotalMilliseconds} failure aborting {TransactionId} CommitReadOnly",
                         _stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
                         info.TransactionId
                     );
-                }
 
                 _logger.LogWarning(
                     ex,

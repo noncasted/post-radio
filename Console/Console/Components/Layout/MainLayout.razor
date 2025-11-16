@@ -2,24 +2,25 @@
 @using Console.Services
 @inherits LayoutComponentBase
 
-<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
 
 <AuthenticationRequired>
     <MudLayout>
         <MudAppBar Elevation="1" Style="height: 50px">
-            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                           OnClick="@(e => DrawerToggle())"/>
             <MudText Typo="Typo.h5" Class="ml-3">Console</MudText>
-            <MudSpacer />
-            <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
+            <MudSpacer/>
+            <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle"/>
             <MudTooltip Text="Logout">
-                <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit" OnClick="@Logout" />
+                <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit" OnClick="@Logout"/>
             </MudTooltip>
         </MudAppBar>
         <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-            <NavMenu />
+            <NavMenu/>
         </MudDrawer>
         <MudMainContent Class="mt-16 pa-4">
             @Body
@@ -38,15 +39,15 @@
     [Inject] private IAuthService AuthService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
-    private bool _drawerOpen = false;
+    private bool _drawerOpen;
     private bool _isDarkMode = true;
-    private MudTheme? _theme = null;
+    private MudTheme? _theme;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
 
-        _theme = new()
+        _theme = new MudTheme
         {
             PaletteLight = _lightPalette,
             PaletteDark = _darkPalette,
@@ -77,7 +78,7 @@
         AppbarBackground = "rgba(255,255,255,0.8)",
         DrawerBackground = "#ffffff",
         GrayLight = "#e8e8e8",
-        GrayLighter = "#f9f9f9",
+        GrayLighter = "#f9f9f9"
     };
 
     private readonly PaletteDark _darkPalette = new()
@@ -106,14 +107,15 @@
         LinesDefault = "#33323e",
         TableLines = "#33323e",
         Divider = "#292838",
-        OverlayLight = "#1e1e2d80",
+        OverlayLight = "#1e1e2d80"
     };
 
     public string DarkLightModeButtonIcon => _isDarkMode switch
     {
         true => Icons.Material.Rounded.AutoMode,
-        false => Icons.Material.Outlined.DarkMode,
+        false => Icons.Material.Outlined.DarkMode
     };
+
 }
 
 

@@ -1,9 +1,8 @@
-﻿namespace Common
+﻿namespace Common;
+
+public interface IViewableDictionary<TKey, TValue> :
+    IEventSource<IReadOnlyLifetime, TKey, TValue>,
+    IReadOnlyDictionary<TKey, TValue>
 {
-    public interface IViewableDictionary<TKey, TValue> :
-        IEventSource<IReadOnlyLifetime, TKey, TValue>,
-        IReadOnlyDictionary<TKey, TValue>
-    {
-        IReadOnlyLifetime GetLifetime(TKey value);
-    }
+    IReadOnlyLifetime GetLifetime(TKey value);
 }

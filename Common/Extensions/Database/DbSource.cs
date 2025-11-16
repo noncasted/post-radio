@@ -15,7 +15,7 @@ public class DbSource : IDbSource
         var connectionString = configuration.GetConnectionString(ConnectionNames.Postgres)!;
         Value = NpgsqlDataSource.Create(connectionString);
     }
-    
+
     public NpgsqlDataSource Value { get; }
 }
 

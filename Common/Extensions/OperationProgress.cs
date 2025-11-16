@@ -26,16 +26,14 @@ public enum OperationStatus
 public class OperationProgress : IOperationProgress
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly ViewableProperty<string> _message = new(string.Empty);
 
     private readonly ViewableProperty<float> _progress = new(0);
     private readonly ViewableProperty<OperationStatus> _status = new(OperationStatus.NotStarted);
-    private readonly ViewableProperty<string> _message = new(string.Empty);
 
-    private DateTime _startTime;
-    private DateTime _endTime;
+    public DateTime StartTime { get; private set; }
 
-    public DateTime StartTime => _startTime;
-    public DateTime EndTime => _endTime;
+    public DateTime EndTime { get; private set; }
 
     public IViewableProperty<float> Progress => _progress;
     public IViewableProperty<OperationStatus> Status => _status;
@@ -58,10 +56,10 @@ public class OperationProgress : IOperationProgress
     public void SetStatus(OperationStatus status)
     {
         if (status == OperationStatus.Preparing)
-            _startTime = DateTime.UtcNow;
-        
+            StartTime = DateTime.UtcNow;
+
         if (status == OperationStatus.Success || status == OperationStatus.Failed)
-            _endTime = DateTime.UtcNow;
+            EndTime = DateTime.UtcNow;
 
         _lock.Wait();
         _status.Set(status);

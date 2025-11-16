@@ -15,7 +15,7 @@ public static class AudioServicesExtensions
 
         services.Add<PlaylistLoader>()
             .As<IPlaylistLoader>();
-        
+
         services.Add<PlaylistsCollection>()
             .As<IPlaylistsCollection>()
             .As<ICoordinatorSetupCompleted>();
@@ -26,7 +26,7 @@ public static class AudioServicesExtensions
 
         services.Add<AudioServicesStartup>()
             .As<ICoordinatorSetupCompleted>();
-        
+
         return builder;
     }
 }

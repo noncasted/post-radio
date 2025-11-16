@@ -20,35 +20,37 @@ public class Transactions : ITransactions
 
 public static class TransactionsExtensions
 {
-    public static Task Create(this ITransactions transactions, Func<Task> action)
+    extension(ITransactions transactions)
     {
-        return transactions.Client.RunTransaction(TransactionOption.Create, action);
-    }
+        public Task Create(Func<Task> action)
+        {
+            return transactions.Client.RunTransaction(TransactionOption.Create, action);
+        }
 
-    public static Task Join(this ITransactions transactions, Func<Task> action)
-    {
-        return transactions.Client.RunTransaction(TransactionOption.Join, action);
-    }
+        public Task Join(Func<Task> action)
+        {
+            return transactions.Client.RunTransaction(TransactionOption.Join, action);
+        }
 
-    public static Task<T> Create<T>(this ITransactions transactions, Func<Task<T>> action)
-    {
-        return transactions.Run(TransactionOption.Create, action);
-    }
+        public Task<T> Create<T>(Func<Task<T>> action)
+        {
+            return transactions.Run(TransactionOption.Create, action);
+        }
 
-    public static Task<T> Join<T>(this ITransactions transactions, Func<Task<T>> action)
-    {
-        return transactions.Run(TransactionOption.Join, action);
-    }
+        public Task<T> Join<T>(Func<Task<T>> action)
+        {
+            return transactions.Run(TransactionOption.Join, action);
+        }
 
-    public static async Task<T> Run<T>(
-        this ITransactions transactions,
-        TransactionOption option,
-        Func<Task<T>> action)
-    {
-        T result = default!;
+        public async Task<T> Run<T>(
+            TransactionOption option,
+            Func<Task<T>> action)
+        {
+            T result = default!;
 
-        await transactions.Client.RunTransaction(option, async () => { result = await action(); });
+            await transactions.Client.RunTransaction(option, async () => { result = await action(); });
 
-        return result;
+            return result;
+        }
     }
 }

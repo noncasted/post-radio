@@ -1,111 +1,110 @@
-﻿namespace Common
+﻿namespace Common;
+
+public class ViewableList<TSource> : ViewableList<TSource, TSource> where TSource : notnull
 {
-    public class ViewableList<TSource> : ViewableList<TSource, TSource> where TSource : notnull
+}
+
+public class ViewableList<TSource, TView> : List<TSource>, IViewableList<TView>
+    where TView : notnull
+    where TSource : TView
+{
+    private readonly EventSource<IReadOnlyLifetime, TView> _eventSource = new();
+    private readonly Dictionary<TView, ILifetime> _lifetimes = new();
+
+    private bool _isDisposed;
+
+    public new TView this[int index] => base[index];
+
+    public void Advise(IReadOnlyLifetime lifetime, Action<IReadOnlyLifetime, TView> handler)
     {
+        _eventSource.Advise(lifetime, handler);
     }
 
-    public class ViewableList<TSource, TView> : List<TSource>, IViewableList<TView>
-        where TView : notnull
-        where TSource : TView
+    public IReadOnlyLifetime GetLifetime(TView value)
     {
-        private readonly EventSource<IReadOnlyLifetime, TView> _eventSource = new();
-        private readonly Dictionary<TView, ILifetime> _lifetimes = new();
+        return _lifetimes[value];
+    }
 
-        private bool _isDisposed;
+    public new IEnumerator<TView> GetEnumerator()
+    {
+        List<TSource> list = this;
 
-        public new TView this[int index] => base[index];
+        foreach (var source in list)
+            yield return source;
+    }
 
-        public void Advise(IReadOnlyLifetime lifetime, Action<IReadOnlyLifetime, TView> handler)
-        {
-            _eventSource.Advise(lifetime, handler);
-        }
+    public void Dispose()
+    {
+        Clear();
+        _eventSource.Dispose();
+        _isDisposed = true;
+    }
 
-        public IReadOnlyLifetime GetLifetime(TView value)
-        {
-            return _lifetimes[value];
-        }
+    public new IReadOnlyLifetime Add(TSource value)
+    {
+        if (_isDisposed == true)
+            return new TerminatedLifetime();
 
-        public new IReadOnlyLifetime Add(TSource value)
-        {
-            if (_isDisposed == true)
-                return new TerminatedLifetime();
+        base.Add(value);
+        var lifetime = new Lifetime();
+        _lifetimes.Add(value, lifetime);
 
-            base.Add(value);
-            var lifetime = new Lifetime();
-            _lifetimes.Add(value, lifetime);
+        _eventSource.Invoke(lifetime, value);
 
-            _eventSource.Invoke(lifetime, value);
+        OnModified();
 
-            OnModified();
+        return lifetime;
+    }
 
-            return lifetime;
-        }
+    public new void Remove(TSource value)
+    {
+        if (_isDisposed == true)
+            return;
 
-        public new void Remove(TSource value)
-        {
-            if (_isDisposed == true)
-                return;
+        base.Remove(value);
+        _lifetimes[value].Terminate();
 
-            base.Remove(value);
-            _lifetimes[value].Terminate();
+        OnModified();
+    }
 
-            OnModified();
-        }
+    public new void AddRange(IEnumerable<TSource> collection)
+    {
+        foreach (var value in collection)
+            Add(value);
+    }
 
-        public new void AddRange(IEnumerable<TSource> collection)
-        {
-            foreach (var value in collection)
-                Add(value);
-        }
-
-        public void RemoveRange(IEnumerable<TSource> collection)
-        {
-            foreach (var value in collection)
-                Remove(value);
-        }
-
-        public new void RemoveAt(int index)
-        {
-            var source = this as IList<TSource>;
-            var value = source[index];
+    public void RemoveRange(IEnumerable<TSource> collection)
+    {
+        foreach (var value in collection)
             Remove(value);
-        }
+    }
 
-        public new IEnumerator<TView> GetEnumerator()
-        {
-            List<TSource> list = this;
+    public new void RemoveAt(int index)
+    {
+        var source = this as IList<TSource>;
+        var value = source[index];
+        Remove(value);
+    }
 
-            foreach (var source in list)
-                yield return source;
-        }
+    public IEnumerable<TSource> GetEnumerable()
+    {
+        List<TSource> list = this;
 
-        public IEnumerable<TSource> GetEnumerable()
-        {
-            List<TSource> list = this;
+        foreach (var source in list)
+            yield return source;
+    }
 
-            foreach (var source in list)
-                yield return source;
-        }
+    public new void Clear()
+    {
+        foreach (var entry in this)
+            _lifetimes[entry].Terminate();
 
-        public new void Clear()
-        {
-            foreach (var entry in this)
-                _lifetimes[entry].Terminate();
+        _lifetimes.Clear();
 
-            _lifetimes.Clear();
+        OnModified();
+    }
 
-            OnModified();
-        }
-
-        protected virtual void OnModified()
-        {
-        }
-
-        public void Dispose()
-        {
-            Clear();
-            _eventSource.Dispose();
-            _isDisposed = true;
-        }
+    protected virtual void OnModified()
+    {
     }
 }

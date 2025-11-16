@@ -6,10 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj" />
-      <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj" />
-      <ProjectReference Include="..\..\Orleans\Common\Common.csproj" />
-      <ProjectReference Include="..\..\StorableActions\ClusterStates\Service\Service.csproj" />
+        <ProjectReference Include="..\..\Loop\ServiceLoop\ServiceLoop.csproj"/>
+        <ProjectReference Include="..\..\Messaging\Interfaces\Interfaces.csproj"/>
+        <ProjectReference Include="..\..\Orleans\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\StorableActions\ClusterStates\Service\Service.csproj"/>
     </ItemGroup>
 
 </Project>

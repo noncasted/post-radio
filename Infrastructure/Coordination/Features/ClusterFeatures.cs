@@ -24,18 +24,15 @@ public class ClusterFeatures : ClusterState<ClusterFeaturesState>, IClusterFeatu
 
     public IViewableProperty<bool> AcceptingConnections => _acceptingConnections;
 
-    protected override void OnSetup(IReadOnlyLifetime lifetime)
-    {
-        this.View(lifetime, value =>
-        {
-            _acceptingConnections.Set(value.AcceptingConnections);
-        });
-    }
-
     public Task SetAcceptingConnections(bool accepting)
     {
         Value.AcceptingConnections = accepting;
         return SetValue(Value);
+    }
+
+    protected override void OnSetup(IReadOnlyLifetime lifetime)
+    {
+        this.View(lifetime, value => { _acceptingConnections.Set(value.AcceptingConnections); });
     }
 }
 

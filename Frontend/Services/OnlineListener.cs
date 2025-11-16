@@ -20,11 +20,8 @@ public class OnlineListener : ViewableProperty<int>, IOnlineListener, ICoordinat
 
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
-        _messaging.ListenQueue<OnlineTrackerPayload>(lifetime, _queueId, payload =>
-        {
-            Set(payload.Value);
-        });
-        
+        _messaging.ListenQueue<OnlineTrackerPayload>(lifetime, _queueId, payload => { Set(payload.Value); });
+
         return Task.CompletedTask;
     }
 }
