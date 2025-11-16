@@ -17,7 +17,7 @@ public static class OrleansClientExtensions
 
                 clientBuilder.UseTransactions();
                 
-                clientBuilder.Configure<MessagingOptions>(options =>
+                clientBuilder.Configure<ClientMessagingOptions>(options =>
                     {
                         options.ResponseTimeout = TimeSpan.FromSeconds(5);
                         options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(5);
@@ -57,7 +57,7 @@ public static class OrleansClientExtensions
                 var npgsqlConnectionString = configuration.GetConnectionString(ConnectionNames.Postgres)!;
 
                 siloBuilder.UseTransactions();
-                siloBuilder.Configure<MessagingOptions>(options =>
+                siloBuilder.Configure<SiloMessagingOptions>(options =>
                     {
                         options.ResponseTimeout = TimeSpan.FromSeconds(5);
                         options.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(5);
