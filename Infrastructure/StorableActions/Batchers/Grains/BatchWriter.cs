@@ -52,7 +52,7 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
     private readonly Dictionary<Guid, List<TEntry>> _pending = new();
 
     private readonly IPriorityTask _task;
-    
+
     protected abstract BatchWriterOptions Options { get; }
 
     public Task Start()
@@ -77,14 +77,26 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
 
         list.Add(value);
         _taskScheduler.Schedule(_task);
+        
+        _logger.LogTrace("[BatchWriter] WriteTransactional {writerName} {batchType} {transactionId}",
+            this.GetPrimaryKeyString(),
+            typeof(TEntry).Name,
+            transactionId
+        );
+        
         return Task.CompletedTask;
     }
-    
+
     public async Task WriteDirect(TEntry value)
     {
         _state.State.Entries.Add(value);
         await _state.WriteStateAsync();
         _taskScheduler.Schedule(_task);
+
+        _logger.LogTrace("[BatchWriter] WriteDirect {writerName} {batchType}",
+            this.GetPrimaryKeyString(),
+            typeof(TEntry).Name
+        );
     }
 
     public async Task OnSuccess(Guid transactionId)
@@ -131,11 +143,11 @@ public abstract class BatchWriter<TState, TEntry> : CommonGrain, ITransactionHoo
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "[BatchWriter] Process failed {writerName} {batchType}", 
+            _logger.LogError(e, "[BatchWriter] Process failed {writerName} {batchType}",
                 this.GetPrimaryKeyString(),
                 typeof(TEntry).Name
             );
-            
+
             _taskScheduler.Schedule(_task);
             return;
         }

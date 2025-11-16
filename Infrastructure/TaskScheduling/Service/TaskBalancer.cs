@@ -1,4 +1,7 @@
-﻿using Common;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text;
+using Common;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.TaskScheduling;
@@ -25,7 +28,7 @@ public class TaskBalancer : ITaskBalancer
     };
 
     private const int _iterationScore = 1;
-    private const int _exceptionPenalty = 10;
+    private const int _exceptionPenalty = 50;
     private const int _concurrentTasks = 10;
 
     private readonly ILogger<TaskBalancer> _logger;
@@ -33,10 +36,7 @@ public class TaskBalancer : ITaskBalancer
     private readonly TimeSpan _emptyDelay = TimeSpan.FromMilliseconds(500);
     private readonly TimeSpan _nextDelay = TimeSpan.FromMilliseconds(100);
 
-    private readonly HashSet<string> _queuedTasks = new();
-    private readonly SemaphoreSlim _entriesLock = new(1, 1);
-
-    private List<TaskEntry> _entries = new();
+    private readonly ConcurrentDictionary<string, TaskEntry> _scheduled = new();
 
     public Task Run(IReadOnlyLifetime lifetime)
     {
@@ -57,31 +57,39 @@ public class TaskBalancer : ITaskBalancer
                 continue;
             }
 
-            await _entriesLock.WaitAsync();
-
-            foreach (var entry in _entries)
+            foreach (var (_, entry) in _scheduled)
                 entry.Score += _iterationScore;
 
             foreach (var task in items)
             {
-                if (_queuedTasks.Contains(task.Id) == true)
+                if (_scheduled.TryGetValue(task.Id, out var entry) == true)
+                {
+                    entry.Score += _iterationScore;
                     continue;
+                }
 
-                var entry = new TaskEntry
+                _scheduled[task.Id] = new TaskEntry
                 {
                     Task = task,
-                    Score = _priorityToScore[task.Priority]
+                    Score = _priorityToScore[task.Priority],
+                    Key = task.Id
                 };
-
-                _queuedTasks.Add(task.Id);
-                _entries.Add(entry);
             }
 
-            _entries = _entries.OrderBy(t => t.Score).ToList();
-
-            _entriesLock.Release();
+            LogEntries();
 
             await Task.Delay(_nextDelay);
+        }
+
+        void LogEntries()
+        {
+            var sb = new StringBuilder();
+            sb.Append($"[TaskBalancer] Currently scheduled tasks ({_scheduled.Count}):\n");
+
+            foreach (var (_, entry) in _scheduled)
+                sb.AppendLine($"    {entry.Task.Id} with score {entry.Score}");
+
+            _logger.LogTrace(sb.ToString());
         }
     }
 
@@ -91,18 +99,20 @@ public class TaskBalancer : ITaskBalancer
 
         while (lifetime.IsTerminated == false)
         {
-            if (_entries.Any() == false)
+            if (_scheduled.Any() == false)
             {
                 await Task.Delay(_emptyDelay);
                 continue;
             }
 
-            await _entriesLock.WaitAsync();
+            await executionLock.WaitAsync();
 
-            var entry = _entries[0];
-            _entries.RemoveAt(0);
-
-            _entriesLock.Release();
+            if (TryPickMaxScored(out var entry) == false)
+            {
+                executionLock.Release();
+                await Task.Delay(_emptyDelay);
+                continue;
+            }
 
             Execute(entry).NoAwait();
         }
@@ -111,34 +121,60 @@ public class TaskBalancer : ITaskBalancer
 
         async Task Execute(TaskEntry entry)
         {
+            var stopwatch = Stopwatch.StartNew();
+
             try
             {
-                await executionLock.WaitAsync(lifetime.Token);
+                _logger.LogTrace("[TaskBalancer] Executing task, free handles: {count} {taskId}",
+                    executionLock.CurrentCount, entry.Task.Id
+                );
+                
                 await entry.Task.Execute();
-
-                await _entriesLock.WaitAsync();
-                _queuedTasks.Remove(entry.Task.Id);
-                _entriesLock.Release();
             }
             catch (Exception e)
             {
-                await _entriesLock.WaitAsync();
+                stopwatch.Stop();
+                entry.Score -= _exceptionPenalty;
+                _scheduled.AddOrUpdate(entry.Key, _ => entry, (_, _) => entry);
 
-                entry.Score += _exceptionPenalty;
-                _entries.Add(entry);
-
-                _entriesLock.Release();
-                _logger.LogError(e, "[TaskBalancer] Task execution failed {taskId}", entry.Task.Id);
+                _logger.LogError(e, "[TaskBalancer] Task execution failed in {time} {taskId}",
+                    stopwatch.Elapsed, entry.Task.Id
+                );
             }
             finally
             {
                 executionLock.Release();
             }
+
+            stopwatch.Stop();
+            
+            _logger.LogTrace("[TaskBalancer] Task execution completed in {time} {taskId}",
+                stopwatch.Elapsed, entry.Task.Id
+            );
         }
+    }
+
+    private bool TryPickMaxScored(out TaskEntry maxEntry)
+    {
+        maxEntry = null;
+
+        foreach (var (_, entry) in _scheduled)
+        {
+            if (maxEntry == null || entry.Score > maxEntry.Score)
+                maxEntry = entry;
+        }
+
+        if (maxEntry == null)
+            return false;
+
+        _scheduled.Remove(maxEntry.Key, out _);
+
+        return true;
     }
 
     public class TaskEntry
     {
+        public required string Key { get; init; }
         public required IPriorityTask Task { get; init; }
         public required int Score { get; set; }
     }

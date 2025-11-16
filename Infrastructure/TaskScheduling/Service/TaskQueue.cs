@@ -1,4 +1,7 @@
-﻿namespace Infrastructure.TaskScheduling;
+﻿using System.Text;
+using Microsoft.Extensions.Logging;
+
+namespace Infrastructure.TaskScheduling;
 
 public interface ITaskQueue
 {
@@ -8,40 +11,64 @@ public interface ITaskQueue
 
 public class TaskQueue : ITaskQueue
 {
+    public TaskQueue(ILogger<TaskQueue> logger)
+    {
+        _logger = logger;
+    }
+
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly Dictionary<string, Entry> _queue = new();
+    private readonly ILogger<TaskQueue> _logger;
 
     public void Enqueue(IPriorityTask task)
     {
         _lock.Wait();
 
-        _queue[task.Id] = new Entry()
+        if (_queue.ContainsKey(task.Id) == false)
         {
-            Task = task,
-            ScheduleDate = DateTime.UtcNow + task.Delay,
-        };
+            _queue[task.Id] = new Entry()
+            {
+                Task = task,
+                ScheduleDate = DateTime.UtcNow + task.Delay,
+            };
+        }
 
         _lock.Release();
     }
 
     public IReadOnlyList<IPriorityTask> Collect()
     {
+        if (_queue.Count == 0)
+            return [];
+
         var tasks = new List<IPriorityTask>(_queue.Count);
 
         _lock.Wait();
 
+        var sb = new StringBuilder();
+        sb.AppendLine($"[TaskQueue] Collecting tasks ({_queue.Count}): ");
+
         foreach (var (_, entry) in _queue)
         {
             if (DateTime.UtcNow < entry.ScheduleDate)
+            {
+                sb.AppendLine(
+                    $"    Skipping task {entry.Task.Id}, wait for {(entry.ScheduleDate - DateTime.UtcNow).TotalSeconds:F1}s"
+                );
+
                 continue;
+            }
 
             tasks.Add(entry.Task);
+            sb.AppendLine($"    Scheduling task {entry.Task.Id}");
         }
 
         foreach (var task in tasks)
             _queue.Remove(task.Id);
 
         _lock.Release();
+
+        _logger.LogTrace(sb.ToString());
 
         return tasks;
     }

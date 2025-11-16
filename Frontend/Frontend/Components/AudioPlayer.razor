@@ -84,7 +84,7 @@
     private async Task Loop()
     {
         _dotNetRef = DotNetObjectReference.Create(this);
-        var updateTimeSpan = TimeSpan.FromSeconds(5);
+        var updateTimeSpan = TimeSpan.FromSeconds(10);
 
         await _jsRuntime.InvokeVoidAsync("audioHelper.setAudioElement", _dotNetRef);
         await OnVolumeChanged(State.Volume.Value);
@@ -99,15 +99,36 @@
                 await Task.Delay(100, State.Lifetime.Token);
                 await _jsRuntime.InvokeVoidAsync("play");
 
-                while (_audioUrl == url &&
-                       DateTime.UtcNow - _lastTimeUpdate < updateTimeSpan &&
-                       State.Lifetime.IsTerminated == false)
-                {
+                while (CheckCondition() == true)
                     await Task.Delay(500, State.Lifetime.Token);
-                }
 
                 if (_audioUrl == url)
                     await SetNext();
+                
+                continue;;
+
+                bool CheckCondition()
+                {
+                    if (_audioUrl != url)
+                    {
+                        Console.WriteLine("Audio URL changed, moving to next track.");
+                        return false;
+                    }
+                    
+                    if (DateTime.UtcNow - _lastTimeUpdate >= updateTimeSpan)
+                    {
+                        Console.WriteLine("No audio progress update received, moving to next track.");
+                        return false;
+                    }
+                    
+                    if (State.Lifetime.IsTerminated)
+                    {
+                        Console.WriteLine("Session terminated, exiting audio loop.");
+                        return false;
+                    }
+                    
+                    return true;
+                }
             }
             catch (Exception e)
             {

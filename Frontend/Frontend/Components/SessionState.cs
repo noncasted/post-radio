@@ -75,7 +75,7 @@ public class SessionState
 
     public SongData IncSongIndex()
     {
-        _songIndex += _indexOffset;
+        _songIndex += _indexOffset + 1;
         var playlist = _songsCollection.ByPlaylist[_playlist.Value.Id];
         var index = _songIndex % playlist.Count;
         var data = playlist[index];
