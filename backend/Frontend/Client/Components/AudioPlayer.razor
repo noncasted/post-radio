@@ -20,9 +20,14 @@
 
     async function play() {
         const audio = document.getElementById("audio");
+        if (!audio.getAttribute("src")) return false;
         audio.currentTime = 0;
-        try { await audio.play(); } catch (e) {
+        try {
+            await audio.play();
+            return true;
+        } catch (e) {
             if (e.name !== 'AbortError') console.error("play error:", e);
+            return false;
         }
     }
 
@@ -68,11 +73,31 @@
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(_audioUrl))
+                    await SetNext();
+
+                if (string.IsNullOrWhiteSpace(_audioUrl))
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), State.Token);
+                    continue;
+                }
+
                 await Js.InvokeVoidAsync("stop");
                 var url = _audioUrl;
+                _lastTimeUpdate = DateTime.UtcNow;
                 await InvokeAsync(StateHasChanged);
                 await Task.Delay(100, State.Token);
-                await Js.InvokeVoidAsync("play");
+
+                var started = await Js.InvokeAsync<bool>("play");
+
+                if (!started)
+                {
+                    if (_audioUrl == url)
+                        await SetNext();
+
+                    await Task.Delay(TimeSpan.FromSeconds(1), State.Token);
+                    continue;
+                }
 
                 while (Check())
                     await Task.Delay(500, State.Token);
