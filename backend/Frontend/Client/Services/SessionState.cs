@@ -26,7 +26,6 @@ public class SessionState : IDisposable
     public FrontendOptionsDto Options { get; private set; } = new()
     {
         BaseVolume = 0.5f,
-        MinVolume = 0.1f,
         MaxVolume = 1.0f,
         ImageSwitchIntervalMs = 8000,
         ImageFadeMs = 1000
@@ -47,7 +46,7 @@ public class SessionState : IDisposable
             return;
 
         Options = options;
-        Volume = options.BaseVolume * 100;
+        Volume = Math.Clamp(options.BaseVolume, 0, 1) * 100;
         OptionsChanged?.Invoke();
         VolumeChanged?.Invoke();
     }

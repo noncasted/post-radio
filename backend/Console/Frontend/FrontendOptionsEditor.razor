@@ -9,14 +9,8 @@
     <div class="flex flex-col">
         <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
             <LucideIcon Name="volume-2" Size="12" class="text-muted-foreground shrink-0" />
-            <span class="text-sm flex-1">Base Volume (0..1, relative between min and max)</span>
+            <span class="text-sm flex-1">Base Volume (0..1, relative from zero to max)</span>
             <input type="number" step="0.01" min="0" max="1" @bind="Value.BaseVolume"
-                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
-        </div>
-        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
-            <LucideIcon Name="volume-x" Size="12" class="text-muted-foreground shrink-0" />
-            <span class="text-sm flex-1">Min Volume</span>
-            <input type="number" step="0.01" min="0" max="1" @bind="Value.MinVolume"
                    class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
         </div>
         <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
@@ -41,5 +35,5 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public FrontendOptions Value { get; set; } = null!;
+    [Parameter, EditorRequired] public Cluster.Configs.FrontendOptions Value { get; set; } = null!;
 }

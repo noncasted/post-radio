@@ -1,0 +1,91 @@
+@page "/frontend-options"
+@using Cluster.Configs
+@using global::Common.Extensions
+@using global::Common.Reactive
+@inherits UiComponent
+
+<PageTitle>Frontend Options</PageTitle>
+<PageHeader Title="Frontend Options"/>
+
+<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-6">
+    <div class="rounded-lg border bg-card p-4 flex items-center justify-between gap-4">
+        <div class="text-sm text-muted-foreground">
+            Edit player and visual frontend settings. Saved values are persisted in state storage and used by the radio client.
+        </div>
+        <div class="flex items-center gap-2">
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@_saving" @onclick="ResetDraft">
+                Reset
+            </BbButton>
+            <BbButton Disabled="@_saving" @onclick="Save">
+                @if (_saving)
+                {
+                    <LucideIcon Name="loader-circle" Size="16" class="animate-spin mr-2"/>
+                    <span>Saving...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="save" Size="16" class="mr-2"/>
+                    <span>Save options</span>
+                }
+            </BbButton>
+        </div>
+    </div>
+
+    <FrontendOptionsEditor Value="_frontend" />
+</div>
+
+@code {
+    [Inject] public IFrontendConfig FrontendConfig { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+
+    private Cluster.Configs.FrontendOptions _frontend = new();
+    private bool _saving;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        ResetDraft();
+
+        FrontendConfig.View(lifetime, value =>
+        {
+            if (_saving)
+                return;
+
+            _frontend = Copy(value);
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private void ResetDraft()
+    {
+        _frontend = Copy(FrontendConfig.Value);
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+
+        try
+        {
+            await FrontendConfig.SetValue(Copy(_frontend));
+            ToastService.Success("Frontend options saved", "Done");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[FrontendOptions] Save failed: {ex.Message}", "Error");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static Cluster.Configs.FrontendOptions Copy(Cluster.Configs.FrontendOptions value) => new()
+    {
+        BaseVolume = value.BaseVolume,
+        MaxVolume = value.MaxVolume,
+        ImageSwitchIntervalMs = value.ImageSwitchIntervalMs,
+        ImageFadeMs = value.ImageFadeMs
+    };
+}

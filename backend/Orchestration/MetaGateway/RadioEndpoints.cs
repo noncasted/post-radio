@@ -33,7 +33,6 @@ public static class RadioEndpoints
         return new FrontendOptionsDto
         {
             BaseVolume = value.BaseVolume,
-            MinVolume = value.MinVolume,
             MaxVolume = value.MaxVolume,
             ImageSwitchIntervalMs = value.ImageSwitchIntervalMs,
             ImageFadeMs = value.ImageFadeMs
@@ -135,7 +134,6 @@ public class ImagesCountDto
 public class FrontendOptionsDto
 {
     public required float BaseVolume { get; init; }
-    public required float MinVolume { get; init; }
     public required float MaxVolume { get; init; }
     public required int ImageSwitchIntervalMs { get; init; }
     public required int ImageFadeMs { get; init; }

@@ -1,0 +1,42 @@
+@using global::Common
+
+<button type="button"
+        class="image-grid-item group overflow-hidden rounded-lg border bg-card text-left transition hover:border-primary/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        title="@Image.FileName"
+        @onclick="() => OnOpen.InvokeAsync(Image)">
+    <div class="image-grid-item__preview bg-muted">
+        <img src="@ImageUrl"
+             alt="@Image.FileName"
+             loading="lazy"
+             decoding="async"
+             class="image-grid-item__image transition duration-200 group-hover:scale-105" />
+    </div>
+    <div class="image-grid-item__meta flex flex-col gap-0.5 px-2 py-1.5">
+        <div class="truncate text-xs font-medium">@Image.FileName</div>
+        <div class="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span>@FormatBytes(Image.SizeBytes)</span>
+            <span>@Image.LastModifiedUtc.ToLocalTime().ToString("dd.MM.yyyy")</span>
+        </div>
+    </div>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public MediaImage Image { get; set; } = null!;
+    [Parameter, EditorRequired] public string ImageUrl { get; set; } = string.Empty;
+    [Parameter] public EventCallback<MediaImage> OnOpen { get; set; }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        var value = (double)bytes;
+        var unit = 0;
+
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+
+        return unit == 0 ? $"{bytes} {units[unit]}" : $"{value:0.#} {units[unit]}";
+    }
+}

@@ -133,6 +133,7 @@ if (authEnabled)
 }
 
 app.MapDefaultEndpoints();
+app.MapConsoleMediaEndpoints();
 
 app.MapRazorComponents<App>()
    .AddInteractiveServerRenderMode()

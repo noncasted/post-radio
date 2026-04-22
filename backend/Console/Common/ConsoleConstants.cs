@@ -15,6 +15,7 @@ public static class ConsoleConstants
         public const string UserDashboard = "/users/{0}";
         public const string Match = "/match/{0}";
         public const string InfrastructureOptions = "/infrastructure-options";
+        public const string FrontendOptions = "/frontend-options";
         public const string Features = "/features";
         public const string SideEffects = "/side-effects";
         public const string StateExplorer = "/debug/state";

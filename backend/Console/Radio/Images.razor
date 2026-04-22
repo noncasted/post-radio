@@ -1,33 +1,792 @@
 @page "/images"
+@using global::Common
 @using global::Meta.Images
 
 <PageTitle>Images</PageTitle>
-<PageHeader Title="Images" />
+@if (_isLoading)
+{
+    <div class="flex items-center justify-center py-16">
+        <LucideIcon Name="loader-circle" Size="32" class="animate-spin text-primary" />
+    </div>
+    return;
+}
 
-<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-4">
-    <div class="rounded-lg border bg-card p-4 flex items-center justify-between">
+<div class="images-page-shell container mx-auto px-4 py-3 flex flex-col gap-3">
+    <div class="images-toolbar rounded-lg border bg-card px-4 py-3 flex flex-wrap items-center gap-3">
         <div class="flex items-center gap-3">
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" @onclick="NavigateHome">
+                <LucideIcon Name="arrow-left" Size="18" />
+            </BbButton>
             <div class="rounded-md bg-primary/10 p-2.5">
                 <LucideIcon Name="image" Size="20" class="text-primary" />
             </div>
             <div>
-                <div class="text-sm font-semibold">Stored images</div>
-                <div class="text-xs text-muted-foreground">@Collection.Count file(s) in bucket</div>
+                <div class="text-lg font-semibold leading-tight">Images (@_images.Count)</div>
+                <div class="text-xs text-muted-foreground">@_images.Count image(s) in media storage</div>
             </div>
         </div>
-        <BbButton @onclick="RefreshImages">
+        <div class="flex-1"></div>
+        <BbButton Variant="ButtonVariant.Outline" Disabled="@_isUploading" @onclick="RefreshImages">
             <LucideIcon Name="refresh-cw" Size="16" class="mr-2" />
             Refresh
         </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" Disabled="@(_isUploading || _isPasting)" @onclick="PasteImageUrl">
+            @if (_isPasting)
+            {
+                <LucideIcon Name="loader-circle" Size="16" class="mr-2 animate-spin" />
+                <span>Pasting...</span>
+            }
+            else
+            {
+                <LucideIcon Name="clipboard" Size="16" class="mr-2" />
+                <span>Paste</span>
+            }
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" Disabled="@(_images.Count == 0)" @onclick="DownloadAll">
+            <LucideIcon Name="archive" Size="16" class="mr-2" />
+            Download all
+        </BbButton>
+        <BbButton Disabled="@(_isUploading || _isPasting)" @onclick="OpenUpload">
+            <LucideIcon Name="upload" Size="16" class="mr-2" />
+            Upload
+        </BbButton>
     </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            @_error
+        </div>
+    }
+
+    @if (_images.Count == 0)
+    {
+        <div class="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
+            No images yet. Click <strong>Upload</strong> to add individual images or a folder.
+        </div>
+    }
+    else
+    {
+        <div class="images-grid">
+            @foreach (var image in _pageImages)
+            {
+                <ImageGridItem @key="image.Key"
+                               Image="@image"
+                               ImageUrl="@GetImageUrl(image)"
+                               OnOpen="OpenPreview" />
+            }
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
+            <div class="text-xs text-muted-foreground">
+                Showing @PageStart-@PageEnd of @_images.Count, 12 per page
+            </div>
+
+            <div class="flex items-center gap-2">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          Disabled="@(_page == 0)" @onclick="PrevPage">
+                    <LucideIcon Name="chevron-left" Size="16" />
+                </BbButton>
+                <span class="text-xs text-muted-foreground px-2">@(_page + 1) / @_totalPages</span>
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          Disabled="@(_page >= _totalPages - 1)" @onclick="NextPage">
+                    <LucideIcon Name="chevron-right" Size="16" />
+                </BbButton>
+            </div>
+        </div>
+    }
 </div>
+
+@if (_isUploadOpen)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" @onclick="CloseUpload">
+        <div class="w-full max-w-2xl rounded-lg border bg-card shadow-lg" @onclick:stopPropagation>
+            <div class="flex items-start justify-between gap-4 border-b p-4">
+                <div class="flex items-center gap-3">
+                    <div class="rounded-md bg-primary/10 p-2">
+                        <LucideIcon Name="images" Size="18" class="text-primary" />
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-semibold">Upload images</h2>
+                        <p class="text-xs text-muted-foreground">Drop images here, select files, or select a whole folder.</p>
+                    </div>
+                </div>
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" Disabled="@_isUploading" @onclick="CloseUpload">
+                    <LucideIcon Name="x" Size="16" />
+                </BbButton>
+            </div>
+
+            <div class="flex flex-col gap-3 p-4">
+                <div class="relative rounded-lg border bg-background p-4 transition-all hover:border-primary/40 hover:bg-muted/30">
+                    <div class="flex items-center gap-3">
+                        <div class="rounded-md bg-primary/10 p-2.5">
+                            <LucideIcon Name="upload" Size="18" class="text-primary" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-medium">Drag & drop images</div>
+                            <div class="text-xs text-muted-foreground">Drop files on this row or click it to choose multiple images.</div>
+                        </div>
+                        <span class="text-xs text-muted-foreground">Files</span>
+                    </div>
+                    <InputFile OnChange="UploadFiles"
+                               multiple
+                               accept="image/*"
+                               disabled="@_isUploading"
+                               class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                </div>
+
+                <div class="relative rounded-lg border bg-background p-4 transition-all hover:border-primary/40 hover:bg-muted/30">
+                    <div class="flex items-center gap-3">
+                        <div class="rounded-md bg-primary/10 p-2.5">
+                            <LucideIcon Name="folder-up" Size="18" class="text-primary" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-medium">Upload a folder</div>
+                            <div class="text-xs text-muted-foreground">Choose a directory; nested image files will be included by the browser.</div>
+                        </div>
+                        <span class="text-xs text-muted-foreground">Folder</span>
+                    </div>
+                    <InputFile OnChange="UploadFiles"
+                               multiple
+                               accept="image/*"
+                               webkitdirectory="webkitdirectory"
+                               directory="directory"
+                               disabled="@_isUploading"
+                               class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3 border-t px-4 py-3">
+                @if (_isUploading || _uploadBytesTotal > 0)
+                {
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                            <div class="min-w-0 truncate">
+                                @if (_isUploading)
+                                {
+                                    <LucideIcon Name="loader-circle" Size="14" class="mr-2 inline animate-spin" />
+                                }
+                                @_uploadStatus
+                            </div>
+                            <div class="shrink-0 font-mono">@UploadPercent.ToString("0")%</div>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-muted">
+                            <div class="h-full rounded-full bg-primary transition-all duration-150" style="width: @UploadPercent%"></div>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                            <span class="min-w-0 truncate">@_uploadFileName</span>
+                            <span class="shrink-0 font-mono">@FormatBytes(_uploadBytesDone) / @FormatBytes(_uploadBytesTotal)</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="flex justify-end">
+                    <BbButton Variant="ButtonVariant.Ghost" Disabled="@_isUploading" @onclick="CloseUpload">Close</BbButton>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_selectedImage != null)
+{
+    <div class="image-preview-overlay fixed inset-0 z-50 flex items-center justify-center p-6" @onclick="ClosePreview">
+        <div class="image-preview-panel" @onclick:stopPropagation>
+            <div class="image-preview-header">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="rounded-md bg-primary/10 p-2">
+                        <LucideIcon Name="image" Size="18" class="text-primary" />
+                    </div>
+                    <div class="min-w-0">
+                        <div class="truncate text-sm font-semibold">@_selectedImage.FileName</div>
+                        <div class="text-xs text-muted-foreground">Full resolution preview</div>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="DownloadSelected">
+                        <LucideIcon Name="download" Size="14" class="mr-1" />
+                        Download
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small" @onclick="DeleteSelected">
+                        <LucideIcon Name="trash-2" Size="14" class="mr-1" />
+                        Delete
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" @onclick="ClosePreview">
+                        <LucideIcon Name="x" Size="18" />
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="image-preview-body">
+                <img src="@GetImageUrl(_selectedImage)"
+                     alt="@_selectedImage.FileName"
+                     class="image-preview-image" />
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .images-page-shell {
+        max-width: 76rem;
+        height: calc(100vh - 7.25rem);
+        overflow: hidden;
+    }
+
+    .images-toolbar {
+        flex: 0 0 auto;
+    }
+
+    .images-grid {
+        display: grid;
+        flex: 1 1 auto;
+        min-height: 0;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+
+    .image-grid-item {
+        display: flex;
+        min-height: 0;
+        height: 100%;
+        flex-direction: column;
+    }
+
+    .image-grid-item__preview {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+    }
+
+    .image-grid-item__image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .image-grid-item__meta {
+        flex: 0 0 auto;
+    }
+
+    .image-preview-overlay {
+        background: rgb(0 0 0 / 0.72);
+        backdrop-filter: blur(4px);
+        cursor: zoom-out;
+    }
+
+    .image-preview-panel {
+        display: inline-flex;
+        width: fit-content;
+        max-width: calc(100vw - 3rem);
+        max-height: calc(100vh - 3rem);
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid hsl(var(--border));
+        border-radius: 0.75rem;
+        background: hsl(var(--card));
+        box-shadow: 0 30px 110px rgb(0 0 0 / 0.85);
+        cursor: default;
+    }
+
+    .image-preview-header {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid hsl(var(--border));
+        padding: 0.75rem 1rem;
+        background: hsl(var(--card));
+    }
+
+    .image-preview-body {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 0.35);
+    }
+
+    .image-preview-image {
+        display: block;
+        max-width: calc(100vw - 3rem);
+        max-height: calc(100vh - 8.5rem);
+        object-fit: contain;
+    }
+
+    @@media (max-width: 900px) {
+        .images-page-shell {
+            height: auto;
+            overflow: visible;
+        }
+
+        .images-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-rows: none;
+        }
+    }
+</style>
 
 @code {
     [Inject] public required IImagesCollection Collection { get; init; }
+    [Inject] public required IConsoleNavigation Navigation { get; init; }
+    [Inject] public required IHttpClientFactory HttpClientFactory { get; init; }
+    [Inject] public required IMediaStorage Storage { get; init; }
+    [Inject] public required IJSRuntime JS { get; init; }
+    [Inject] public required ToastService ToastService { get; init; }
+
+    private const int PageSize = 12;
+    private const int MaxUploadFiles = 10000;
+    private const long MaxUploadFileSize = 250L * 1024L * 1024L;
+
+    private List<MediaImage> _images = new();
+    private List<MediaImage> _pageImages = new();
+    private MediaImage? _selectedImage;
+    private bool _isLoading = true;
+    private bool _isUploadOpen;
+    private bool _isUploading;
+    private bool _isPasting;
+    private string _uploadStatus = string.Empty;
+    private string _uploadFileName = string.Empty;
+    private string _error = string.Empty;
+    private long _uploadBytesDone;
+    private long _uploadBytesTotal;
+    private long _lastUploadProgressRenderMs;
+    private int _page;
+    private int _totalPages = 1;
+
+    private double UploadPercent => _uploadBytesTotal == 0
+        ? 0
+        : Math.Clamp(_uploadBytesDone * 100.0 / _uploadBytesTotal, 0, 100);
+
+    private int PageStart => _images.Count == 0 ? 0 : _page * PageSize + 1;
+    private int PageEnd => Math.Min(_images.Count, (_page + 1) * PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshImages();
+        _isLoading = false;
+    }
+
+    private void NavigateHome()
+    {
+        Navigation.NavigateTo("/");
+    }
 
     private async Task RefreshImages()
     {
-        await Collection.Refresh();
-        StateHasChanged();
+        _error = string.Empty;
+
+        try
+        {
+            await Collection.Refresh();
+            ApplyImages(Collection.Images);
+        }
+        catch (Exception ex)
+        {
+            _error = $"[Images] Refresh failed: {ex.Message}";
+            ToastService.Error(_error, "Error");
+        }
+    }
+
+    private void ApplyImages(IReadOnlyList<MediaImage> images)
+    {
+        _images = images.ToList();
+        _totalPages = _images.Count == 0 ? 1 : (_images.Count + PageSize - 1) / PageSize;
+        if (_page >= _totalPages)
+            _page = Math.Max(0, _totalPages - 1);
+
+        ApplyPage();
+    }
+
+    private void ApplyPage()
+    {
+        _pageImages = _images.Skip(_page * PageSize).Take(PageSize).ToList();
+    }
+
+    private void PrevPage()
+    {
+        if (_page <= 0) return;
+        _page--;
+        ApplyPage();
+    }
+
+    private void NextPage()
+    {
+        if (_page >= _totalPages - 1) return;
+        _page++;
+        ApplyPage();
+    }
+
+    private void OpenUpload()
+    {
+        ResetUploadProgress();
+        _isUploadOpen = true;
+    }
+
+    private void CloseUpload()
+    {
+        if (_isUploading) return;
+        _isUploadOpen = false;
+    }
+
+    private void OpenPreview(MediaImage image)
+    {
+        _selectedImage = image;
+    }
+
+    private void ClosePreview()
+    {
+        _selectedImage = null;
+    }
+
+    private async Task PasteImageUrl()
+    {
+        _error = string.Empty;
+        _isPasting = true;
+
+        try
+        {
+            var clipboardText = await JS.InvokeAsync<string>("readClipboardText");
+            if (!TryGetPastedImageUrl(clipboardText, out var uri, out var fileName, out var error))
+            {
+                ToastService.Error(error, "Paste failed");
+                return;
+            }
+
+            var client = HttpClientFactory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ToastService.Error($"Download failed: HTTP {(int)response.StatusCode}", "Paste failed");
+                return;
+            }
+
+            if (response.Content.Headers.ContentLength > MaxUploadFileSize)
+            {
+                ToastService.Error($"Image is too large: {FormatBytes(response.Content.Headers.ContentLength.Value)}", "Paste failed");
+                return;
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            if (!string.IsNullOrEmpty(contentType) &&
+                !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) &&
+                !contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            {
+                ToastService.Error($"URL did not return an image. Content-Type: {contentType}", "Paste failed");
+                return;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            await Storage.SaveImage(fileName, stream);
+            await Collection.Refresh();
+            ApplyImages(Collection.Images);
+
+            ToastService.Success($"Saved image from clipboard: {fileName}", "Done");
+        }
+        catch (JSException ex)
+        {
+            ToastService.Error($"Cannot read clipboard: {ex.Message}", "Paste failed");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Could not parse or download image URL: {ex.Message}", "Paste failed");
+        }
+        finally
+        {
+            _isPasting = false;
+        }
+    }
+
+    private async Task UploadFiles(InputFileChangeEventArgs e)
+    {
+        var files = e.GetMultipleFiles(MaxUploadFiles);
+        if (files.Count == 0)
+            return;
+
+        _isUploading = true;
+        _error = string.Empty;
+        _uploadBytesDone = 0;
+        _uploadBytesTotal = files.Sum(file => file.Size);
+        _lastUploadProgressRenderMs = 0;
+        _uploadStatus = $"Preparing {files.Count} file(s)...";
+        _uploadFileName = string.Empty;
+
+        var uploaded = 0;
+        var failed = 0;
+
+        for (var index = 0; index < files.Count; index++)
+        {
+            var file = files[index];
+            _uploadFileName = $"{index + 1} / {files.Count}: {file.Name}";
+            _uploadStatus = $"Uploading {uploaded + failed + 1} of {files.Count}";
+            StateHasChanged();
+
+            try
+            {
+                await using var stream = file.OpenReadStream(MaxUploadFileSize);
+                await using var progressStream = new UploadProgressStream(stream, OnUploadBytesRead);
+                await Storage.SaveImage(file.Name, progressStream);
+                uploaded++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                _error = $"[Images] Failed to upload {file.Name}: {ex.Message}";
+            }
+
+            _uploadStatus = $"Uploaded {uploaded} of {files.Count} file(s)" + (failed > 0 ? $", failed {failed}" : "");
+            StateHasChanged();
+        }
+
+        try
+        {
+            await Collection.Refresh();
+            ApplyImages(Collection.Images);
+            ToastService.Success($"Uploaded {uploaded} image(s)" + (failed > 0 ? $", failed {failed}" : ""), "Done");
+        }
+        catch (Exception ex)
+        {
+            _error = $"[Images] Upload refresh failed: {ex.Message}";
+            ToastService.Error(_error, "Error");
+        }
+        finally
+        {
+            _isUploading = false;
+            _uploadStatus = $"Uploaded {uploaded} image(s)" + (failed > 0 ? $", failed {failed}" : "");
+            _uploadFileName = failed > 0 ? "Finished with errors" : "Finished";
+            StateHasChanged();
+        }
+    }
+
+    private void ResetUploadProgress()
+    {
+        _uploadStatus = string.Empty;
+        _uploadFileName = string.Empty;
+        _uploadBytesDone = 0;
+        _uploadBytesTotal = 0;
+        _lastUploadProgressRenderMs = 0;
+    }
+
+    private void OnUploadBytesRead(int bytesRead)
+    {
+        if (bytesRead <= 0)
+            return;
+
+        _uploadBytesDone += bytesRead;
+
+        var now = Environment.TickCount64;
+        if (now - _lastUploadProgressRenderMs < 100 && _uploadBytesDone < _uploadBytesTotal)
+            return;
+
+        _lastUploadProgressRenderMs = now;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static bool TryGetPastedImageUrl(string? clipboardText, out Uri uri, out string fileName, out string error)
+    {
+        uri = null!;
+        fileName = string.Empty;
+        error = string.Empty;
+
+        var candidate = ExtractFirstUrl(clipboardText);
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            error = "Clipboard does not contain a URL.";
+            return false;
+        }
+
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var parsed) ||
+            (parsed.Scheme != Uri.UriSchemeHttps && parsed.Scheme != Uri.UriSchemeHttp))
+        {
+            error = "Clipboard URL must be an absolute http(s) link.";
+            return false;
+        }
+
+        var extension = Path.GetExtension(parsed.AbsolutePath);
+        if (!IsPastedImageExtension(extension))
+        {
+            error = "Clipboard URL must point to a .jpg, .jpeg, or .png image.";
+            return false;
+        }
+
+        var parsedFileName = Path.GetFileName(Uri.UnescapeDataString(parsed.AbsolutePath));
+        if (string.IsNullOrWhiteSpace(parsedFileName))
+        {
+            error = "Image URL does not contain a file name.";
+            return false;
+        }
+
+        uri = parsed;
+        fileName = parsedFileName;
+        return true;
+    }
+
+    private static string ExtractFirstUrl(string? clipboardText)
+    {
+        var text = clipboardText?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        var trimmed = text.Trim('"', '\'', '<', '>', '(', ')', '[', ']');
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out _))
+            return trimmed;
+
+        var match = System.Text.RegularExpressions.Regex.Match(text, @"https?://\S+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success
+            ? match.Value.TrimEnd('.', ',', ';', ':', ')', ']', '}', '"', '\'')
+            : string.Empty;
+    }
+
+    private static bool IsPastedImageExtension(string extension)
+    {
+        return extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".png", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        var value = (double)bytes;
+        var unit = 0;
+
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+
+        return unit == 0 ? $"{bytes} {units[unit]}" : $"{value:0.#} {units[unit]}";
+    }
+
+    private async Task DownloadAll()
+    {
+        if (_images.Count == 0)
+            return;
+
+        await JS.InvokeVoidAsync("downloadFileFromUrl", "/console/media/images/all.zip");
+    }
+
+    private async Task DownloadSelected()
+    {
+        if (_selectedImage == null)
+            return;
+
+        await JS.InvokeVoidAsync("downloadFileFromUrl", GetImageDownloadUrl(_selectedImage));
+    }
+
+    private async Task DeleteSelected()
+    {
+        if (_selectedImage == null)
+            return;
+
+        var image = _selectedImage;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete image '{image.FileName}'?");
+        if (!confirmed)
+            return;
+
+        try
+        {
+            var removed = await Collection.Delete(image.Key);
+            if (!removed)
+            {
+                ToastService.Error($"Image '{image.FileName}' was not found", "Error");
+                return;
+            }
+
+            _selectedImage = null;
+            ApplyImages(Collection.Images);
+            ToastService.Success($"Deleted {image.FileName}", "Done");
+        }
+        catch (Exception ex)
+        {
+            _error = $"[Images] Delete failed: {ex.Message}";
+            ToastService.Error(_error, "Error");
+        }
+    }
+
+    private static string GetImageUrl(MediaImage image)
+    {
+        return $"/console/media/images/{Uri.EscapeDataString(image.Key)}";
+    }
+
+    private static string GetImageDownloadUrl(MediaImage image)
+    {
+        return $"/console/media/images/{Uri.EscapeDataString(image.Key)}/download";
+    }
+
+
+    private sealed class UploadProgressStream : Stream
+    {
+        public UploadProgressStream(Stream inner, Action<int> onBytesRead)
+        {
+            _inner = inner;
+            _onBytesRead = onBytesRead;
+        }
+
+        private readonly Stream _inner;
+        private readonly Action<int> _onBytesRead;
+
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => _inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => _inner.Length;
+
+        public override long Position
+        {
+            get => _inner.Position;
+            set => _inner.Position = value;
+        }
+
+        public override void Flush() => _inner.Flush();
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = _inner.Read(buffer, offset, count);
+            _onBytesRead(read);
+            return read;
+        }
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var read = await _inner.ReadAsync(buffer.AsMemory(offset, count), cancellationToken);
+            _onBytesRead(read);
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var read = await _inner.ReadAsync(buffer, cancellationToken);
+            _onBytesRead(read);
+            return read;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
+        public override void SetLength(long value) => _inner.SetLength(value);
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _inner.Dispose();
+
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await _inner.DisposeAsync();
+            await base.DisposeAsync();
+        }
     }
 }

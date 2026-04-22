@@ -11,6 +11,7 @@ public interface IPlaylistLoader
 {
     Task Fetch(PlaylistData playlist, IOperationProgress progress);
     Task Load(PlaylistData playlist, IOperationProgress progress);
+    Task LoadAll(IOperationProgress progress);
 }
 
 public class PlaylistLoader : IPlaylistLoader
@@ -119,6 +120,35 @@ public class PlaylistLoader : IPlaylistLoader
                       .ToList();
 
         progress.Log($"Found {pending.Count} unloaded songs.");
+        await LoadPending(pending,
+            progress,
+            (state, e) => _logger.LogError(e,
+                "[Audio] [Playlist] Failed to download {Author} - {Name} (playlist {PlaylistId})",
+                state.Author, state.Name, playlist.Id));
+    }
+
+    public async Task LoadAll(IOperationProgress progress)
+    {
+        progress.SetStatus(OperationStatus.InProgress);
+        progress.Log("Scanning all songs for unloaded audio...");
+
+        var pending = _songs
+                      .Where(kv => !kv.Value.IsLoaded)
+                      .Select(kv => (Id: kv.Key, State: kv.Value))
+                      .ToList();
+
+        progress.Log($"Found {pending.Count} unloaded songs.");
+        await LoadPending(pending,
+            progress,
+            (state, e) => _logger.LogError(e,
+                "[Audio] [Songs] Failed to download {Author} - {Name}", state.Author, state.Name));
+    }
+
+    private async Task LoadPending(
+        IReadOnlyList<(long Id, SongState State)> pending,
+        IOperationProgress progress,
+        Action<SongState, Exception> logError)
+    {
         progress.SetProgress(0f);
 
         var downloaded = 0;
@@ -144,8 +174,7 @@ public class PlaylistLoader : IPlaylistLoader
             {
                 failed++;
 
-                _logger.LogError(e, "[Audio] [Playlist] Failed to download {Author} - {Name} (playlist {PlaylistId})",
-                    state.Author, state.Name, playlist.Id);
+                logError(state, e);
                 progress.Log($"Failed {i + 1} / {pending.Count}: {e.Message}");
             }
 
@@ -158,7 +187,7 @@ public class PlaylistLoader : IPlaylistLoader
 
     private async Task Download(long id, SongState state)
     {
-        _logger.LogInformation("[Audio] [Playlist] Downloading {Author} {Name}", state.Author, state.Name);
+        _logger.LogInformation("[Audio] Downloading {Author} {Name}", state.Author, state.Name);
 
         var mediaUrl = await _soundCloud.Tracks.GetDownloadUrlAsync(state.Url);
 

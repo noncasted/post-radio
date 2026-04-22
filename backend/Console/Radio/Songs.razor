@@ -11,6 +11,10 @@
     <div class="flex gap-2 items-center flex-wrap">
         <span class="text-sm text-muted-foreground">@Collection.Count song(s)</span>
         <div class="flex-1"></div>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadAudio">
+            <LucideIcon Name="cloud-download" Size="14" class="mr-1" />
+            <span>Load audio</span>
+        </BbButton>
         <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadLookup">
             <LucideIcon Name="download" Size="14" class="mr-1" />
             <span>Load data from lookup</span>
@@ -46,6 +50,7 @@
 
 @code {
     [Inject] public required ISongsCollection Collection { get; init; }
+    [Inject] public required IPlaylistLoader Loader { get; init; }
     [Inject] public required ISongDataLookup Lookup { get; init; }
 
     private readonly ILifetime _lifetime = new Lifetime();
@@ -61,6 +66,7 @@
 
     private Task RunSaveLookup() => RunOp("Saving", p => Lookup.Save(p));
     private Task RunLoadLookup() => RunOp("Loading", p => Lookup.Load(p));
+    private Task RunLoadAudio() => RunOp("Loading audio", p => Loader.LoadAll(p));
 
     private async Task RunOp(string label, Func<IOperationProgress, Task> action)
     {
@@ -107,7 +113,8 @@
                 {
                     SortBy.Name => Collection.OrderBy(kv => kv.Value.Name),
                     SortBy.AddDate => Collection.OrderByDescending(kv => kv.Value.AddDate),
-                    SortBy.Invalid => Collection.Where(kv => string.IsNullOrWhiteSpace(kv.Value.Author)).OrderByDescending(kv => kv.Value.AddDate),
+                    SortBy.Invalid => Collection.Where(kv => string.IsNullOrWhiteSpace(kv.Value.Author))
+                                                .OrderByDescending(kv => kv.Value.AddDate),
                     _ => Collection
                 };
 

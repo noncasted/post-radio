@@ -129,9 +129,7 @@
     {
         var ratio = Math.Clamp(value / 100, 0, 1);
         var options = State.Options;
-        var volume = ratio <= 0
-            ? 0
-            : options.MinVolume + ratio * (options.MaxVolume - options.MinVolume);
+        var volume = ratio * options.MaxVolume;
 
         await Js.InvokeVoidAsync("setVolume", Math.Clamp(volume, 0, 1));
     }

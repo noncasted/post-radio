@@ -25,7 +25,6 @@ public class ImagesCountDto
 public class FrontendOptionsDto
 {
     public required float BaseVolume { get; init; }
-    public required float MinVolume { get; init; }
     public required float MaxVolume { get; init; }
     public required int ImageSwitchIntervalMs { get; init; }
     public required int ImageFadeMs { get; init; }
