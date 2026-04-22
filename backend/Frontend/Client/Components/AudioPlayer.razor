@@ -167,11 +167,13 @@
     private static readonly TimeSpan BufferingTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan WatchdogInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan StartupSilencePeriod = TimeSpan.FromSeconds(30);
 
     private readonly SemaphoreSlim _setNextLock = new(1, 1);
 
     private string _audioUrl = string.Empty;
     private int _generation;
+    private DateTime _componentStartUtc = DateTime.UtcNow;
     private DateTime? _loadAndPlayCompletedUtc;
     private DateTime _lastProgressUtc = DateTime.MinValue;
     private DateTime? _bufferingStartedUtc;
@@ -198,6 +200,7 @@
 
     protected override void OnInitialized()
     {
+        _componentStartUtc = DateTime.UtcNow;
         _componentCts = CancellationTokenSource.CreateLinkedTokenSource(State.Token);
 
         _startedHandler = EnsureLoopStarted;
@@ -253,7 +256,10 @@
                     skippedMissingCount = 0;
                     emptyUrlRetryCount++;
                     var delay = GetEmptyUrlDelay(emptyUrlRetryCount);
-                    Logger.LogInformation("[AudioPlayer] Empty url retry count={Count} delay={Delay}", emptyUrlRetryCount, delay);
+                    var isStartupWindow = DateTime.UtcNow - _componentStartUtc < StartupSilencePeriod;
+                    Logger.Log(isStartupWindow ? LogLevel.Debug : LogLevel.Information,
+                        "[AudioPlayer] Empty url retry count={Count} delay={Delay} startupWindow={StartupWindow}",
+                        emptyUrlRetryCount, delay, isStartupWindow);
                     await Task.Delay(delay, ComponentToken);
                     continue;
                 }
@@ -595,12 +601,26 @@
         }
     }
 
+    private bool IsReportSuppressed(string reason)
+    {
+        if (reason == "playlist-changed" || reason == "ended" || reason == "skip-requested")
+            return true;
+
+        if (reason == "empty-url" && DateTime.UtcNow - _componentStartUtc < StartupSilencePeriod)
+            return true;
+
+        return false;
+    }
+
     private void ReportSkip(
         string reason,
         SongDto? previousSong,
         IReadOnlyList<KeyValuePair<string, string?>> details,
         AudioStateSnapshot? snapshot)
     {
+        if (IsReportSuppressed(reason))
+            return;
+
         var (title, severity) = DescribeReason(reason);
         var songLabel = FormatSongLabel(previousSong);
         var timestamp = DateTime.UtcNow;
