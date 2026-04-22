@@ -12,7 +12,7 @@ using Frontend = Projects.Server;
 // does not boot this assembly. Anything that used to read prod-only env (COOLIFY_URL,
 // DB_CONNECTION_STRING, ASPIRE_TOKEN) has been dropped — those paths are dead here.
 
-CleanupLogs();
+LogCleanup.Run();
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -35,17 +35,13 @@ var dbConnection = $"Host=127.0.0.1;" +
                    $"Username={upstream.User};" +
                    $"Password={upstream.Password}";
 
-var minio = builder.AddContainer("minio", "minio/minio", "latest")
-                   .WithArgs("server", "/data", "--console-address", ":9001")
-                   .WithHttpEndpoint(9000, 9000, "api")
-                   .WithHttpEndpoint(9001, 9001, "console")
-                   .WithEnvironment("MINIO_ROOT_USER", "minioadmin")
-                   .WithEnvironment("MINIO_ROOT_PASSWORD", "minioadmin")
-                   .WithVolume("post-radio-minio-data", "/data")
-                   .WithLifetime(ContainerLifetime.Persistent);
+var mediaRoot = configuration["MediaStorage:RootPath"]
+                ?? Path.Combine(TelemetryPaths.FindProjectRoot() ?? AppContext.BaseDirectory, ".media");
+Directory.CreateDirectory(Path.Combine(mediaRoot, "audio"));
+Directory.CreateDirectory(Path.Combine(mediaRoot, "images"));
 
 var silo = builder.AddProject<Silo>("silo");
-silo.WaitFor(pgbouncer.Resource).WaitFor(minio);
+silo.WaitFor(pgbouncer.Resource);
 
 var coordinator = builder.AddProject<Coordinator>("coordinator");
 var meta = builder.AddProject<MetaGateway>("meta");
@@ -58,11 +54,7 @@ var frontend = builder.AddProject<Frontend>("frontend")
                       .WithReference(meta);
 
 foreach (var project in new[] { silo, coordinator, meta, console })
-{
-    project.WithEnvironment("Minio__Endpoint", "localhost:9000")
-           .WithEnvironment("Minio__AccessKey", "minioadmin")
-           .WithEnvironment("Minio__SecretKey", "minioadmin");
-}
+    project.WithEnvironment("MediaStorage__RootPath", mediaRoot);
 
 SetupDB();
 
@@ -76,27 +68,6 @@ builder.Eventing.Subscribe<AfterResourcesCreatedEvent>((_, _) => PostResourcesSe
 builder.Build().Run();
 
 return;
-
-void CleanupLogs()
-{
-    var logsDir = TelemetryPaths.GetTelemetryDir("logs");
-
-    if (logsDir == null)
-        return;
-
-    foreach (var entry in Directory.EnumerateFileSystemEntries(logsDir))
-    {
-        try
-        {
-            if (File.Exists(entry))
-                File.Delete(entry);
-            else if (Directory.Exists(entry))
-                Directory.Delete(entry, true);
-        }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-    }
-}
 
 void SetupDB()
 {

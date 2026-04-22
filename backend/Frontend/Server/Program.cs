@@ -38,14 +38,34 @@ app.Map("/api/{**path}", async (HttpContext ctx, IHttpClientFactory factory, str
             req.Content.Headers.TryAddWithoutValidation("Content-Type", ct);
     }
 
+    foreach (var header in ctx.Request.Headers)
+    {
+        if (ShouldSkipProxyRequestHeader(header.Key))
+            continue;
+
+        req.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+    }
+
     using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ctx.RequestAborted);
     ctx.Response.StatusCode = (int)resp.StatusCode;
+    foreach (var h in resp.Headers)
+        ctx.Response.Headers[h.Key] = h.Value.ToArray();
     foreach (var h in resp.Content.Headers)
         ctx.Response.Headers[h.Key] = h.Value.ToArray();
     ctx.Response.Headers.Remove("transfer-encoding");
+    ctx.Response.Headers.Remove("connection");
     await resp.Content.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
 });
 
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+static bool ShouldSkipProxyRequestHeader(string name)
+{
+    return string.Equals(name, "Host", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(name, "Content-Type", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(name, "Connection", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(name, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase);
+}

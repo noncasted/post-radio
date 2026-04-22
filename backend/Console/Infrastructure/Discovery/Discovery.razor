@@ -1,0 +1,110 @@
+@page "/discovery"
+@using Cluster.Discovery
+@using global::Common.Reactive
+@inherits UiComponent
+
+<PageTitle>Discovery</PageTitle>
+<PageHeader Title="Discovery"/>
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-6">
+    <div class="grid grid-cols-4 gap-3">
+        @foreach (var tag in _tagOrder)
+        {
+            var entries = _services.Where(s => s.Tag == tag).ToList();
+            <div class="rounded-lg border bg-card p-4 flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <div class="rounded-md @(entries.Count > 0 ? "bg-green-500/15" : "bg-muted") p-1.5">
+                        <LucideIcon Name="@TagIcon(tag)" Size="14" class="@(entries.Count > 0 ? "text-green-400" : "text-muted-foreground")" />
+                    </div>
+                    <span class="text-sm font-medium">@tag</span>
+                </div>
+                <span class="text-2xl font-bold">@entries.Count</span>
+                <span class="text-xs text-muted-foreground">@StaleCount(entries) stale</span>
+            </div>
+        }
+    </div>
+
+    <div class="rounded-lg border bg-card overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+            <tr class="border-b bg-muted/50">
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Service</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Id</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Last heartbeat (UTC)</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Age</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (_services.Count == 0)
+            {
+                <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">No services discovered yet.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var service in _services.OrderBy(s => s.Tag).ThenBy(s => s.Id))
+                {
+                    var age = DateTime.UtcNow - service.UpdateTime;
+                    var stale = IsStale(service);
+                    <tr class="border-b last:border-b-0 hover:bg-muted/30">
+                        <td class="px-4 py-2.5 font-medium">@service.Tag</td>
+                        <td class="px-4 py-2.5 font-mono text-xs">@service.Id</td>
+                        <td class="px-4 py-2.5 font-mono text-xs">@service.UpdateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="px-4 py-2.5 font-mono text-xs">@FormatAge(age)</td>
+                        <td class="px-4 py-2.5">
+                            <span class="rounded-full px-2 py-0.5 text-xs @(stale ? "bg-amber-500/15 text-amber-400" : "bg-green-500/15 text-green-400")">
+                                @(stale ? "stale" : "healthy")
+                            </span>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject] public IServiceDiscovery ServiceDiscovery { get; set; } = null!;
+
+    private static readonly ServiceTag[] _tagOrder =
+        [ServiceTag.Coordinator, ServiceTag.Meta, ServiceTag.Silo, ServiceTag.Console];
+
+    private IReadOnlyList<IServiceOverview> _services = [];
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        _ = RefreshLoop(lifetime);
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshLoop(IReadOnlyLifetime lifetime)
+    {
+        while (lifetime.IsTerminated == false)
+        {
+            _services = ServiceDiscovery.Entries.Values.ToList();
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(TimeSpan.FromSeconds(2), lifetime.Token);
+        }
+    }
+
+    private static bool IsStale(IServiceOverview service) =>
+        DateTime.UtcNow - service.UpdateTime > TimeSpan.FromSeconds(20);
+
+    private static int StaleCount(IReadOnlyList<IServiceOverview> services) =>
+        services.Count(IsStale);
+
+    private static string FormatAge(TimeSpan age) =>
+        age.TotalSeconds < 60 ? $"{age.TotalSeconds:F0}s" : $"{age.TotalMinutes:F1}m";
+
+    private static string TagIcon(ServiceTag tag) => tag switch
+    {
+        ServiceTag.Coordinator => "crown",
+        ServiceTag.Meta => "users",
+        ServiceTag.Silo => "database",
+        ServiceTag.Console => "monitor",
+        _ => "circle"
+    };
+}

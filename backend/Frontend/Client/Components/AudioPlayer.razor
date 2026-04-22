@@ -32,7 +32,11 @@
         audio.currentTime = 0;
     }
 
-    function setVolume(v) { document.getElementById("audio").volume = v; }
+    function setVolume(v) {
+        const audio = document.getElementById("audio");
+        audio.volume = v;
+        audio.muted = v <= 0;
+    }
 </script>
 
 @code {
@@ -100,7 +104,10 @@
     {
         var ratio = Math.Clamp(value / 100, 0, 1);
         var options = State.Options;
-        var volume = options.MinVolume + ratio * (options.MaxVolume - options.MinVolume);
+        var volume = ratio <= 0
+            ? 0
+            : options.MinVolume + ratio * (options.MaxVolume - options.MinVolume);
+
         await Js.InvokeVoidAsync("setVolume", Math.Clamp(volume, 0, 1));
     }
 

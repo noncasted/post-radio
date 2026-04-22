@@ -1,0 +1,119 @@
+@page "/audit"
+@using global::Common.Extensions
+@using global::Common.Reactive
+@inherits UiComponent
+
+<PageTitle>Audit Log</PageTitle>
+<PageHeader Title="Audit Log"/>
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-6">
+    <div class="rounded-lg border bg-card p-4 flex items-center justify-between gap-4">
+        <div class="text-sm text-muted-foreground">
+            Recent admin actions and configuration changes from <span class="font-mono">audit_log</span>.
+        </div>
+        <BbButton Variant="ButtonVariant.Outline" Disabled="@_loading" @onclick="Load">
+            <LucideIcon Name="refresh-cw" Size="16" class="mr-2" />
+            Refresh
+        </BbButton>
+    </div>
+
+    @if (_error != null)
+    {
+        <div class="text-sm text-destructive rounded border border-destructive/30 bg-destructive/10 p-3">@_error</div>
+    }
+
+    <div class="rounded-lg border bg-card overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+            <tr class="border-b bg-muted/50">
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Timestamp (UTC)</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Action</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Details</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Id</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (_loading)
+            {
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">Loading...</td>
+                </tr>
+            }
+            else if (_entries.Count == 0)
+            {
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">No audit log entries.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var entry in _entries)
+                {
+                    <tr class="border-b last:border-b-0 hover:bg-muted/30 align-top">
+                        <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap">@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="px-4 py-2.5 font-medium">@entry.Action</td>
+                        <td class="px-4 py-2.5 text-xs text-muted-foreground whitespace-pre-wrap">@entry.Details</td>
+                        <td class="px-4 py-2.5 font-mono text-xs">@entry.Id</td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject] public IDbSource DbSource { get; set; } = null!;
+
+    private IReadOnlyList<AuditEntry> _entries = [];
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            await using var connection = await DbSource.Value.OpenConnectionAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                                  SELECT id, timestamp, action, details
+                                  FROM audit_log
+                                  ORDER BY timestamp DESC
+                                  LIMIT 100
+                                  """;
+
+            var entries = new List<AuditEntry>();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                entries.Add(new AuditEntry(
+                    reader.GetGuid(0),
+                    reader.GetDateTime(1),
+                    reader.GetString(2),
+                    reader.GetString(3)));
+            }
+
+            _entries = entries;
+        }
+        catch (Exception ex)
+        {
+            _entries = [];
+            _error = $"[AuditLog] Failed to load audit log: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private record AuditEntry(Guid Id, DateTime Timestamp, string Action, string Details);
+}

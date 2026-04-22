@@ -1,0 +1,229 @@
+@page "/side-effects"
+@using Cluster.Coordination
+@using Cluster.Discovery
+@using Cluster.Monitoring
+@using Console.Infrastructure.SideEffects
+@using global::Common.Reactive
+@using global::Infrastructure
+@inherits UiComponent
+
+<PageTitle>Side Effects</PageTitle>
+<PageHeader Title="Side Effects"/>
+
+<div class="container mx-auto max-w-6xl px-4 py-4 flex flex-col gap-6">
+    <div class="grid grid-cols-4 gap-3">
+        <MetricCard Title="Queued" Value="_aggregate.QueueCount" Icon="list" Tone="blue" />
+        <MetricCard Title="Processing" Value="_aggregate.ProcessingCount" Icon="loader-circle" Tone="violet" />
+        <MetricCard Title="Retry" Value="_aggregate.RetryCount" Icon="refresh-cw" Tone="amber" />
+        <MetricCard Title="Dead Letter" Value="_aggregate.DeadLetterCount" Icon="octagon-alert" Tone="red" />
+    </div>
+
+    <div class="rounded-lg border bg-card p-4 flex items-center justify-between gap-4">
+        <div class="text-sm text-muted-foreground">
+            Last update: <span class="font-mono">@(_aggregate.UpdatedAt == default ? "never" : _aggregate.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss"))</span>
+        </div>
+        <div class="flex gap-2">
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@_busy" @onclick="Refresh">
+                <LucideIcon Name="refresh-cw" Size="16" class="mr-2" />
+                Refresh
+            </BbButton>
+            <BbButton Disabled="@_busy" @onclick="RequeueReady">
+                Requeue ready entries
+            </BbButton>
+        </div>
+    </div>
+
+    <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Per-service live data</h2>
+        <table class="w-full text-sm">
+            <thead>
+            <tr class="border-b bg-muted/50">
+                <th class="h-9 px-3 text-left font-medium text-muted-foreground">Service</th>
+                <th class="h-9 px-3 text-left font-medium text-muted-foreground">Id</th>
+                <th class="h-9 px-3 text-right font-medium text-muted-foreground">Queued</th>
+                <th class="h-9 px-3 text-right font-medium text-muted-foreground">Processing</th>
+                <th class="h-9 px-3 text-right font-medium text-muted-foreground">Retry</th>
+                <th class="h-9 px-3 text-right font-medium text-muted-foreground">Dead</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (_aggregate.Services.Count == 0)
+            {
+                <tr>
+                    <td colspan="6" class="px-3 py-6 text-center text-muted-foreground">No side effects snapshots available yet.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var service in _aggregate.Services.OrderBy(s => s.ServiceTag).ThenBy(s => s.ServiceId))
+                {
+                    <tr class="border-b last:border-b-0 hover:bg-muted/30">
+                        <td class="px-3 py-2.5 font-medium">@service.ServiceTag</td>
+                        <td class="px-3 py-2.5 font-mono text-xs">@service.ServiceId</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-xs">@service.Data.QueueCount</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-xs">@service.Data.ProcessingCount</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-xs">@service.Data.RetryCount</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-xs">@service.Data.DeadLetterCount</td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Retry queue</h2>
+        <table class="w-full text-sm">
+            <thead>
+            <tr class="border-b bg-muted/50">
+                <th class="h-9 px-3 text-left font-medium text-muted-foreground">Id</th>
+                <th class="h-9 px-3 text-left font-medium text-muted-foreground">Type</th>
+                <th class="h-9 px-3 text-right font-medium text-muted-foreground">Retries</th>
+                <th class="h-9 px-3 text-left font-medium text-muted-foreground">Retry after</th>
+                <th class="h-9 px-3 text-left font-medium text-muted-foreground">Created</th>
+                <th class="h-9 px-3 text-right font-medium text-muted-foreground"></th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (_aggregate.RetryEntries.Count == 0)
+            {
+                <tr>
+                    <td colspan="6" class="px-3 py-6 text-center text-muted-foreground">Retry queue is empty.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var entry in _aggregate.RetryEntries)
+                {
+                    <tr class="border-b last:border-b-0 hover:bg-muted/30">
+                        <td class="px-3 py-2.5 font-mono text-xs">@entry.Id</td>
+                        <td class="px-3 py-2.5 text-xs">@entry.TypeName</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-xs">@entry.RetryCount</td>
+                        <td class="px-3 py-2.5 font-mono text-xs">@entry.RetryAfter.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="px-3 py-2.5 font-mono text-xs">@entry.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="px-3 py-2.5 text-right">
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" Disabled="@_busy" @onclick="() => RequeueEntry(entry.Id)">
+                                Requeue
+                            </BbButton>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Inject] public ISideEffectsStorage Storage { get; set; } = null!;
+    [Inject] public IMessaging Messaging { get; set; } = null!;
+    [Inject] public IServiceDiscovery Discovery { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+
+    private SideEffectsAggregate _aggregate = new();
+    private bool _busy;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        _ = RefreshLoop(lifetime);
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshLoop(IReadOnlyLifetime lifetime)
+    {
+        while (lifetime.IsTerminated == false)
+        {
+            await Refresh();
+            await Task.Delay(TimeSpan.FromSeconds(5), lifetime.Token);
+        }
+    }
+
+    private async Task Refresh()
+    {
+        try
+        {
+            var stats = await Storage.GetStats();
+            var retryEntries = await Storage.GetRetryEntries(50);
+            var services = await CollectServiceSnapshots();
+
+            _aggregate = new SideEffectsAggregate
+            {
+                QueueCount = stats.QueueCount,
+                ProcessingCount = stats.ProcessingCount,
+                RetryCount = stats.RetryCount,
+                DeadLetterCount = stats.DeadLetterCount,
+                Services = services,
+                RetryEntries = retryEntries.Select(e => new SideEffectsRetryEntry
+                {
+                    Id = e.Id,
+                    TypeName = e.TypeName,
+                    RetryCount = e.RetryCount,
+                    RetryAfter = e.RetryAfter,
+                    CreatedAt = e.CreatedAt
+                }).ToList(),
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[SideEffects] Refresh failed: {ex.Message}", "Error");
+        }
+    }
+
+    private async Task<IReadOnlyList<PerServiceSideEffects>> CollectServiceSnapshots()
+    {
+        var serviceTasks = Discovery.Entries.Values.Select(async service => {
+            try
+            {
+                var pipeId = new MessagePipeServiceRequestId(service, typeof(SideEffectsSnapshotRequest));
+                var response = await Messaging.SendPipe<SideEffectsSnapshotResponse>(pipeId, new SideEffectsSnapshotRequest());
+
+                return new PerServiceSideEffects
+                {
+                    ServiceTag = response.ServiceTag,
+                    ServiceId = response.ServiceId,
+                    Data = response.Data
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        });
+
+        var results = await Task.WhenAll(serviceTasks);
+        return results.Where(s => s != null).Cast<PerServiceSideEffects>().ToList();
+    }
+
+    private async Task RequeueReady()
+    {
+        await RunStorageAction("Ready retry entries requeued", () => Storage.RequeueReady());
+    }
+
+    private async Task RequeueEntry(Guid id)
+    {
+        await RunStorageAction("Retry entry requeued", () => Storage.RequeueRetryEntry(id));
+    }
+
+    private async Task RunStorageAction(string successMessage, Func<Task> action)
+    {
+        _busy = true;
+
+        try
+        {
+            await action();
+            await Refresh();
+            ToastService.Success(successMessage, "Done");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[SideEffects] Operation failed: {ex.Message}", "Error");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

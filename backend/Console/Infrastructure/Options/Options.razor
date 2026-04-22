@@ -1,0 +1,210 @@
+@page "/infrastructure-options"
+@using Cluster.Configs
+@using global::Common.Extensions
+@using global::Common.Reactive
+@using global::Infrastructure
+@using global::Infrastructure.Execution
+@inherits UiComponent
+
+<PageTitle>Infrastructure Options</PageTitle>
+<PageHeader Title="Infrastructure Options"/>
+
+<div class="container mx-auto max-w-6xl px-4 py-4 flex flex-col gap-6">
+    <div class="rounded-lg border bg-card p-4 flex items-center justify-between gap-4">
+        <div class="text-sm text-muted-foreground">
+            Edit runtime infrastructure configuration. Saved values are persisted in state storage and broadcast to services.
+        </div>
+        <div class="flex items-center gap-2">
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@_saving" @onclick="ResetDrafts">
+                Reset
+            </BbButton>
+            <BbButton Disabled="@_saving" @onclick="SaveAll">
+                @if (_saving)
+                {
+                    <LucideIcon Name="loader-circle" Size="16" class="animate-spin mr-2"/>
+                    <span>Saving...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="save" Size="16" class="mr-2"/>
+                    <span>Save options</span>
+                }
+            </BbButton>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <TaskBalancerOptionsEditor Value="_taskBalancer" />
+        <SideEffectsOptionsEditor Value="_sideEffects" />
+        <DurableQueueOptionsEditor Value="_durableQueue" />
+        <TransactionOptionsEditor Value="_transaction" />
+        <FrontendOptionsEditor Value="_frontend" />
+
+        <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+                <div class="rounded-md bg-emerald-500/15 p-1.5">
+                    <LucideIcon Name="route" Size="14" class="text-emerald-400" />
+                </div>
+                <h2 class="text-sm font-semibold">Runtime Pipe</h2>
+            </div>
+            <div class="flex flex-col">
+                <OptionNumber Label="Observer Keep-Alive (minutes)" Icon="clock" @bind-Value="_runtimePipe.ObserverKeepAliveMinutes" />
+                <OptionNumber Label="Send Timeout (sec)" Icon="timer" @bind-Value="_runtimePipe.SendTimeoutSeconds" />
+                <OptionNumber Label="Send Retry Count" Icon="refresh-cw" @bind-Value="_runtimePipe.SendRetryCount" />
+                <OptionNumber Label="Send Retry Base Delay (ms)" Icon="timer-reset" @bind-Value="_runtimePipe.SendRetryBaseDelayMs" Last="true" />
+            </div>
+        </div>
+
+        <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+                <div class="rounded-md bg-cyan-500/15 p-1.5">
+                    <LucideIcon Name="radio-tower" Size="14" class="text-cyan-400" />
+                </div>
+                <h2 class="text-sm font-semibold">Runtime Channel</h2>
+            </div>
+            <div class="flex flex-col">
+                <OptionNumber Label="Observer Keep-Alive (minutes)" Icon="clock" @bind-Value="_runtimeChannel.ObserverKeepAliveMinutes" />
+                <OptionNumber Label="Catch-up Buffer Size" Icon="list" @bind-Value="_runtimeChannel.CatchUpBufferSize" />
+                <OptionNumber Label="Delivery Timeout (sec)" Icon="timer" @bind-Value="_runtimeChannel.DeliveryTimeoutSeconds" Last="true" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] public ITaskBalancerConfig TaskBalancerConfig { get; set; } = null!;
+    [Inject] public ISideEffectsConfig SideEffectsConfig { get; set; } = null!;
+    [Inject] public IDurableQueueConfig DurableQueueConfig { get; set; } = null!;
+    [Inject] public IRuntimePipeConfig RuntimePipeConfig { get; set; } = null!;
+    [Inject] public IRuntimeChannelConfig RuntimeChannelConfig { get; set; } = null!;
+    [Inject] public ITransactionConfig TransactionConfig { get; set; } = null!;
+    [Inject] public IFrontendConfig FrontendConfig { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+
+    private TaskBalancerOptions _taskBalancer = new();
+    private SideEffectsOptions _sideEffects = new();
+    private DurableQueueOptions _durableQueue = new();
+    private RuntimePipeOptions _runtimePipe = new();
+    private RuntimeChannelOptions _runtimeChannel = new();
+    private TransactionOptions _transaction = new();
+    private FrontendOptions _frontend = new();
+    private bool _saving;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        ResetDrafts();
+
+        Watch(lifetime, TaskBalancerConfig, value => _taskBalancer = Copy(value));
+        Watch(lifetime, SideEffectsConfig, value => _sideEffects = Copy(value));
+        Watch(lifetime, DurableQueueConfig, value => _durableQueue = Copy(value));
+        Watch(lifetime, RuntimePipeConfig, value => _runtimePipe = Copy(value));
+        Watch(lifetime, RuntimeChannelConfig, value => _runtimeChannel = Copy(value));
+        Watch(lifetime, TransactionConfig, value => _transaction = Copy(value));
+        Watch(lifetime, FrontendConfig, value => _frontend = Copy(value));
+
+        return Task.CompletedTask;
+    }
+
+    private void Watch<T>(IReadOnlyLifetime lifetime, IAddressableState<T> state, Action<T> apply) where T : class, new()
+    {
+        state.View(lifetime, value => {
+            if (_saving)
+                return;
+
+            apply(value);
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+    }
+
+    private void ResetDrafts()
+    {
+        _taskBalancer = Copy(TaskBalancerConfig.Value);
+        _sideEffects = Copy(SideEffectsConfig.Value);
+        _durableQueue = Copy(DurableQueueConfig.Value);
+        _runtimePipe = Copy(RuntimePipeConfig.Value);
+        _runtimeChannel = Copy(RuntimeChannelConfig.Value);
+        _transaction = Copy(TransactionConfig.Value);
+        _frontend = Copy(FrontendConfig.Value);
+    }
+
+    private async Task SaveAll()
+    {
+        _saving = true;
+
+        try
+        {
+            await TaskBalancerConfig.SetValue(Copy(_taskBalancer));
+            await SideEffectsConfig.SetValue(Copy(_sideEffects));
+            await DurableQueueConfig.SetValue(Copy(_durableQueue));
+            await RuntimePipeConfig.SetValue(Copy(_runtimePipe));
+            await RuntimeChannelConfig.SetValue(Copy(_runtimeChannel));
+            await TransactionConfig.SetValue(Copy(_transaction));
+            await FrontendConfig.SetValue(Copy(_frontend));
+
+            ToastService.Success("Infrastructure options saved", "Done");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[Options] Save failed: {ex.Message}", "Error");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static TaskBalancerOptions Copy(TaskBalancerOptions value) => new()
+    {
+        EmptyDelayMs = value.EmptyDelayMs,
+        NextDelayMs = value.NextDelayMs,
+        IterationScore = value.IterationScore,
+        ExceptionPenalty = value.ExceptionPenalty,
+        ConcurrentTasks = value.ConcurrentTasks
+    };
+
+    private static SideEffectsOptions Copy(SideEffectsOptions value) => new()
+    {
+        ScanDelay = value.ScanDelay,
+        EmptyScanDelay = value.EmptyScanDelay,
+        ConcurrentExecutions = value.ConcurrentExecutions,
+        MaxRetryCount = value.MaxRetryCount,
+        IncrementalRetryDelay = value.IncrementalRetryDelay,
+        StuckCheckIntervalSeconds = value.StuckCheckIntervalSeconds,
+        StuckThresholdMinutes = value.StuckThresholdMinutes
+    };
+
+    private static DurableQueueOptions Copy(DurableQueueOptions value) => new()
+    {
+        ObserverKeepAliveMinutes = value.ObserverKeepAliveMinutes
+    };
+
+    private static RuntimePipeOptions Copy(RuntimePipeOptions value) => new()
+    {
+        ObserverKeepAliveMinutes = value.ObserverKeepAliveMinutes,
+        SendTimeoutSeconds = value.SendTimeoutSeconds,
+        SendRetryCount = value.SendRetryCount,
+        SendRetryBaseDelayMs = value.SendRetryBaseDelayMs
+    };
+
+    private static RuntimeChannelOptions Copy(RuntimeChannelOptions value) => new()
+    {
+        ObserverKeepAliveMinutes = value.ObserverKeepAliveMinutes,
+        CatchUpBufferSize = value.CatchUpBufferSize,
+        DeliveryTimeoutSeconds = value.DeliveryTimeoutSeconds
+    };
+
+    private static TransactionOptions Copy(TransactionOptions value) => new()
+    {
+        LockWaitSeconds = value.LockWaitSeconds,
+        StuckGraceSeconds = value.StuckGraceSeconds
+    };
+
+    private static FrontendOptions Copy(FrontendOptions value) => new()
+    {
+        BaseVolume = value.BaseVolume,
+        MinVolume = value.MinVolume,
+        MaxVolume = value.MaxVolume,
+        ImageSwitchIntervalMs = value.ImageSwitchIntervalMs,
+        ImageFadeMs = value.ImageFadeMs
+    };
+}

@@ -37,9 +37,9 @@ Verify: `sudo docker network inspect coolify --format '{{range .Containers}}{{.N
 
 The setup is gated on `OrleansQuery` existence, so first deploy bootstraps everything and subsequent deploys are essentially no-ops. If you upgrade Orleans, re-check upstream `PostgreSQL-Clustering.sql` — the supplemental row may have been merged and the patch can be removed.
 
-## Console returns 502 / Gateway Timeout while game and meta work
+## Console returns 502 / Gateway Timeout while frontend and meta work
 
-**Symptom.** `https://console.minesleader.xyz/login` hangs and returns 504, but `meta` / `game` on identical Traefik labels are fine. Container itself is `Up (healthy)`, internal `curl http://localhost:8080/login` works, `coolify-proxy` access logs do not show the request.
+**Symptom.** `https://console.example.com/login` hangs and returns 504, but `meta` / `frontend` on identical Traefik labels are fine. Container itself is `Up (healthy)`, internal `curl http://localhost:8080/login` works, `coolify-proxy` access logs do not show the request.
 
 **Cause.** Traefik's dynamic router store can hold a stale entry for the host pointing at a dead container after a redeploy or a rapid label change. The router exists — Traefik resolves the host — but the upstream IP is gone, hence the timeout (request enters Traefik, never leaves).
 
@@ -47,12 +47,12 @@ The setup is gated on `OrleansQuery` existence, so first deploy bootstraps every
 ```bash
 # enumerate routers Traefik thinks exist for this host
 sudo docker exec coolify-proxy wget -qO- http://127.0.0.1:8080/api/http/routers \
-  | python3 -m json.tool | grep -iC2 console.minesleader
+  | python3 -m json.tool | grep -iC2 console.example
 
 # scan host for label collisions on the same hostname
 sudo docker ps --format "{{.Names}}" | while read c; do
   sudo docker inspect "$c" --format '{{range $k,$v := .Config.Labels}}{{$k}}={{$v}} {{end}}' \
-    | grep -q "console.minesleader.xyz" && echo "=== $c ==="
+    | grep -q "console.example.com" && echo "=== $c ==="
 done
 ```
 
@@ -65,7 +65,7 @@ sudo docker restart coolify-proxy
 
 We hit this once after the rapid healthcheck-tuning redeploy cycle. A clean Redeploy from the Coolify UI fixed it without needing the proxy restart, presumably because Coolify reissues all dynamic config on Redeploy.
 
-If the symptom returns, the nuclear option is to rename the offending hostname temporarily (e.g. `admin.minesleader.xyz`) — that bypasses any cached router and confirms whether the issue is host-name-bound or container-bound.
+If the symptom returns, the nuclear option is to rename the offending hostname temporarily (e.g. `admin.example.com`) — that bypasses any cached router and confirms whether the issue is host-name-bound or container-bound.
 
 ## `host.docker.internal` does not resolve in pgbouncer (local only)
 
@@ -117,7 +117,7 @@ Verify: edit a `.cs` file, rerun `docker build` locally, confirm the `restore` s
 **Fix.** `resource-service` container (forked `noncasted/Aspire.ResourceServer.Standalone`) provides this. Required pieces:
 - `DASHBOARD__RESOURCESERVICECLIENT__URL=http://resource-service:80` on `aspire-dashboard`.
 - `resource-service` mounts `/var/run/docker.sock:ro`.
-- `COMPOSE_PROJECT_FILTER=mines-leader` env on `resource-service` so it filters our containers out of the entire Docker host.
+- `COMPOSE_PROJECT_FILTER=post-radio` env on `resource-service` so it filters our containers out of the entire Docker host.
 
 If the tab is still empty, check `docker logs <resource-service>` — most failures are permission-related on the socket mount or label-filter typos.
 
@@ -167,10 +167,10 @@ If you ever bump to a newer syntax version (e.g. `1.8`), check that it is a `-la
 
 **Cause.** Two combined mistakes:
 1. Our `.csproj` files rely on `Directory.Build.props` to set `TargetFramework`.
-2. If the restore stage uses `dotnet restore backend/backend.slnx` and the solution includes `Tests.csproj` while `.dockerignore` excludes `backend/Tools/Tests/`, the solution file references a project that is not in the build context → restore fails on the missing csproj.
+2. If the restore stage uses `dotnet restore backend/post-radio.slnx` and the solution includes `Tests.csproj` while `.dockerignore` excludes `backend/Tools/Tests/`, the solution file references a project that is not in the build context → restore fails on the missing csproj.
 
 **Fix.** Two guardrails:
-1. Restore stage must copy all `Directory.*.props` files (we use `COPY --parents backend/backend.slnx **/Directory.*.props **/*.csproj`).
+1. Restore stage must copy all `Directory.*.props` files (we use `COPY --parents backend/post-radio.slnx **/Directory.*.props **/*.csproj`).
 2. Do not `dotnet restore` a solution that references excluded projects. List the six production `.csproj` files explicitly in the Dockerfile restore step. When you add a new production service, add a `dotnet restore` line for it alongside the existing five.
 
 ## BuildKit cache-mount race across parallel publishes
@@ -189,15 +189,15 @@ If you ever bump to a newer syntax version (e.g. `1.8`), check that it is a `-la
 
 **Fix.** In Coolify UI → Domains, always include the port for multi-port services:
 ```
-https://aspire.minesleader.xyz:18888
+https://aspire.example.com:18888
 ```
-Single-port services (meta/game/console on 8080) can omit the port — Traefik picks the only option. Affects `aspire-dashboard` (18888 / 18889 / 18890). If you expose a second port on any other service, add `:port` to its Domain entry.
+Single-port services (meta/console/frontend on 8080) can omit the port — Traefik picks the only option. Affects `aspire-dashboard` (18888 / 18889 / 18890). If you expose a second port on any other service, add `:port` to its Domain entry.
 
 ## Resource-service image tag out of sync with fork SHA
 
 **Symptom.** After pushing a fix to the fork, rebuild pulls new code but the container keeps running the old behaviour. `docker inspect` shows the old short-SHA in the image tag.
 
-**Cause.** Compose pins the fork by `build.context: https://github.com/noncasted/Aspire.ResourceServer.Standalone.git#<sha>` and tags the image `mines-leader/resource-service:<short-sha>`. BuildKit caches the git clone by URL+ref. If we bump only the `context:` ref but leave the `image:` tag unchanged, docker may still use the cached image layer under the old tag.
+**Cause.** Compose pins the fork by `build.context: https://github.com/noncasted/Aspire.ResourceServer.Standalone.git#<sha>` and tags the image `post-radio/resource-service:<short-sha>`. BuildKit caches the git clone by URL+ref. If we bump only the `context:` ref but leave the `image:` tag unchanged, docker may still use the cached image layer under the old tag.
 
 **Fix.** When you update the fork:
 1. Bump the full SHA in `build.context`.
@@ -264,7 +264,7 @@ If you bump the fork further, keep this invariant: the lookup key in `GetResourc
 
 ## Console: `Failed to load resource: 404` for `_framework/blazor.web.js` (Blazor admin dead)
 
-**Symptom.** `https://console.minesleader.xyz/login` loads, but every page is dead — no buttons clickable, top-bar links return 404, browser console shows `blazor.web.js:1 Failed to load resource: the server responded with a status of 404`. `/_content/...` and `/css/...` work fine. `/_framework/blazor.web.js` returns 404 from prod, even though `MapStaticAssets()` is wired and the manifest (`<svc>.staticwebassets.endpoints.json`) lists the route.
+**Symptom.** `https://console.example.com/login` loads, but every page is dead — no buttons clickable, top-bar links return 404, browser console shows `blazor.web.js:1 Failed to load resource: the server responded with a status of 404`. `/_content/...` and `/css/...` work fine. `/_framework/blazor.web.js` returns 404 from prod, even though `MapStaticAssets()` is wired and the manifest (`<svc>.staticwebassets.endpoints.json`) lists the route.
 
 **Cause (after a long detour).** The `mcr.microsoft.com/dotnet/sdk` image — both `:10.0`, `:10.0.201`, `:10.0.202` — does **not** auto-restore the private `Microsoft.AspNetCore.App.Internal.Assets` package, even for Web SDK projects that need it. That package is the actual carrier of `blazor.web.js`, `dotnet.js`, etc; without it, `dotnet publish` writes the manifest pointing at files that do not exist on disk (because they were never copied — never even fetched). Local hosts have the package because earlier projects pulled it; the SDK image starts clean and the implicit framework reference for Web SDK is not enough to drag it in.
 
@@ -343,7 +343,7 @@ Even though the SHA exists on `origin` and `git rev-parse b2f751c` resolves loca
 ```yaml
 build:
   context: https://github.com/<owner>/<repo>.git#ba56b364bfb7d56262e984c476071a811af07c5a
-image: mines-leader/resource-service:ba56b36
+image: post-radio/resource-service:ba56b36
 ```
 
 When you bump the fork, copy the full SHA into `context:` (`git rev-parse HEAD` in the fork worktree), then truncate it for the image tag.
@@ -411,7 +411,7 @@ Done in `ConsoleGateway/Program.cs`. Apply the same change to any other Web SDK 
 
 ## Aspire Dashboard takes ~2 minutes to become reachable after deploy
 
-**Symptom.** Right after a successful redeploy, `https://aspire.minesleader.xyz/` hangs / 504s for 1-3 minutes, then suddenly works. Console and game services are responsive immediately.
+**Symptom.** Right after a successful redeploy, `https://aspire.example.com/` hangs / 504s for 1-3 minutes, then suddenly works. Console and frontend services are responsive immediately.
 
 **Cause.** `aspire-dashboard` is wired with `depends_on: resource-service condition: service_started`. `service_started` waits only until Docker has booted the container, **not** until its gRPC port is actually accepting connections. The dashboard kicks off `WatchResources` immediately, the call fails (port not yet listening), and the gRPC channel goes into exponential back-off. Each retry doubles the delay; after a few rounds the back-off window happens to land just past the moment resource-service is ready, and the next call succeeds.
 

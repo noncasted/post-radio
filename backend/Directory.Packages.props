@@ -21,7 +21,6 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="MemoryPack" Version="1.21.4" />
     <PackageVersion Include="MemoryPack.Core" Version="1.21.4" />
-    <PackageVersion Include="Minio" Version="6.0.3" />
     <PackageVersion Include="SoundCloudExplode" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>

@@ -21,14 +21,14 @@ public class ImagesRefreshQueueId : IDurableQueueId
 
 public class ImagesCollection : IImagesCollection, ICoordinatorSetupCompleted
 {
-    public ImagesCollection(IObjectStorage objectStorage, IMessaging messaging)
+    public ImagesCollection(IMediaStorage mediaStorage, IMessaging messaging)
     {
-        _objectStorage = objectStorage;
+        _mediaStorage = mediaStorage;
         _messaging = messaging;
     }
 
     private readonly IMessaging _messaging;
-    private readonly IObjectStorage _objectStorage;
+    private readonly IMediaStorage _mediaStorage;
     private readonly ImagesRefreshQueueId _refreshQueue = new();
 
     private IReadOnlyList<string> _entries = new List<string>();
@@ -36,9 +36,8 @@ public class ImagesCollection : IImagesCollection, ICoordinatorSetupCompleted
 
     public async Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
-        await _objectStorage.EnsureBucket("images");
-        await _objectStorage.EnsureBucket("audio");
-        _messaging.ListenDurableQueue<int>(lifetime, _refreshQueue, _ => OnRefreshRequested().NoAwait());
+        await _mediaStorage.EnsureStorage();
+        _ = _messaging.ListenDurableQueue<int>(lifetime, _refreshQueue, _ => OnRefreshRequested().NoAwait());
         await OnRefreshRequested();
     }
 
@@ -50,12 +49,12 @@ public class ImagesCollection : IImagesCollection, ICoordinatorSetupCompleted
     public Task<string> GetUrl(int index)
     {
         var key = _entries[index];
-        return _objectStorage.GetUrl("images", key);
+        return Task.FromResult(_mediaStorage.GetImageUrl(key));
     }
 
     private async Task OnRefreshRequested()
     {
-        _entries = await _objectStorage.GetAllKeys("images");
+        _entries = await _mediaStorage.GetImageKeys();
     }
 }
 

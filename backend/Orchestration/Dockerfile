@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7-labs
 #
-# Shared multi-stage Dockerfile for the six production .NET services.
+# Shared multi-stage Dockerfile for the post-radio production .NET services.
 # Optimised for Coolify/BuildKit:
 #   - restore stage only copies .csproj / .slnx / Directory.*.props so that a code edit
 #     does not invalidate the NuGet cache layer.
@@ -22,7 +22,7 @@ WORKDIR /src
 
 # `--parents` preserves source directory layout so restore paths match the full repo.
 COPY --parents \
-    backend/backend.slnx \
+    backend/post-radio.slnx \
     **/Directory.*.props \
     **/*.csproj \
     ./
@@ -30,7 +30,7 @@ COPY --parents \
 RUN dotnet restore backend/Orchestration/Silo/Silo.csproj \
  && dotnet restore backend/Orchestration/Coordinator/Coordinator.csproj \
  && dotnet restore backend/Orchestration/MetaGateway/MetaGateway.csproj \
- && dotnet restore backend/Orchestration/GameGateway/GameGateway.csproj \
+ && dotnet restore backend/Frontend/Server/Server.csproj \
  && dotnet restore backend/Orchestration/ConsoleGateway/ConsoleGateway.csproj \
  && dotnet restore backend/Tools/DeploySetup/DeploySetup.csproj
 
@@ -46,7 +46,7 @@ RUN set -e; \
       "backend/Orchestration/Silo/Silo.csproj:Silo" \
       "backend/Orchestration/Coordinator/Coordinator.csproj:Coordinator" \
       "backend/Orchestration/MetaGateway/MetaGateway.csproj:MetaGateway" \
-      "backend/Orchestration/GameGateway/GameGateway.csproj:GameGateway" \
+      "backend/Frontend/Server/Server.csproj:Frontend.Server" \
       "backend/Orchestration/ConsoleGateway/ConsoleGateway.csproj:ConsoleGateway" \
       "backend/Tools/DeploySetup/DeploySetup.csproj:DeploySetup"; do \
       proj=${pair%:*}; name=${pair##*:}; \

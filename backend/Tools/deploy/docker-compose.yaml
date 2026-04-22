@@ -1,0 +1,290 @@
+# Production deployment for Coolify.
+#
+# Deploy via Coolify → Build Pack: Docker Compose → Compose Location: /backend/Tools/deploy/docker-compose.yaml.
+# Configure environment variables in the Coolify UI (see .env.example / COOLIFY.md).
+#
+# Local smoke test (run from repo root):
+#   docker compose --env-file backend/Tools/deploy/.env.local \
+#     -f backend/Tools/deploy/docker-compose.yaml \
+#     -f backend/Tools/deploy/docker-compose.local.yaml up --build
+
+name: post-radio
+
+# Dedicated Coolify Destination network. Keep every service on this single
+# external network so Coolify Traefik, managed Postgres and our containers all
+# resolve/reach each other deterministically.
+networks:
+  post-radio-production:
+    external: true
+
+x-service-build: &service-build
+  # Compose file lives at backend/Tools/deploy/, build context is the repo root.
+  context: ../../..
+  dockerfile: ./backend/Orchestration/Dockerfile
+
+x-service-env: &service-env
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_URLS: http://0.0.0.0:8080
+  ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+  DOTNET_RUNNING_IN_CONTAINER: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_EXPORTER_OTLP_HEADERS: "x-otlp-api-key=${OTEL_API_KEY:-dev-otlp-key}"
+  OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: in_memory
+  ConnectionStrings__postgres: "Host=pgbouncer;Port=6432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
+  postgres: "Host=pgbouncer;Port=6432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
+  MediaStorage__RootPath: /app/media
+
+x-traefik-network-labels: &traefik-network-labels
+  - "traefik.docker.network=post-radio-production"
+
+services:
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      LISTEN_PORT: "6432"
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: "200"
+      DEFAULT_POOL_SIZE: "20"
+      SERVER_TLS_SSLMODE: prefer
+    extra_hosts:
+      # Allow DB_HOST=host.docker.internal to resolve to the Docker host on Linux.
+      # Safe on macOS/Windows where the name is built-in.
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "6432"
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${DB_USER} || exit 1" ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+
+  migrator:
+    build:
+      <<: *service-build
+      args:
+        ASSEMBLY_NAME: DeploySetup
+    image: post-radio/migrator:latest
+    environment:
+      ConnectionStrings__postgres: "Host=pgbouncer;Port=6432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
+      postgres: "Host=pgbouncer;Port=6432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - post-radio-production
+
+  silo:
+    build:
+      <<: *service-build
+      args:
+        ASSEMBLY_NAME: Silo
+    image: post-radio/silo:latest
+    environment:
+      <<: *service-env
+      SERVICE_NAME: silo
+    expose:
+      - "8080"
+    volumes:
+      - media-data:/app/media
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ready || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  coordinator:
+    build:
+      <<: *service-build
+      args:
+        ASSEMBLY_NAME: Coordinator
+    image: post-radio/coordinator:latest
+    environment:
+      <<: *service-env
+      SERVICE_NAME: coordinator
+    expose:
+      - "8080"
+    volumes:
+      - media-data:/app/media
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      silo:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ready || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  meta:
+    build:
+      <<: *service-build
+      args:
+        ASSEMBLY_NAME: MetaGateway
+    image: post-radio/meta:latest
+    environment:
+      <<: *service-env
+      SERVICE_NAME: meta
+      SERVICE_FQDN_META_8080: /
+    expose:
+      - "8080"
+    volumes:
+      - media-data:/app/media
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      silo:
+        condition: service_healthy
+      coordinator:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    labels: *traefik-network-labels
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ready || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  console:
+    build:
+      <<: *service-build
+      args:
+        ASSEMBLY_NAME: ConsoleGateway
+    image: post-radio/console:latest
+    environment:
+      <<: *service-env
+      SERVICE_NAME: console
+      CONSOLE_TOKEN: ${CONSOLE_TOKEN}
+      SERVICE_FQDN_CONSOLE_8080: /
+    expose:
+      - "8080"
+    user: root
+    volumes:
+      # Persist DataProtection keyring across redeploys so Blazor auth and
+      # antiforgery cookies survive container replacement.
+      - console-keys:/root/.aspnet/DataProtection-Keys
+      - media-data:/app/media
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      silo:
+        condition: service_healthy
+      coordinator:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    labels: *traefik-network-labels
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ready || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  frontend:
+    build:
+      <<: *service-build
+      args:
+        ASSEMBLY_NAME: Frontend.Server
+    image: post-radio/frontend:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      DOTNET_RUNNING_IN_CONTAINER: "true"
+      services__meta__http__0: http://meta:8080
+      SERVICE_FQDN_FRONTEND_8080: /
+    expose:
+      - "8080"
+    depends_on:
+      meta:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    labels: *traefik-network-labels
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1" ]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    environment:
+      DASHBOARD__FRONTEND__AUTHMODE: BrowserToken
+      DASHBOARD__FRONTEND__BROWSERTOKEN: ${ASPIRE_TOKEN:-dev-token}
+      DASHBOARD__OTLP__AUTHMODE: ApiKey
+      DASHBOARD__OTLP__PRIMARYAPIKEY: ${OTEL_API_KEY:-dev-otlp-key}
+      DASHBOARD__OTLP__ENDPOINTURL: http://0.0.0.0:18889
+      DASHBOARD__FRONTEND__ENDPOINTURLS: http://0.0.0.0:18888
+      DASHBOARD__RESOURCESERVICECLIENT__AUTHMODE: Unsecured
+      DASHBOARD__RESOURCESERVICECLIENT__URL: http://resource-service:80
+      SERVICE_FQDN_ASPIREDASHBOARD_18888: /
+    expose:
+      - "18888"
+      - "18889"
+    user: root
+    volumes:
+      - aspire-dashboard-keys:/root/.aspnet/DataProtection-Keys
+    depends_on:
+      resource-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+    labels: *traefik-network-labels
+
+  # Standalone Aspire resource server: fills the dashboard Resources tab by
+  # reading Docker state through a read-only socket mount.
+  resource-service:
+    build:
+      context: https://github.com/noncasted/Aspire.ResourceServer.Standalone.git#ba56b364bfb7d56262e984c476071a811af07c5a
+    image: post-radio/resource-service:ba56b36
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:80
+      ResourceProvider: docker
+      COMPOSE_PROJECT_FILTER: ${COMPOSE_PROJECT_NAME:-post-radio}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    expose:
+      - "80"
+    restart: unless-stopped
+    networks:
+      - post-radio-production
+
+volumes:
+  aspire-dashboard-keys:
+  console-keys:
+  media-data:

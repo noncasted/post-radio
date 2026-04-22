@@ -76,13 +76,13 @@ tools/scripts/
 
 ## Dockerfile layering (production)
 
-One Dockerfile serves six containers: `silo`, `coordinator`, `meta`, `game`, `console`, `migrator`. The image a container ends up as is selected through the `ASSEMBLY_NAME` build-arg passed from compose.
+One Dockerfile serves six .NET containers: `silo`, `coordinator`, `meta`, `console`, `frontend`, `migrator`. The image a container ends up as is selected through the `ASSEMBLY_NAME` build-arg passed from compose.
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7-labs      # labs flag — enables COPY --parents
 
 FROM sdk AS restore                       # narrow cache key:
-COPY --parents backend/backend.slnx       #   slnx + csproj + Directory.*.props only.
+COPY --parents backend/post-radio.slnx       #   slnx + csproj + Directory.*.props only.
               **/Directory.*.props        #   Source edits do not touch this layer.
               **/*.csproj
 RUN dotnet restore <each .csproj>
@@ -119,20 +119,17 @@ Why this shape beats the naive “one build stage per service”:
 ```yaml
 x-service-build: &service-build      # shared build spec: context = repo root, one Dockerfile.
 x-service-env:   &service-env        # ASPNETCORE_*, OTLP endpoint + API key, pgbouncer conn-string.
-x-service-healthcheck: &service-healthcheck   # curl -fsS /ready, interval 2s, retries 60, start_period 10s.
 ```
 
 ### Networks
 
 ```yaml
 networks:
-  coolify:
-    external: true                    # declared, not managed by this compose.
+  post-radio-production:
+    external: true                    # Coolify Destination network, not managed by this compose.
 ```
 
-Every service attaches to **both** `default` (compose-created per-project bridge) and `coolify` (Coolify's shared bridge that also hosts managed Postgres). Without `coolify` the app cannot DNS-resolve `qxeff...`.
-
-Important subtlety — Coolify **overrides** our top-level `networks: default: external: coolify` attempt. The only thing that sticks is explicit `networks: [default, coolify]` under each service block. See `DEPLOY_TROUBLESHOOTING.md`.
+Every service attaches to the same external Coolify Destination network (`post-radio-production`). That network must also contain Coolify Traefik and the managed Postgres resource. Keeping a single explicit network avoids Docker/Traefik choosing an unreachable backend IP from an auto-created compose default network.
 
 ### Service graph
 
@@ -149,14 +146,19 @@ silo       (ASSEMBLY_NAME=Silo)
 coordinator (ASSEMBLY_NAME=Coordinator)
   │ healthcheck ← OrleansReadyHealthCheck AND CoordinatorReadyHealthCheck (DeployId != empty)
   ▼
-meta / game / console (three parallel leaves)
+meta / console (parallel Orleans clients)
+  │
+  ▼
+frontend (static WASM frontend + /api proxy to meta)
+
+minio (object storage sidecar for audio/images)
 
 aspire-dashboard (mcr.microsoft.com/dotnet/aspire-dashboard:9.0)
   - publishes OTLP endpoint on :18889 for every service
   - reads resources from resource-service over gRPC
 resource-service (noncasted fork, pinned SHA)
   - mounts /var/run/docker.sock read-only
-  - filters containers by COMPOSE_PROJECT_FILTER=mines-leader
+  - filters containers by COMPOSE_PROJECT_FILTER=post-radio
 ```
 
 Dependencies use `depends_on.condition: service_healthy` — matches the old AppHost `WaitFor(...)` semantics without needing AppHost.
@@ -170,7 +172,9 @@ All services declare `expose:` (internal) — no `ports:` mapped to host. TLS / 
 | pgbouncer | 6432 | consumed by migrator + services |
 | silo | 8080 | /alive /ready /health for compose healthcheck |
 | coordinator | 8080 | same |
-| meta / game / console | 8080 | same, plus user traffic via Traefik |
+| meta / console | 8080 | same, plus user traffic via Traefik |
+| frontend | 8080 | public static frontend + `/api` proxy to meta |
+| minio | 9000 / 9001 | internal object storage API / optional local console |
 | aspire-dashboard | 18888 (frontend), 18889 (OTLP gRPC), 18890 (OTLP HTTP) | 18888 user, 18889 app→dashboard |
 | resource-service | 80 (gRPC) | dashboard→resource-service |
 
@@ -183,7 +187,7 @@ For services with one port (8080) the Coolify magic variable `SERVICE_FQDN_<NAME
 ```
 DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD    # consumed by pgbouncer + connection-string interpolation
 CONSOLE_TOKEN                                  # blazor admin login
-GAME_SERVER_URL                                # public URL announced to the Unity client
+MINIO_ROOT_USER MINIO_ROOT_PASSWORD           # object-storage root credentials
 ASPIRE_TOKEN                                   # aspire-dashboard browser token
 OTEL_API_KEY                                   # services → dashboard OTLP header
 ```
@@ -192,12 +196,13 @@ Everything else is literal or derived inside compose (`x-service-env`). Secrets 
 
 ### Persistent volumes
 
-Two named volumes carry ASP.NET Core DataProtection keyrings across redeploys:
+Three named volumes are persistent across redeploys:
 
 | Volume | Mount | Why |
 |---|---|---|
 | `aspire-dashboard-keys` | `aspire-dashboard:/root/.aspnet/DataProtection-Keys` | Without it, every redeploy invalidates dashboard browser cookies — every page throws `CryptographicException`. |
 | `console-keys` | `console:/root/.aspnet/DataProtection-Keys` | Same mechanism: Blazor antiforgery + auth cookies become undecryptable, all admin buttons silently fail (`AntiforgeryValidationException`). |
+| `minio-data` | `minio:/data` | Stores uploaded/cached audio and images used by the radio metadata services. |
 
 Both services also set `user: root` because the runtime image drops privileges by default and the `/root/...` directory is root-owned, so the volume mount would be read-only otherwise.
 
@@ -239,16 +244,16 @@ docker compose \
 The overlay:
 
 - Swaps `Dockerfile` → `Dockerfile.prebuilt` (runtime-only; copies pre-published binaries from host). Docker build finishes in seconds.
-- Overrides the prod `default → coolify external` network with a local bridge (`mines-leader-local`) because the `coolify` network does not exist outside the Coolify host.
-- Adds host-port maps on `meta:7100`, `game:7101`, `console:7102`, `aspire-dashboard:7200/7201` so you can open them in a browser from the host.
+- Overrides the prod external network with a local bridge (`post-radio-local`) because the Coolify destination network does not exist outside the Coolify host.
+- Adds host-port maps on `meta:7100`, `console:7102`, `frontend:7103`, `minio:7900/7901`, `aspire-dashboard:7200/7201` so you can open them in a browser from the host.
 
 ## Coolify application configuration
 
 See `backend/Tools/deploy/COOLIFY.md` for the full runbook. One-liner summary:
 
 - Build Pack: `Docker Compose`
-- Base Directory: `/backend/Tools/deploy`
-- Docker Compose Location: `/docker-compose.yaml`
+- Base Directory: `/`
+- Docker Compose Location: `/backend/Tools/deploy/docker-compose.yaml`
 - Custom Docker Options: empty (no `--privileged`)
 - Domains: per-service in UI, **include `:port` for multi-port containers**
 - Env vars: the set above, secrets marked
@@ -275,7 +280,7 @@ Aspire's standalone dashboard only shows telemetry (Structured logs / Traces / M
 
 We ship a third-party implementation pinned by commit SHA: `https://github.com/noncasted/Aspire.ResourceServer.Standalone` (fork of `kiapanahi/Aspire.ResourceServer.Standalone`, MIT-licensed). Our fork adds three patches on top of upstream:
 
-1. `COMPOSE_PROJECT_FILTER` env — filter listed containers by `com.docker.compose.project` label so we only see `mines-leader-*`, not every container on the host.
+1. `COMPOSE_PROJECT_FILTER` env — filter listed containers by `com.docker.compose.project` label so we only see `post-radio-*`, not every container on the host.
 2. Docker container state (`running`, `exited`, …) mapped to Aspire `KnownResourceStates` (`Running`, `Exited`, …) so the icon colour is correct.
 3. Display name comes from `com.docker.compose.service` label; exit code parsed from `Status` string so `migrator` (exit 0) shows as `Finished` not `Failed`.
 
@@ -285,7 +290,7 @@ We ship a third-party implementation pinned by commit SHA: `https://github.com/n
 
 | | AppHost DinD era | Coolify Compose (idle) | Coolify Compose (silo benchmarks running) |
 |---|---|---|---|
-| 5 game services | 870 MB Debug | 576 MiB Release | 940 MiB Release |
+| 5 application services | 870 MB Debug | 576 MiB Release | 940 MiB Release |
 | └── of which silo | — | 113 MiB | **531 MiB** ← benchmark-driven grain caches |
 | Aspire host + dashboard + dcp + 6× dotnet run | ~1.6 GB | — | — |
 | aspire-dashboard + resource-service | — | 156 MiB | 197 MiB |

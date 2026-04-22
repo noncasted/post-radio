@@ -16,7 +16,7 @@ publish() {
 publish Silo           backend/Orchestration/Silo/Silo.csproj
 publish Coordinator    backend/Orchestration/Coordinator/Coordinator.csproj
 publish MetaGateway    backend/Orchestration/MetaGateway/MetaGateway.csproj
-publish GameGateway    backend/Orchestration/GameGateway/GameGateway.csproj
+publish Frontend.Server backend/Frontend/Server/Server.csproj
 publish ConsoleGateway backend/Orchestration/ConsoleGateway/ConsoleGateway.csproj
 publish DeploySetup    backend/Tools/DeploySetup/DeploySetup.csproj
 

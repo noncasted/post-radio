@@ -1,0 +1,32 @@
+<div class="rounded-lg border bg-card p-4 flex flex-col gap-2">
+    <div class="flex items-center gap-2">
+        <div class="rounded-md @ToneBg p-1.5">
+            <LucideIcon Name="@Icon" Size="14" class="@ToneText" />
+        </div>
+        <span class="text-sm font-medium">@Title</span>
+    </div>
+    <span class="text-2xl font-bold">@Value</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public int Value { get; set; }
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Tone { get; set; } = "blue";
+
+    private string ToneBg => Tone switch
+    {
+        "violet" => "bg-violet-500/15",
+        "amber" => "bg-amber-500/15",
+        "red" => "bg-red-500/15",
+        _ => "bg-blue-500/15"
+    };
+
+    private string ToneText => Tone switch
+    {
+        "violet" => "text-violet-400",
+        "amber" => "text-amber-400",
+        "red" => "text-red-400",
+        _ => "text-blue-400"
+    };
+}

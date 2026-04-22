@@ -3,11 +3,13 @@ using Common;
 using Meta.Audio;
 using Meta.Images;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace MetaGateway;
 
 public static class RadioEndpoints
 {
+    private static readonly FileExtensionContentTypeProvider ContentTypes = new();
     public static IEndpointRouteBuilder AddRadioEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/radio");
@@ -17,6 +19,8 @@ public static class RadioEndpoints
         group.MapGet("/songs/{id:long}/stream", GetSongStream);
         group.MapGet("/images", ListImages);
         group.MapGet("/images/{index:int}", GetImageUrl);
+        group.MapGet("/media/audio/{id:long}", GetAudioFile);
+        group.MapGet("/media/images/{key}", GetImageFile);
         group.MapGet("/options", GetOptions);
 
         return builder;
@@ -45,6 +49,7 @@ public static class RadioEndpoints
 
     private static IReadOnlyList<SongDto> ListSongs(
         [FromServices] ISongsCollection collection,
+        [FromServices] IMediaStorage storage,
         [FromQuery] Guid? playlistId)
     {
         var source = playlistId.HasValue
@@ -52,6 +57,7 @@ public static class RadioEndpoints
             : collection;
 
         return source
+               .Where(kv => kv.Value.IsLoaded && File.Exists(storage.GetAudioPath(kv.Key)))
                .Select(kv => new SongDto
                {
                    Id = kv.Key,
@@ -64,11 +70,33 @@ public static class RadioEndpoints
                .ToList();
     }
 
-    private static async Task<string> GetSongStream(
-        [FromServices] IObjectStorage storage,
+    private static string GetSongStream(
+        [FromServices] IMediaStorage storage,
         long id)
     {
-        return await storage.GetUrl("audio", id);
+        return storage.GetAudioUrl(id);
+    }
+
+    private static IResult GetAudioFile([FromServices] IMediaStorage storage, long id)
+    {
+        var path = storage.GetAudioPath(id);
+
+        return File.Exists(path)
+            ? Results.File(path, "audio/mpeg", enableRangeProcessing: true)
+            : Results.NotFound();
+    }
+
+    private static IResult GetImageFile([FromServices] IMediaStorage storage, string key)
+    {
+        var path = storage.GetImagePath(key);
+
+        if (!File.Exists(path))
+            return Results.NotFound();
+
+        if (!ContentTypes.TryGetContentType(path, out var contentType))
+            contentType = "application/octet-stream";
+
+        return Results.File(path, contentType, enableRangeProcessing: true);
     }
 
     private static ImagesCountDto ListImages([FromServices] IImagesCollection collection)

@@ -7,7 +7,6 @@
 
     <ItemGroup>
         <PackageReference Include="MemoryPack.Core"/>
-        <PackageReference Include="Minio"/>
         <PackageReference Include="Newtonsoft.Json"/>
         <PackageReference Include="Npgsql"/>
     </ItemGroup>

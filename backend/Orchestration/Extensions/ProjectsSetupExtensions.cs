@@ -112,7 +112,7 @@ public static class ProjectsSetupExtensions
                 .AddStates()
                 .AddMonitoring()
                 .AddHeapDiagnostics()
-                .AddObjectStorage()
+                .AddMediaStorage()
                 .AddAudioServices()
                 .AddImagesServices()
                 .AddOnlineServices();

@@ -1,0 +1,16 @@
+<div class="flex items-center gap-3 py-1.5 @(Last ? "" : "border-b border-border/60")">
+    <LucideIcon Name="@Icon" Size="12" class="text-muted-foreground shrink-0" />
+    <span class="text-sm flex-1">@Label</span>
+    <input type="number" @bind="Value" @bind:after="NotifyChanged"
+           class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public bool Last { get; set; }
+
+    private Task NotifyChanged() => ValueChanged.InvokeAsync(Value);
+}

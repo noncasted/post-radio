@@ -1,0 +1,118 @@
+@page "/features"
+@using Cluster.State
+@using global::Common.Extensions
+@using global::Common.Reactive
+@inherits UiComponent
+
+<PageTitle>Features</PageTitle>
+<PageHeader Title="Features"/>
+
+<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-6">
+    <div class="rounded-lg border bg-card p-6 flex flex-col gap-4">
+        <div class="flex items-center justify-between border-b pb-2">
+            <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cluster feature flags</h2>
+            <span class="text-xs @(ClusterFeatures.IsInitialized ? "text-green-400" : "text-amber-400")">
+                @(ClusterFeatures.IsInitialized ? "Attached to deploy" : "Waiting for deploy")
+            </span>
+        </div>
+
+        <FeatureToggle
+            Label="Connections"
+            Description="Allow frontend clients and services to accept new connections."
+            Value="_state.AcceptingConnections"
+            Saving="@IsSaving(FeatureName.Connections)"
+            OnToggle="@(() => Toggle(FeatureName.Connections))" />
+
+        <FeatureToggle
+            Label="Matchmaking"
+            Description="Enable matchmaking and match creation paths."
+            Value="_state.MatchmakingEnabled"
+            Saving="@IsSaving(FeatureName.Matchmaking)"
+            OnToggle="@(() => Toggle(FeatureName.Matchmaking))" />
+
+        <FeatureToggle
+            Label="Side Effects"
+            Description="Allow the side effects worker to execute queued effects."
+            Value="_state.SideEffectsEnabled"
+            Saving="@IsSaving(FeatureName.SideEffects)"
+            OnToggle="@(() => Toggle(FeatureName.SideEffects))" />
+
+        <FeatureToggle
+            Label="Snapshot Diff Guard"
+            Description="Enable snapshot-diff validation guardrails for state updates."
+            Value="_state.SnapshotDiffGuardEnabled"
+            Saving="@IsSaving(FeatureName.SnapshotDiffGuard)"
+            OnToggle="@(() => Toggle(FeatureName.SnapshotDiffGuard))" />
+    </div>
+</div>
+
+@code {
+    [Inject] public IClusterFeatures ClusterFeatures { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+
+    private ClusterFeaturesState _state = new();
+    private FeatureName? _saving;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        ClusterFeatures.View(lifetime, state => {
+            _state = state;
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private bool IsSaving(FeatureName feature) => _saving == feature;
+
+    private async Task Toggle(FeatureName feature)
+    {
+        _saving = feature;
+
+        try
+        {
+            switch (feature)
+            {
+                case FeatureName.Connections:
+                    await ClusterFeatures.SetAcceptingConnections(!_state.AcceptingConnections);
+                    break;
+                case FeatureName.Matchmaking:
+                    await ClusterFeatures.SetMatchmakingEnabled(!_state.MatchmakingEnabled);
+                    break;
+                case FeatureName.SideEffects:
+                    await ClusterFeatures.SetSideEffectsEnabled(!_state.SideEffectsEnabled);
+                    break;
+                case FeatureName.SnapshotDiffGuard:
+                    await ClusterFeatures.SetSnapshotDiffGuardEnabled(!_state.SnapshotDiffGuardEnabled);
+                    break;
+            }
+
+            ToastService.Success($"{Label(feature)} updated", "Done");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[Features] {Label(feature)} update failed: {ex.Message}", "Error");
+        }
+        finally
+        {
+            _saving = null;
+        }
+    }
+
+    private static string Label(FeatureName feature) => feature switch
+    {
+        FeatureName.Connections => "Connections",
+        FeatureName.Matchmaking => "Matchmaking",
+        FeatureName.SideEffects => "Side Effects",
+        FeatureName.SnapshotDiffGuard => "Snapshot Diff Guard",
+        _ => feature.ToString()
+    };
+
+    private enum FeatureName
+    {
+        Connections,
+        Matchmaking,
+        SideEffects,
+        SnapshotDiffGuard
+    }
+}

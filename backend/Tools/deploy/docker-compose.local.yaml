@@ -1,0 +1,70 @@
+# Local smoke-test overlay.
+# Uses pre-published artefacts from ./publish/<Name>/ at the repo root
+# (populate via ./tools/scripts/publish-local.sh).
+# Swaps the full-build Dockerfile for a runtime-only one — docker build becomes seconds.
+#
+# Usage (from repo root):
+#   ./tools/scripts/publish-local.sh
+#   docker compose --env-file backend/Tools/deploy/.env.local \
+#     -f backend/Tools/deploy/docker-compose.yaml \
+#     -f backend/Tools/deploy/docker-compose.local.yaml up --build -d
+
+networks:
+  post-radio-production:
+    name: post-radio-local
+    driver: bridge
+
+services:
+  migrator:
+    build:
+      dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
+      args:
+        PUBLISH_DIR: publish/DeploySetup
+        ASSEMBLY_NAME: DeploySetup
+
+  silo:
+    build:
+      dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
+      args:
+        PUBLISH_DIR: publish/Silo
+        ASSEMBLY_NAME: Silo
+
+  coordinator:
+    build:
+      dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
+      args:
+        PUBLISH_DIR: publish/Coordinator
+        ASSEMBLY_NAME: Coordinator
+
+  meta:
+    build:
+      dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
+      args:
+        PUBLISH_DIR: publish/MetaGateway
+        ASSEMBLY_NAME: MetaGateway
+    ports:
+      - "7100:8080"
+
+  console:
+    build:
+      dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
+      args:
+        PUBLISH_DIR: publish/ConsoleGateway
+        ASSEMBLY_NAME: ConsoleGateway
+    ports:
+      - "7102:8080"
+
+  frontend:
+    build:
+      dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
+      args:
+        PUBLISH_DIR: publish/Frontend.Server
+        ASSEMBLY_NAME: Frontend.Server
+    ports:
+      - "7103:8080"
+
+
+  aspire-dashboard:
+    ports:
+      - "7200:18888"
+      - "7201:18889"

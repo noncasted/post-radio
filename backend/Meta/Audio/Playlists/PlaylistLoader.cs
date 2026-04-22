@@ -19,21 +19,21 @@ public class PlaylistLoader : IPlaylistLoader
         IOrleans orleans,
         SoundCloudClient soundCloud,
         ISongsCollection songs,
-        IObjectStorage objectStorage,
+        IMediaStorage mediaStorage,
         HttpClient http,
         ILogger<PlaylistLoader> logger)
     {
         _orleans = orleans;
         _soundCloud = soundCloud;
         _songs = songs;
-        _objectStorage = objectStorage;
+        _mediaStorage = mediaStorage;
         _http = http;
         _logger = logger;
     }
 
     private readonly HttpClient _http;
     private readonly ILogger<PlaylistLoader> _logger;
-    private readonly IObjectStorage _objectStorage;
+    private readonly IMediaStorage _mediaStorage;
     private readonly IOrleans _orleans;
     private readonly ISongsCollection _songs;
     private readonly SoundCloudClient _soundCloud;
@@ -170,10 +170,6 @@ public class PlaylistLoader : IPlaylistLoader
                 $"Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode}).");
 
         await using var stream = await response.Content.ReadAsStreamAsync();
-        var totalLength = response.Content.Headers.ContentLength ?? 0;
-        var destination = new MemoryStream();
-        await stream.CopyToAsync(destination, (int)totalLength, CancellationToken.None);
-
-        await _objectStorage.Put("audio", id.ToString(), destination, "audio/mpeg");
+        await _mediaStorage.SaveAudio(id, stream);
     }
 }
