@@ -22,6 +22,7 @@ public interface IRadioApi
     Task<int> GetImagesCount();
     Task<string> GetImageUrl(int index);
     Task<FrontendOptionsDto?> GetFrontendOptions();
+    Task ReportSkip(object payload, CancellationToken cancellationToken = default);
 }
 
 public class RadioApi : IRadioApi
@@ -154,6 +155,25 @@ public class RadioApi : IRadioApi
         {
             _logger.LogWarning(e, "[RadioApi] GetFrontendOptions failed");
             return null;
+        }
+    }
+
+    public async Task ReportSkip(object payload, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _http.PostAsJsonAsync(
+                WithSession("/api/radio/skip-report"),
+                payload,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            _logger.LogDebug(e, "[RadioApi] ReportSkip failed");
         }
     }
 

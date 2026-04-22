@@ -1,7 +1,5 @@
 @using Frontend.Client.Services
 @using Frontend.Shared
-@inject IRadioApi Api
-
 <div class="controls-overlay">
     <div class="volume-skip">
         <div class="volume-wrap">
@@ -111,19 +109,26 @@
 @code {
     [Parameter] public required SessionState State { get; set; }
 
+    [Inject] public IRadioApi Api { get; set; } = null!;
+
+    private static readonly PlaylistDto AllPlaylist = new()
+    {
+        Id = SessionState.AllPlaylistId,
+        Name = "All",
+        Url = string.Empty
+    };
+
     private IReadOnlyList<PlaylistDto> _playlists = Array.Empty<PlaylistDto>();
     private Guid _selectedId;
 
     protected override async Task OnInitializedAsync()
     {
-        _playlists = await Api.GetPlaylists();
+        var playlists = await Api.GetPlaylists();
+        _playlists = playlists.Prepend(AllPlaylist).ToList();
 
-        if (_playlists.Count > 0)
-        {
-            var first = _playlists[0];
-            _selectedId = first.Id;
-            await State.SetPlaylist(first);
-        }
+        var first = _playlists[0];
+        _selectedId = first.Id;
+        await State.SetPlaylist(first);
     }
 
     private async Task OnPlaylistChanged(PlaylistDto playlist)

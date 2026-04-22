@@ -2,6 +2,14 @@ using Frontend.Shared;
 
 namespace Frontend.Client.Services;
 
+public sealed record SkipNotification(
+    string Reason,
+    string Title,
+    string Severity,
+    string? SongLabel,
+    DateTime TimestampUtc,
+    IReadOnlyList<KeyValuePair<string, string?>> Details);
+
 public class SessionState : IDisposable
 {
     public SessionState(IRadioApi api)
@@ -11,9 +19,12 @@ public class SessionState : IDisposable
         _api.SetSessionId(SessionId);
     }
 
+    private const int MaxRecentSkips = 20;
+
     private readonly IRadioApi _api;
     private readonly CancellationTokenSource _cts = new();
     private readonly Random _random = new();
+    private readonly LinkedList<SkipNotification> _recentSkips = new();
 
     private List<SongDto> _playlistSongs = new();
     private int _songIndex;
@@ -22,9 +33,20 @@ public class SessionState : IDisposable
     public CancellationToken Token => _cts.Token;
     public string SessionId { get; }
 
+    public static readonly Guid AllPlaylistId = Guid.Empty;
+
     public PlaylistDto? Playlist { get; private set; }
     public SongDto? CurrentSong { get; private set; }
     public double Volume { get; private set; } = 50;
+
+    public IReadOnlyList<SkipNotification> RecentSkips
+    {
+        get
+        {
+            lock (_recentSkips)
+                return _recentSkips.ToArray();
+        }
+    }
 
     public FrontendOptionsDto Options { get; private set; } = new()
     {
@@ -40,6 +62,7 @@ public class SessionState : IDisposable
     public event Action? VolumeChanged;
     public event Action? CurrentSongChanged;
     public event Action? OptionsChanged;
+    public event Action<SkipNotification>? SkipReported;
 
     private bool _isStarted;
 
@@ -68,10 +91,27 @@ public class SessionState : IDisposable
 
     public void RequestSkip() => SkipRequested?.Invoke();
 
+    public void ReportSkip(SkipNotification notification)
+    {
+        lock (_recentSkips)
+        {
+            _recentSkips.AddFirst(notification);
+            while (_recentSkips.Count > MaxRecentSkips)
+                _recentSkips.RemoveLast();
+        }
+
+        SkipReported?.Invoke(notification);
+    }
+
     public async Task SetPlaylist(PlaylistDto playlist)
     {
         Playlist = playlist;
-        _playlistSongs = (await _api.GetSongs(playlist.Id)).ToList();
+
+        var playlistId = playlist.Id == AllPlaylistId
+            ? (Guid?)null
+            : playlist.Id;
+
+        _playlistSongs = (await _api.GetSongs(playlistId)).ToList();
         Shuffle(_playlistSongs);
         _songIndex = 0;
         PlaylistChanged?.Invoke();

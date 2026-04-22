@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Cluster.Configs;
 using Common;
 using Meta.Audio;
@@ -5,8 +6,11 @@ using Meta.Images;
 using Meta.Online;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Logging;
 
 namespace MetaGateway;
+
+internal sealed class RadioSkipLog;
 
 public static class RadioEndpoints
 {
@@ -24,6 +28,7 @@ public static class RadioEndpoints
         group.MapGet("/media/images/{key}", GetImageFile);
         group.MapGet("/options", GetOptions);
         group.MapPost("/presence/touch", TouchPresence);
+        group.MapPost("/skip-report", ReceiveSkipReport);
 
         return builder;
     }
@@ -154,6 +159,54 @@ public static class RadioEndpoints
     {
         Touch(onlineTracker, context);
         return Results.NoContent();
+    }
+
+    private static IResult ReceiveSkipReport(
+        [FromServices] ILogger<RadioSkipLog> logger,
+        [FromServices] IOnlineTracker onlineTracker,
+        [FromBody] JsonElement report,
+        HttpContext context)
+    {
+        var sessionId = Touch(onlineTracker, context);
+        var userAgent = context.Request.Headers.UserAgent.ToString();
+        var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "-";
+        var reason = TryGetString(report, "reason") ?? "-";
+        var severity = TryGetString(report, "severity") ?? "-";
+        var title = TryGetString(report, "title") ?? "-";
+        var songId = TryGetString(report, "songId") ?? "-";
+        var songLabel = TryGetString(report, "songLabel") ?? "-";
+        var rawJson = report.GetRawText();
+
+        var level = severity switch
+        {
+            "error" => LogLevel.Error,
+            "warning" => LogLevel.Warning,
+            _ => LogLevel.Information
+        };
+
+        logger.Log(
+            level,
+            "[RadioSkip] session={SessionId} remote={RemoteIp} severity={Severity} reason={Reason} title={Title} songId={SongId} song={SongLabel} userAgent={UserAgent} payload={Payload}",
+            sessionId, remoteIp, severity, reason, title, songId, songLabel, userAgent, rawJson);
+
+        return Results.NoContent();
+    }
+
+    private static string? TryGetString(JsonElement root, string name)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+            return null;
+
+        if (!root.TryGetProperty(name, out var property))
+            return null;
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.String => property.GetString(),
+            JsonValueKind.Null => null,
+            JsonValueKind.Undefined => null,
+            _ => property.ToString()
+        };
     }
 
     private static string? Touch(IOnlineTracker onlineTracker, HttpContext context)

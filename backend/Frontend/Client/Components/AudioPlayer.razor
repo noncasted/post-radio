@@ -1,3 +1,4 @@
+@using System.Globalization
 @using Frontend.Client.Services
 @using Frontend.Shared
 @inject IJSRuntime Js
@@ -17,10 +18,11 @@
             window.audioHelper.detach();
             if (!audio) return;
 
+            const safeNumber = (value) => Number.isFinite(value) ? value : null;
+
             const send = (eventName, generation) => {
                 if (!audio) return;
 
-                const safeNumber = (value) => Number.isFinite(value) ? value : null;
                 const bufferedEnd = audio.buffered && audio.buffered.length > 0
                     ? audio.buffered.end(audio.buffered.length - 1)
                     : null;
@@ -32,7 +34,12 @@
                     safeNumber(audio.currentTime),
                     safeNumber(audio.duration),
                     audio.readyState,
-                    safeNumber(bufferedEnd))
+                    audio.networkState,
+                    audio.paused,
+                    audio.ended,
+                    safeNumber(bufferedEnd),
+                    audio.error ? audio.error.code : null,
+                    audio.error ? (audio.error.message || "") : null)
                     .catch((e) => console.debug("audio event callback failed:", e));
             };
 
@@ -42,7 +49,10 @@
                 window.audioHelper.handlers.push([eventName, handler]);
             };
 
-            ["timeupdate", "ended", "error", "waiting", "stalled", "playing", "canplay", "durationchange", "abort", "emptied"]
+            ["timeupdate", "ended", "error", "waiting", "stalled", "playing", "canplay",
+             "canplaythrough", "pause", "play", "seeking", "seeked",
+             "durationchange", "loadedmetadata", "loadeddata", "suspend",
+             "abort", "emptied"]
                 .forEach(add);
         },
 
@@ -59,7 +69,8 @@
 
         loadAndPlay: async (url, generation) => {
             const audio = document.getElementById("audio");
-            if (!audio || !url) return false;
+            if (!audio) return { started: false, errorName: "no-audio-element", errorMessage: "audio element not found", readyState: 0, networkState: 0 };
+            if (!url) return { started: false, errorName: "empty-url", errorMessage: "empty url", readyState: audio.readyState, networkState: audio.networkState };
 
             try {
                 window.audioHelper.currentGeneration = generation;
@@ -73,11 +84,59 @@
                 audio.load();
 
                 await audio.play();
-                return true;
+                return {
+                    started: true,
+                    errorName: null,
+                    errorMessage: null,
+                    readyState: audio.readyState,
+                    networkState: audio.networkState,
+                    audioErrorCode: null,
+                    audioErrorMessage: null
+                };
             } catch (e) {
                 if (e.name !== "AbortError") console.error("play error:", e);
-                return false;
+                return {
+                    started: false,
+                    errorName: e.name || "unknown",
+                    errorMessage: e.message || "",
+                    readyState: audio.readyState,
+                    networkState: audio.networkState,
+                    audioErrorCode: audio.error ? audio.error.code : null,
+                    audioErrorMessage: audio.error ? (audio.error.message || "") : null
+                };
             }
+        },
+
+        getState: () => {
+            const audio = document.getElementById("audio");
+            if (!audio) return null;
+
+            const safeNumber = (value) => Number.isFinite(value) ? value : null;
+            const bufferedRanges = [];
+            if (audio.buffered) {
+                for (let i = 0; i < audio.buffered.length; i++) {
+                    bufferedRanges.push({
+                        start: safeNumber(audio.buffered.start(i)),
+                        end: safeNumber(audio.buffered.end(i))
+                    });
+                }
+            }
+
+            return {
+                readyState: audio.readyState,
+                networkState: audio.networkState,
+                currentTime: safeNumber(audio.currentTime),
+                duration: safeNumber(audio.duration),
+                paused: audio.paused,
+                ended: audio.ended,
+                muted: audio.muted,
+                volume: safeNumber(audio.volume),
+                seeking: audio.seeking,
+                errorCode: audio.error ? audio.error.code : null,
+                errorMessage: audio.error ? (audio.error.message || "") : null,
+                src: audio.currentSrc || audio.src || null,
+                buffered: bufferedRanges
+            };
         },
 
         stop: () => {
@@ -106,15 +165,25 @@
     private static readonly TimeSpan PlayFailureDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan NormalProgressTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan BufferingTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan WatchdogInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly SemaphoreSlim _setNextLock = new(1, 1);
 
     private string _audioUrl = string.Empty;
     private int _generation;
+    private DateTime? _loadAndPlayCompletedUtc;
     private DateTime _lastProgressUtc = DateTime.MinValue;
     private DateTime? _bufferingStartedUtc;
     private bool _isBuffering;
+    private bool _hasReceivedProgress;
+    private int? _lastReadyState;
+    private int? _lastNetworkState;
+    private double? _lastCurrentTime;
+    private double? _lastDuration;
+    private int? _lastAudioErrorCode;
+    private string? _lastAudioErrorMessage;
+    private string? _lastLoadAndPlayError;
     private bool _disposed;
     private CancellationTokenSource? _componentCts;
     private DotNetObjectReference<AudioPlayer>? _dotNetRef;
@@ -183,7 +252,9 @@
 
                     skippedMissingCount = 0;
                     emptyUrlRetryCount++;
-                    await Task.Delay(GetEmptyUrlDelay(emptyUrlRetryCount), ComponentToken);
+                    var delay = GetEmptyUrlDelay(emptyUrlRetryCount);
+                    Logger.LogInformation("[AudioPlayer] Empty url retry count={Count} delay={Delay}", emptyUrlRetryCount, delay);
+                    await Task.Delay(delay, ComponentToken);
                     continue;
                 }
 
@@ -191,17 +262,36 @@
                 skippedMissingCount = 0;
                 var generation = _generation;
                 var url = _audioUrl;
-                MarkPlaybackStarted(generation, url);
+                ResetPlaybackTracking();
+                Logger.LogInformation("[AudioPlayer] LoadAndPlay begin generation={Generation} url={Url}", generation, url);
 
-                var started = await Js.InvokeAsync<bool>("audioHelper.loadAndPlay", url, generation);
-                if (!started)
+                var result = await Js.InvokeAsync<LoadAndPlayResult>("audioHelper.loadAndPlay", url, generation);
+
+                _lastReadyState = result.ReadyState;
+                _lastNetworkState = result.NetworkState;
+
+                if (result.AudioErrorCode.HasValue)
+                    _lastAudioErrorCode = result.AudioErrorCode;
+
+                if (!string.IsNullOrWhiteSpace(result.AudioErrorMessage))
+                    _lastAudioErrorMessage = result.AudioErrorMessage;
+
+                if (!result.Started)
                 {
+                    _lastLoadAndPlayError = result.ErrorName;
+                    Logger.LogWarning("[AudioPlayer] LoadAndPlay failed generation={Generation} errorName={ErrorName} errorMessage={ErrorMessage} readyState={ReadyState} networkState={NetworkState} audioErrCode={AudioErrCode}",
+                        generation, result.ErrorName, result.ErrorMessage, result.ReadyState, result.NetworkState, result.AudioErrorCode);
+
                     if (IsCurrent(generation, url))
-                        await SetNext("play-failed");
+                        await SetNext($"play-failed:{result.ErrorName ?? "unknown"}");
 
                     await Task.Delay(PlayFailureDelay, ComponentToken);
                     continue;
                 }
+
+                _loadAndPlayCompletedUtc = DateTime.UtcNow;
+                Logger.LogInformation("[AudioPlayer] LoadAndPlay started generation={Generation} readyState={ReadyState} networkState={NetworkState}",
+                    generation, result.ReadyState, result.NetworkState);
 
                 while (IsCurrent(generation, url) && !ComponentToken.IsCancellationRequested)
                 {
@@ -209,7 +299,10 @@
 
                     if (TryGetWatchdogReason(out var reason))
                     {
-                        Logger.LogWarning("[AudioPlayer] Watchdog recovery reason={Reason} generation={Generation} url={Url}", reason, generation, url);
+                        Logger.LogWarning("[AudioPlayer] Watchdog trip reason={Reason} generation={Generation} url={Url} hasProgress={HasProgress} isBuffering={IsBuffering} lastProgressAgoSec={LastProgressAgoSec} bufferingAgoSec={BufferingAgoSec} startedAgoSec={StartedAgoSec} readyState={ReadyState} networkState={NetworkState}",
+                            reason, generation, url, _hasReceivedProgress, _isBuffering,
+                            GetSecondsSince(_lastProgressUtc), GetSecondsSinceNullable(_bufferingStartedUtc), GetSecondsSinceNullable(_loadAndPlayCompletedUtc),
+                            _lastReadyState, _lastNetworkState);
                         await SetNext(reason);
                         break;
                     }
@@ -231,12 +324,18 @@
         }
     }
 
-    private void MarkPlaybackStarted(int generation, string url)
+    private void ResetPlaybackTracking()
     {
-        _lastProgressUtc = DateTime.UtcNow;
+        _lastProgressUtc = DateTime.MinValue;
         _bufferingStartedUtc = null;
         _isBuffering = false;
-        Logger.LogInformation("[AudioPlayer] LoadAndPlay generation={Generation} url={Url}", generation, url);
+        _hasReceivedProgress = false;
+        _loadAndPlayCompletedUtc = null;
+        _lastAudioErrorCode = null;
+        _lastAudioErrorMessage = null;
+        _lastLoadAndPlayError = null;
+        _lastCurrentTime = null;
+        _lastDuration = null;
     }
 
     private static TimeSpan GetEmptyUrlDelay(int retryCount)
@@ -259,6 +358,18 @@
             if (_bufferingStartedUtc.HasValue && now - _bufferingStartedUtc.Value >= BufferingTimeout)
             {
                 reason = "buffering-timeout";
+                return true;
+            }
+
+            reason = string.Empty;
+            return false;
+        }
+
+        if (!_hasReceivedProgress)
+        {
+            if (_loadAndPlayCompletedUtc.HasValue && now - _loadAndPlayCompletedUtc.Value >= StartupTimeout)
+            {
+                reason = "startup-timeout";
                 return true;
             }
 
@@ -313,16 +424,42 @@
         double? currentTime,
         double? duration,
         int readyState,
-        double? bufferedEnd)
+        int networkState,
+        bool paused,
+        bool ended,
+        double? bufferedEnd,
+        int? errorCode,
+        string? errorMessage)
     {
         if (_disposed)
             return;
 
+        _lastReadyState = readyState;
+        _lastNetworkState = networkState;
+
+        if (currentTime.HasValue)
+            _lastCurrentTime = currentTime;
+
+        if (duration.HasValue)
+            _lastDuration = duration;
+
+        if (errorCode.HasValue)
+            _lastAudioErrorCode = errorCode;
+
+        if (!string.IsNullOrWhiteSpace(errorMessage))
+            _lastAudioErrorMessage = errorMessage;
+
         if (generation != _generation)
         {
-            Logger.LogDebug("[AudioPlayer] Ignored stale event event={EventName} eventGeneration={EventGeneration} currentGeneration={CurrentGeneration}", eventName, generation, _generation);
+            Logger.LogDebug("[AudioPlayer] Stale event event={EventName} eventGeneration={EventGeneration} currentGeneration={CurrentGeneration}",
+                eventName, generation, _generation);
             return;
         }
+
+        var level = eventName == "timeupdate" ? LogLevel.Debug : LogLevel.Information;
+        Logger.Log(level,
+            "[AudioPlayer] Event event={EventName} gen={Generation} ct={CurrentTime} dur={Duration} rs={ReadyState} ns={NetworkState} paused={Paused} ended={Ended} buf={BufferedEnd} errCode={ErrorCode}",
+            eventName, generation, currentTime, duration, readyState, networkState, paused, ended, bufferedEnd, errorCode);
 
         var now = DateTime.UtcNow;
 
@@ -330,32 +467,44 @@
         {
             case "timeupdate":
                 _lastProgressUtc = now;
+                _hasReceivedProgress = true;
                 _bufferingStartedUtc = null;
                 _isBuffering = false;
                 break;
             case "playing":
             case "canplay":
+            case "canplaythrough":
                 _lastProgressUtc = now;
+                _hasReceivedProgress = true;
                 _bufferingStartedUtc = null;
                 _isBuffering = false;
                 break;
             case "waiting":
             case "stalled":
+            case "suspend":
                 _bufferingStartedUtc ??= now;
                 _isBuffering = true;
-                Logger.LogInformation("[AudioPlayer] Buffering started reason={Reason} generation={Generation} ct={CurrentTime} duration={Duration} readyState={ReadyState} bufferedEnd={BufferedEnd}", eventName, generation, currentTime, duration, readyState, bufferedEnd);
+                Logger.LogWarning("[AudioPlayer] Buffering started event={EventName} generation={Generation} ct={CurrentTime} duration={Duration} readyState={ReadyState} networkState={NetworkState} bufferedEnd={BufferedEnd}",
+                    eventName, generation, currentTime, duration, readyState, networkState, bufferedEnd);
                 break;
             case "ended":
                 Logger.LogInformation("[AudioPlayer] Ended generation={Generation} ct={CurrentTime} duration={Duration}", generation, currentTime, duration);
                 await SetNext("ended");
                 break;
             case "error":
-                Logger.LogWarning("[AudioPlayer] Media error generation={Generation} ct={CurrentTime} duration={Duration} readyState={ReadyState}", generation, currentTime, duration, readyState);
-                await SetNext("media-error");
+                Logger.LogError("[AudioPlayer] Media error generation={Generation} errorCode={ErrorCode} errorMessage={ErrorMessage} ct={CurrentTime} duration={Duration} readyState={ReadyState} networkState={NetworkState}",
+                    generation, errorCode, errorMessage, currentTime, duration, readyState, networkState);
+                await SetNext($"media-error:{errorCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}");
                 break;
+            case "pause":
+            case "play":
+            case "seeking":
+            case "seeked":
+            case "loadedmetadata":
+            case "loadeddata":
+            case "durationchange":
             case "abort":
             case "emptied":
-            case "durationchange":
                 break;
         }
     }
@@ -367,18 +516,25 @@
 
         if (!await _setNextLock.WaitAsync(0))
         {
-            Logger.LogDebug("[AudioPlayer] SetNext skipped reason={Reason} lock=busy generation={Generation}", reason, _generation);
+            Logger.LogInformation("[AudioPlayer] SetNext skipped reason={Reason} lock=busy generation={Generation}", reason, _generation);
             return SetNextResult.Busy;
         }
 
         try
         {
+            var snapshot = await TryCaptureSnapshot();
+            var previousSong = State.CurrentSong;
+            var details = BuildDetails(snapshot, previousSong);
+            ReportSkip(reason, previousSong, details, snapshot);
+
             var song = State.PeekNextSong();
             var generation = Interlocked.Increment(ref _generation);
             _audioUrl = string.Empty;
-            ResetPlaybackState();
+            ResetPlaybackTracking();
 
-            Logger.LogInformation("[AudioPlayer] SetNext reason={Reason} generation={Generation} songId={SongId}", reason, generation, song?.Id);
+            Logger.LogInformation("[AudioPlayer] SetNext reason={Reason} generation={Generation} prevSongId={PrevSongId} nextSongId={NextSongId}",
+                reason, generation, previousSong?.Id, song?.Id);
+
             await InvokeAsync(StateHasChanged);
             await StopAudio();
 
@@ -394,7 +550,8 @@
 
             if (!stream.IsSuccess)
             {
-                Logger.LogWarning("[AudioPlayer] Stream url failed reason={Reason} generation={Generation} songId={SongId} statusCode={StatusCode} notFound={IsNotFound}", reason, generation, song.Id, stream.StatusCode, stream.IsNotFound);
+                Logger.LogWarning("[AudioPlayer] Stream url failed reason={Reason} generation={Generation} songId={SongId} statusCode={StatusCode} notFound={IsNotFound}",
+                    reason, generation, song.Id, stream.StatusCode, stream.IsNotFound);
 
                 if (stream.IsNotFound)
                     State.CommitNextSong(song);
@@ -421,6 +578,217 @@
         }
     }
 
+    private async Task<AudioStateSnapshot?> TryCaptureSnapshot()
+    {
+        try
+        {
+            return await Js.InvokeAsync<AudioStateSnapshot?>("audioHelper.getState");
+        }
+        catch (JSDisconnectedException)
+        {
+            return null;
+        }
+        catch (Exception e)
+        {
+            Logger.LogDebug(e, "[AudioPlayer] getState failed");
+            return null;
+        }
+    }
+
+    private void ReportSkip(
+        string reason,
+        SongDto? previousSong,
+        IReadOnlyList<KeyValuePair<string, string?>> details,
+        AudioStateSnapshot? snapshot)
+    {
+        var (title, severity) = DescribeReason(reason);
+        var songLabel = FormatSongLabel(previousSong);
+        var timestamp = DateTime.UtcNow;
+
+        var notification = new SkipNotification(
+            Reason: reason,
+            Title: title,
+            Severity: severity,
+            SongLabel: songLabel,
+            TimestampUtc: timestamp,
+            Details: details);
+
+        State.ReportSkip(notification);
+
+        var payload = new
+        {
+            reason,
+            title,
+            severity,
+            songId = previousSong?.Id,
+            songLabel,
+            timestampUtc = timestamp,
+            sessionId = State.SessionId,
+            generation = _generation,
+            audioState = snapshot,
+            details = details.Select(kv => new { key = kv.Key, value = kv.Value }).ToArray(),
+            recentSkipCount = State.RecentSkips.Count
+        };
+
+        _ = PushSkipToBackend(payload);
+    }
+
+    private async Task PushSkipToBackend(object payload)
+    {
+        try
+        {
+            await Api.ReportSkip(payload, ComponentToken);
+        }
+        catch (Exception e)
+        {
+            Logger.LogDebug(e, "[AudioPlayer] PushSkipToBackend failed");
+        }
+    }
+
+    private IReadOnlyList<KeyValuePair<string, string?>> BuildDetails(AudioStateSnapshot? snapshot, SongDto? song)
+    {
+        var list = new List<KeyValuePair<string, string?>>();
+
+        void Add(string key, string? value) => list.Add(new KeyValuePair<string, string?>(key, value));
+
+        Add("gen", _generation.ToString(CultureInfo.InvariantCulture));
+        if (song != null)
+            Add("songId", song.Id.ToString(CultureInfo.InvariantCulture));
+
+        if (snapshot != null)
+        {
+            Add("ct", FormatNumber(snapshot.CurrentTime));
+            Add("dur", FormatNumber(snapshot.Duration));
+            Add("rs", $"{snapshot.ReadyState} ({ReadyStateName(snapshot.ReadyState)})");
+            Add("ns", $"{snapshot.NetworkState} ({NetworkStateName(snapshot.NetworkState)})");
+            Add("paused", snapshot.Paused.ToString());
+            Add("ended", snapshot.Ended.ToString());
+            if (snapshot.ErrorCode.HasValue)
+                Add("errCode", $"{snapshot.ErrorCode} ({MediaErrorName(snapshot.ErrorCode.Value)})");
+            if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
+                Add("errMsg", snapshot.ErrorMessage);
+            if (snapshot.Buffered is { Count: > 0 })
+            {
+                var last = snapshot.Buffered[^1];
+                Add("bufferedEnd", FormatNumber(last.End));
+            }
+        }
+        else
+        {
+            if (_lastCurrentTime.HasValue) Add("ct", FormatNumber(_lastCurrentTime));
+            if (_lastDuration.HasValue) Add("dur", FormatNumber(_lastDuration));
+            if (_lastReadyState.HasValue) Add("rs", $"{_lastReadyState} ({ReadyStateName(_lastReadyState.Value)})");
+            if (_lastNetworkState.HasValue) Add("ns", $"{_lastNetworkState} ({NetworkStateName(_lastNetworkState.Value)})");
+        }
+
+        Add("buffering", _isBuffering.ToString());
+        if (_bufferingStartedUtc.HasValue)
+            Add("bufferingAgoSec", GetSecondsSinceNullable(_bufferingStartedUtc).ToString("F1", CultureInfo.InvariantCulture));
+        if (_lastProgressUtc != DateTime.MinValue)
+            Add("progressAgoSec", GetSecondsSince(_lastProgressUtc).ToString("F1", CultureInfo.InvariantCulture));
+        if (_loadAndPlayCompletedUtc.HasValue)
+            Add("startedAgoSec", GetSecondsSinceNullable(_loadAndPlayCompletedUtc).ToString("F1", CultureInfo.InvariantCulture));
+        if (!string.IsNullOrWhiteSpace(_lastLoadAndPlayError))
+            Add("loadAndPlayError", _lastLoadAndPlayError);
+        if (_lastAudioErrorCode.HasValue)
+            Add("lastAudioErrCode", $"{_lastAudioErrorCode} ({MediaErrorName(_lastAudioErrorCode.Value)})");
+        if (!string.IsNullOrWhiteSpace(_lastAudioErrorMessage))
+            Add("lastAudioErrMsg", _lastAudioErrorMessage);
+
+        return list;
+    }
+
+    private static (string Title, string Severity) DescribeReason(string reason)
+    {
+        if (reason.StartsWith("media-error", StringComparison.Ordinal))
+            return ("Ошибка декодирования аудио", "error");
+
+        if (reason.StartsWith("play-failed", StringComparison.Ordinal))
+            return ("Браузер не смог запустить воспроизведение", "error");
+
+        return reason switch
+        {
+            "ended" => ("Трек доигран", "info"),
+            "skip-requested" => ("Пропущено пользователем", "info"),
+            "playlist-changed" => ("Смена плейлиста", "info"),
+            "empty-url" => ("Нет URL для трека", "warning"),
+            "progress-timeout" => ("Watchdog: нет прогресса 30 сек", "warning"),
+            "buffering-timeout" => ("Watchdog: буферизация > 90 сек", "warning"),
+            "startup-timeout" => ("Watchdog: трек не стартовал за 20 сек", "warning"),
+            "loop-exception" => ("Исключение в плеере", "error"),
+            _ => ($"Переход: {reason}", "info")
+        };
+    }
+
+    private static string? FormatSongLabel(SongDto? song)
+    {
+        if (song == null)
+            return null;
+
+        var author = song.Author?.Trim();
+        var name = song.Name?.Trim();
+
+        if (string.IsNullOrEmpty(author) && string.IsNullOrEmpty(name))
+            return $"#{song.Id}";
+
+        if (string.IsNullOrEmpty(author))
+            return $"{name} #{song.Id}";
+
+        if (string.IsNullOrEmpty(name))
+            return $"{author} #{song.Id}";
+
+        return $"{author} — {name} #{song.Id}";
+    }
+
+    private static string FormatNumber(double? value)
+    {
+        if (!value.HasValue)
+            return "-";
+        return value.Value.ToString("F2", CultureInfo.InvariantCulture);
+    }
+
+    private static double GetSecondsSince(DateTime utc)
+    {
+        if (utc == DateTime.MinValue)
+            return 0;
+        return (DateTime.UtcNow - utc).TotalSeconds;
+    }
+
+    private static double GetSecondsSinceNullable(DateTime? utc)
+    {
+        if (!utc.HasValue)
+            return 0;
+        return (DateTime.UtcNow - utc.Value).TotalSeconds;
+    }
+
+    private static string ReadyStateName(int value) => value switch
+    {
+        0 => "HAVE_NOTHING",
+        1 => "HAVE_METADATA",
+        2 => "HAVE_CURRENT_DATA",
+        3 => "HAVE_FUTURE_DATA",
+        4 => "HAVE_ENOUGH_DATA",
+        _ => "?"
+    };
+
+    private static string NetworkStateName(int value) => value switch
+    {
+        0 => "NETWORK_EMPTY",
+        1 => "NETWORK_IDLE",
+        2 => "NETWORK_LOADING",
+        3 => "NETWORK_NO_SOURCE",
+        _ => "?"
+    };
+
+    private static string MediaErrorName(int value) => value switch
+    {
+        1 => "MEDIA_ERR_ABORTED",
+        2 => "MEDIA_ERR_NETWORK",
+        3 => "MEDIA_ERR_DECODE",
+        4 => "MEDIA_ERR_SRC_NOT_SUPPORTED",
+        _ => "?"
+    };
+
     private enum SetNextResult
     {
         None,
@@ -430,13 +798,6 @@
         NoSong,
         Busy,
         Cancelled
-    }
-
-    private void ResetPlaybackState()
-    {
-        _lastProgressUtc = DateTime.UtcNow;
-        _bufferingStartedUtc = null;
-        _isBuffering = false;
     }
 
     private async Task StopAudio()
@@ -500,4 +861,30 @@
         _componentCts?.Dispose();
         _setNextLock.Dispose();
     }
+
+    private sealed record LoadAndPlayResult(
+        bool Started,
+        string? ErrorName,
+        string? ErrorMessage,
+        int ReadyState,
+        int NetworkState,
+        int? AudioErrorCode,
+        string? AudioErrorMessage);
+
+    private sealed record AudioBufferedRange(double? Start, double? End);
+
+    private sealed record AudioStateSnapshot(
+        int ReadyState,
+        int NetworkState,
+        double? CurrentTime,
+        double? Duration,
+        bool Paused,
+        bool Ended,
+        bool Muted,
+        double? Volume,
+        bool Seeking,
+        int? ErrorCode,
+        string? ErrorMessage,
+        string? Src,
+        IReadOnlyList<AudioBufferedRange> Buffered);
 }
