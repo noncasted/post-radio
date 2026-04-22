@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -21,6 +22,7 @@ public static class ConsoleMediaEndpoints
                  new RequestSizeLimitAttribute(MaxImageUploadBytes + MultipartOverheadBytes),
                  new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxImageUploadBytes + MultipartOverheadBytes });
         group.MapGet("/images/all.zip", DownloadAllImages);
+        group.MapGet("/images/selected.zip", DownloadSelectedImages);
         group.MapGet("/images/{key}/download", DownloadImageFile);
         group.MapGet("/images/{key}", GetImageFile);
 
@@ -77,6 +79,20 @@ public static class ConsoleMediaEndpoints
         return Results.Stream(stream => storage.WriteImagesArchive(stream), "application/zip", fileName);
     }
 
+    private static IResult DownloadSelectedImages([FromServices] IMediaStorage storage, HttpRequest request)
+    {
+        var keys = request.Query["key"]
+                          .Where(key => !string.IsNullOrWhiteSpace(key))
+                          .Select(key => key!)
+                          .Distinct(StringComparer.Ordinal)
+                          .ToList();
+        if (keys.Count == 0)
+            return Results.BadRequest(new { error = "At least one image key is required." });
+
+        var fileName = $"images-selected-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip";
+        return Results.Stream(stream => WriteSelectedImagesArchive(storage, keys, stream), "application/zip", fileName);
+    }
+
     private static IResult GetImageResult(IMediaStorage storage, string key, bool download)
     {
         var path = storage.GetImagePath(key);
@@ -88,5 +104,40 @@ public static class ConsoleMediaEndpoints
 
         var fileName = download ? Path.GetFileName(path) : null;
         return Results.File(path, contentType, fileName, enableRangeProcessing: true);
+    }
+
+    private static async Task WriteSelectedImagesArchive(IMediaStorage storage, IReadOnlyList<string> keys, Stream stream)
+    {
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+        var entryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in keys)
+        {
+            var path = storage.GetImagePath(key);
+            if (!File.Exists(path))
+                continue;
+
+            var entryName = GetUniqueArchiveEntryName(entryNames, Path.GetFileName(path));
+            var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+            await using var entryStream = entry.Open();
+            await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 1024 * 128, useAsync: true);
+            await file.CopyToAsync(entryStream);
+        }
+    }
+
+    private static string GetUniqueArchiveEntryName(HashSet<string> entryNames, string fileName)
+    {
+        if (entryNames.Add(fileName))
+            return fileName;
+
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        var extension = Path.GetExtension(fileName);
+        for (var suffix = 1; ; suffix++)
+        {
+            var candidate = $"{baseName}-{suffix}{extension}";
+            if (entryNames.Add(candidate))
+                return candidate;
+        }
     }
 }

@@ -1,8 +1,16 @@
+using System.Net;
 using System.Net.Http.Json;
 using Frontend.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace Frontend.Client.Services;
+
+public sealed record SongStreamUrlResult(bool IsSuccess, string Url, bool IsNotFound, int? StatusCode)
+{
+    public static SongStreamUrlResult Success(string url, int statusCode) => new(true, url, false, statusCode);
+    public static SongStreamUrlResult Failure(HttpStatusCode? statusCode = null) => new(false, string.Empty, false, statusCode.HasValue ? (int)statusCode.Value : null);
+    public static SongStreamUrlResult NotFound() => new(false, string.Empty, true, (int)HttpStatusCode.NotFound);
+}
 
 public interface IRadioApi
 {
@@ -10,7 +18,7 @@ public interface IRadioApi
     Task TouchPresence();
     Task<IReadOnlyList<PlaylistDto>> GetPlaylists();
     Task<IReadOnlyList<SongDto>> GetSongs(Guid? playlistId = null);
-    Task<string> GetSongStreamUrl(long id);
+    Task<SongStreamUrlResult> GetSongStreamUrl(long id, CancellationToken cancellationToken = default);
     Task<int> GetImagesCount();
     Task<string> GetImageUrl(int index);
     Task<FrontendOptionsDto?> GetFrontendOptions();
@@ -75,16 +83,37 @@ public class RadioApi : IRadioApi
         }
     }
 
-    public async Task<string> GetSongStreamUrl(long id)
+    public async Task<SongStreamUrlResult> GetSongStreamUrl(long id, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _http.GetStringAsync(WithSession($"/api/radio/songs/{id}/stream"));
+            using var response = await _http.GetAsync(WithSession($"/api/radio/songs/{id}/stream"), HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return SongStreamUrlResult.NotFound();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[RadioApi] GetSongStreamUrl failed for {SongId}: {StatusCode}", id, response.StatusCode);
+                return SongStreamUrlResult.Failure(response.StatusCode);
+            }
+
+            var url = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                _logger.LogWarning("[RadioApi] GetSongStreamUrl returned an empty url for {SongId}", id);
+                return SongStreamUrlResult.Failure(response.StatusCode);
+            }
+
+            return SongStreamUrlResult.Success(url, (int)response.StatusCode);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception e)
         {
             _logger.LogWarning(e, "[RadioApi] GetSongStreamUrl failed");
-            return string.Empty;
+            return SongStreamUrlResult.Failure();
         }
     }
 

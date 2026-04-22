@@ -12,7 +12,7 @@
     return;
 }
 
-<div class="images-page-shell container mx-auto px-4 py-3 flex flex-col gap-3">
+<div class="images-page-shell @PageShellClass container mx-auto px-4 py-3 flex flex-col gap-3">
     <div class="images-toolbar rounded-lg border bg-card px-4 py-3 flex flex-wrap items-center gap-3">
         <div class="flex items-center gap-3">
             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" @onclick="NavigateHome">
@@ -27,30 +27,55 @@
             </div>
         </div>
         <div class="flex-1"></div>
-        <BbButton Variant="ButtonVariant.Outline" Disabled="@_isUploading" @onclick="RefreshImages">
-            <LucideIcon Name="refresh-cw" Size="16" class="mr-2" />
-            Refresh
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" Disabled="@(_isUploading || _isPasting)" @onclick="PasteImageUrl">
-            @if (_isPasting)
-            {
-                <LucideIcon Name="loader-circle" Size="16" class="mr-2 animate-spin" />
-                <span>Pasting...</span>
-            }
-            else
-            {
-                <LucideIcon Name="clipboard" Size="16" class="mr-2" />
-                <span>Paste</span>
-            }
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" Disabled="@(_images.Count == 0)" @onclick="DownloadAll">
-            <LucideIcon Name="archive" Size="16" class="mr-2" />
-            Download all
-        </BbButton>
-        <BbButton Disabled="@(_isUploading || _isPasting)" @onclick="OpenUpload">
-            <LucideIcon Name="upload" Size="16" class="mr-2" />
-            Upload
-        </BbButton>
+        @if (_isSelectionMode)
+        {
+            <div class="rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
+                @_selectedImageKeys.Count selected
+            </div>
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@(!HasSelection)" @onclick="DownloadSelection">
+                <LucideIcon Name="download" Size="16" class="mr-2" />
+                Download
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" Disabled="@(!HasSelection)" @onclick="DeleteSelection">
+                <LucideIcon Name="trash-2" Size="16" class="mr-2" />
+                Delete
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Ghost" @onclick="ExitSelectionMode">
+                <LucideIcon Name="x" Size="16" class="mr-2" />
+                Cancel
+            </BbButton>
+        }
+        else
+        {
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@(_images.Count == 0 || _isUploading || _isPasting)" @onclick="EnterSelectionMode">
+                <LucideIcon Name="check" Size="16" class="mr-2" />
+                Select
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@_isUploading" @onclick="RefreshImages">
+                <LucideIcon Name="refresh-cw" Size="16" class="mr-2" />
+                Refresh
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@(_isUploading || _isPasting)" @onclick="PasteImageUrl">
+                @if (_isPasting)
+                {
+                    <LucideIcon Name="loader-circle" Size="16" class="mr-2 animate-spin" />
+                    <span>Pasting...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="clipboard" Size="16" class="mr-2" />
+                    <span>Paste</span>
+                }
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Disabled="@(_images.Count == 0)" @onclick="DownloadAll">
+                <LucideIcon Name="archive" Size="16" class="mr-2" />
+                Download all
+            </BbButton>
+            <BbButton Disabled="@(_isUploading || _isPasting)" @onclick="OpenUpload">
+                <LucideIcon Name="upload" Size="16" class="mr-2" />
+                Upload
+            </BbButton>
+        }
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -74,13 +99,27 @@
                 <ImageGridItem @key="image.Key"
                                Image="@image"
                                ImageUrl="@GetImageUrl(image)"
-                               OnOpen="OpenPreview" />
+                               IsSelectionMode="@_isSelectionMode"
+                               IsSelected="@_selectedImageKeys.Contains(image.Key)"
+                               OnOpen="OpenPreview"
+                               OnToggleSelected="ToggleImageSelected" />
             }
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
-            <div class="text-xs text-muted-foreground">
-                Showing @PageStart-@PageEnd of @_images.Count, @PageSize per page
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="text-xs text-muted-foreground">
+                    Showing @PageStart-@PageEnd of @_images.Count, @_pageSize per page
+                </div>
+                <label class="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Per page</span>
+                    <select class="h-8 rounded-md border bg-background px-2 text-xs" value="@_pageSize" @onchange="OnPageSizeChanged">
+                        @foreach (var size in PageSizes)
+                        {
+                            <option value="@size" selected="@(size == _pageSize)">@size</option>
+                        }
+                    </select>
+                </label>
             </div>
 
             <div class="flex items-center gap-2">
@@ -232,8 +271,16 @@
 <style>
     .images-page-shell {
         max-width: 108rem;
+    }
+
+    .images-page-shell--fixed {
         height: calc(100vh - 5.75rem);
         overflow: hidden;
+    }
+
+    .images-page-shell--scroll {
+        min-height: calc(100vh - 5.75rem);
+        overflow: visible;
     }
 
     .images-toolbar {
@@ -245,16 +292,51 @@
         flex: 1 1 auto;
         min-height: 0;
         grid-template-columns: repeat(7, minmax(0, 1fr));
-        grid-template-rows: repeat(3, minmax(0, 1fr));
         gap: 0.5rem;
     }
 
+    .images-page-shell--fixed .images-grid {
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+
+    .images-page-shell--scroll .images-grid {
+        flex: 0 0 auto;
+        grid-auto-rows: minmax(9rem, 13rem);
+    }
 
     .image-grid-item {
+        position: relative;
         display: flex;
         min-height: 0;
         height: 100%;
         flex-direction: column;
+    }
+
+    .image-grid-item--selected {
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 2px hsl(var(--primary) / 0.35);
+    }
+
+    .image-grid-item__selection {
+        position: absolute;
+        inset: 0.5rem auto auto 0.5rem;
+        z-index: 2;
+        display: flex;
+        height: 1.75rem;
+        width: 1.75rem;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid hsl(var(--border));
+        border-radius: 9999px;
+        background: hsl(var(--background) / 0.92);
+        color: hsl(var(--muted-foreground));
+        box-shadow: 0 6px 18px rgb(0 0 0 / 0.2);
+    }
+
+    .image-grid-item__selection--selected {
+        border-color: hsl(var(--primary));
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
     }
 
     .image-grid-item__preview {
@@ -333,7 +415,12 @@
 
         .images-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .images-page-shell--fixed .images-grid,
+        .images-page-shell--scroll .images-grid {
             grid-template-rows: none;
+            grid-auto-rows: minmax(10rem, 14rem);
         }
     }
 </style>
@@ -346,13 +433,15 @@
     [Inject] public required IJSRuntime JS { get; init; }
     [Inject] public required ToastService ToastService { get; init; }
 
-    private const int PageSize = 21;
+    private const int DefaultPageSize = 21;
     private const int MaxUploadFiles = 10000;
     private const long MaxUploadFileSize = 250L * 1024L * 1024L;
     private const string FilesUploadInputId = "images-files-upload-input";
     private const string FolderUploadInputId = "images-folder-upload-input";
     private const string UploadEndpoint = "/console/media/images/upload";
+    private static readonly int[] PageSizes = [21, 42, 63];
 
+    private readonly HashSet<string> _selectedImageKeys = new(StringComparer.Ordinal);
     private List<MediaImage> _images = new();
     private List<MediaImage> _pageImages = new();
     private MediaImage? _selectedImage;
@@ -361,21 +450,29 @@
     private bool _isUploadOpen;
     private bool _isUploading;
     private bool _isPasting;
+    private bool _isSelectionMode;
     private bool _uploadInputsRegistered;
     private string _uploadStatus = string.Empty;
     private string _uploadFileName = string.Empty;
     private string _error = string.Empty;
     private long _uploadBytesDone;
     private long _uploadBytesTotal;
+    private int _pageSize = DefaultPageSize;
     private int _page;
     private int _totalPages = 1;
+
+    private bool HasSelection => _selectedImageKeys.Count > 0;
+
+    private string PageShellClass => _pageSize == DefaultPageSize
+        ? "images-page-shell--fixed"
+        : "images-page-shell--scroll";
 
     private double UploadPercent => _uploadBytesTotal == 0
         ? 0
         : Math.Clamp(_uploadBytesDone * 100.0 / _uploadBytesTotal, 0, 100);
 
-    private int PageStart => _images.Count == 0 ? 0 : _page * PageSize + 1;
-    private int PageEnd => Math.Min(_images.Count, (_page + 1) * PageSize);
+    private int PageStart => _images.Count == 0 ? 0 : _page * _pageSize + 1;
+    private int PageEnd => Math.Min(_images.Count, (_page + 1) * _pageSize);
 
     protected override async Task OnInitializedAsync()
     {
@@ -427,16 +524,27 @@
     private void ApplyImages(IReadOnlyList<MediaImage> images)
     {
         _images = images.ToList();
-        _totalPages = _images.Count == 0 ? 1 : (_images.Count + PageSize - 1) / PageSize;
+        _totalPages = _images.Count == 0 ? 1 : (_images.Count + _pageSize - 1) / _pageSize;
         if (_page >= _totalPages)
             _page = Math.Max(0, _totalPages - 1);
 
+        SyncSelectionWithImages();
         ApplyPage();
     }
 
     private void ApplyPage()
     {
-        _pageImages = _images.Skip(_page * PageSize).Take(PageSize).ToList();
+        _pageImages = _images.Skip(_page * _pageSize).Take(_pageSize).ToList();
+    }
+
+    private void OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var size) || !PageSizes.Contains(size))
+            return;
+
+        _pageSize = size;
+        _page = 0;
+        ApplyImages(_images);
     }
 
     private void PrevPage()
@@ -469,6 +577,12 @@
 
     private void OpenPreview(MediaImage image)
     {
+        if (_isSelectionMode)
+        {
+            ToggleImageSelected(image);
+            return;
+        }
+
         _selectedImage = image;
     }
 
@@ -704,6 +818,88 @@
         await JS.InvokeVoidAsync("downloadFileFromUrl", "/console/media/images/all.zip");
     }
 
+    private void EnterSelectionMode()
+    {
+        _selectedImageKeys.Clear();
+        _selectedImage = null;
+        _isSelectionMode = true;
+    }
+
+    private void ExitSelectionMode()
+    {
+        _selectedImageKeys.Clear();
+        _isSelectionMode = false;
+    }
+
+    private void ToggleImageSelected(MediaImage image)
+    {
+        if (!_selectedImageKeys.Add(image.Key))
+            _selectedImageKeys.Remove(image.Key);
+    }
+
+    private async Task DownloadSelection()
+    {
+        var images = GetSelectedImages();
+        if (images.Count == 0)
+            return;
+
+        if (images.Count == 1)
+        {
+            await JS.InvokeVoidAsync("downloadFileFromUrl", GetImageDownloadUrl(images[0]));
+            return;
+        }
+
+        var query = string.Join("&", images.Select(image => $"key={Uri.EscapeDataString(image.Key)}"));
+        await JS.InvokeVoidAsync("downloadFileFromUrl", $"/console/media/images/selected.zip?{query}");
+    }
+
+    private async Task DeleteSelection()
+    {
+        var images = GetSelectedImages();
+        if (images.Count == 0)
+            return;
+
+        var message = images.Count == 1
+            ? $"Delete image '{images[0].FileName}'?"
+            : $"Delete {images.Count} selected images?";
+        var confirmed = await JS.InvokeAsync<bool>("confirm", message);
+        if (!confirmed)
+            return;
+
+        var removed = 0;
+        var missing = 0;
+
+        try
+        {
+            foreach (var image in images)
+            {
+                if (await Collection.Delete(image.Key))
+                    removed++;
+                else
+                    missing++;
+            }
+
+            await Collection.Refresh();
+            ApplyImages(Collection.Images);
+            _selectedImageKeys.Clear();
+            _isSelectionMode = false;
+
+            if (removed > 0 && missing == 0)
+                ToastService.Success($"Deleted {removed} image(s)", "Done");
+            else if (removed > 0)
+                ToastService.Warning($"Deleted {removed} image(s), {missing} already missing", "Done");
+            else
+                ToastService.Error("Selected images were not found", "Error");
+        }
+        catch (Exception ex)
+        {
+            _error = $"[Images] Delete failed: {ex.Message}";
+            ToastService.Error(_error, "Error");
+            await Collection.Refresh();
+            ApplyImages(Collection.Images);
+        }
+    }
+
     private async Task DownloadSelected()
     {
         if (_selectedImage == null)
@@ -750,6 +946,20 @@
     private static string GetImageDownloadUrl(MediaImage image)
     {
         return $"/console/media/images/{Uri.EscapeDataString(image.Key)}/download";
+    }
+
+    private List<MediaImage> GetSelectedImages()
+    {
+        return _images.Where(image => _selectedImageKeys.Contains(image.Key)).ToList();
+    }
+
+    private void SyncSelectionWithImages()
+    {
+        if (_selectedImageKeys.Count == 0)
+            return;
+
+        var availableKeys = _images.Select(image => image.Key).ToHashSet(StringComparer.Ordinal);
+        _selectedImageKeys.RemoveWhere(key => !availableKeys.Contains(key));
     }
 
     public void Dispose()

@@ -82,14 +82,17 @@ public static class RadioEndpoints
                .ToList();
     }
 
-    private static string GetSongStream(
+    private static IResult GetSongStream(
         [FromServices] IMediaStorage storage,
         [FromServices] IOnlineTracker onlineTracker,
         HttpContext context,
         long id)
     {
+        if (!File.Exists(storage.GetAudioPath(id)))
+            return Results.NotFound();
+
         var sessionId = Touch(onlineTracker, context);
-        return AppendSessionId(storage.GetAudioUrl(id), sessionId);
+        return Results.Text(AppendSessionId(storage.GetAudioUrl(id), sessionId), "text/plain");
     }
 
     private static IResult GetAudioFile(

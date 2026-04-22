@@ -1,9 +1,19 @@
 @using global::Common
 
 <button type="button"
-        class="image-grid-item group overflow-hidden rounded-lg border bg-card text-left transition hover:border-primary/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        class="@ItemClass"
         title="@Image.FileName"
-        @onclick="() => OnOpen.InvokeAsync(Image)">
+        aria-pressed="@(IsSelectionMode ? IsSelected.ToString().ToLowerInvariant() : null)"
+        @onclick="HandleClick">
+    @if (IsSelectionMode)
+    {
+        <span class="@SelectionClass" aria-hidden="true">
+            @if (IsSelected)
+            {
+                <LucideIcon Name="check" Size="16" />
+            }
+        </span>
+    }
     <div class="image-grid-item__preview bg-muted">
         <img src="@ImageUrl"
              alt="@Image.FileName"
@@ -23,7 +33,25 @@
 @code {
     [Parameter, EditorRequired] public MediaImage Image { get; set; } = null!;
     [Parameter, EditorRequired] public string ImageUrl { get; set; } = string.Empty;
+    [Parameter] public bool IsSelectionMode { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
     [Parameter] public EventCallback<MediaImage> OnOpen { get; set; }
+    [Parameter] public EventCallback<MediaImage> OnToggleSelected { get; set; }
+
+    private string ItemClass => IsSelected
+        ? "image-grid-item image-grid-item--selected group overflow-hidden rounded-lg border bg-card text-left transition hover:border-primary/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        : "image-grid-item group overflow-hidden rounded-lg border bg-card text-left transition hover:border-primary/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary";
+
+    private string SelectionClass => IsSelected
+        ? "image-grid-item__selection image-grid-item__selection--selected"
+        : "image-grid-item__selection";
+
+    private Task HandleClick()
+    {
+        return IsSelectionMode
+            ? OnToggleSelected.InvokeAsync(Image)
+            : OnOpen.InvokeAsync(Image);
+    }
 
     private static string FormatBytes(long bytes)
     {

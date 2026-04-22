@@ -78,9 +78,26 @@ public class MediaStorage : IMediaStorage
         await EnsureStorage();
 
         var path = GetAudioPath(id);
-        await using var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read,
-            bufferSize: 1024 * 128, useAsync: true);
-        await stream.CopyToAsync(file);
+        var tempPath = Path.Combine(_audioPath, $"{id}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                bufferSize: 1024 * 128, useAsync: true))
+            {
+                await stream.CopyToAsync(file);
+                await file.FlushAsync();
+            }
+
+            File.Move(tempPath, path, overwrite: true);
+        }
+        catch
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<MediaImage>> GetImages()

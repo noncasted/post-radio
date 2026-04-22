@@ -1,5 +1,6 @@
 @using Frontend.Client.Services
 @inject IRadioApi Api
+@implements IDisposable
 
 <div class="image-container">
     <img style="position: fixed; left: 0; z-index: -1" src="@_first.Url" class="@($"{_first.State} blurry sub")" />
@@ -41,44 +42,74 @@
     private readonly ImageHandle _second = new();
     private int _totalImages;
     private double _fadeSeconds = 1.0;
+    private bool _disposed;
+    private CancellationTokenSource? _componentCts;
+    private Task? _cycleTask;
 
     protected override async Task OnInitializedAsync()
     {
         _fadeSeconds = State.Options.ImageFadeMs / 1000.0;
+        _componentCts = CancellationTokenSource.CreateLinkedTokenSource(State.Token);
         State.OptionsChanged += OnOptionsChanged;
+
+        var token = _componentCts.Token;
         _totalImages = await Api.GetImagesCount();
-        _ = Cycle();
+
+        if (_disposed || token.IsCancellationRequested)
+            return;
+
+        EnsureCycleStarted(token);
     }
 
     private void OnOptionsChanged()
     {
+        if (_disposed)
+            return;
+
         _fadeSeconds = State.Options.ImageFadeMs / 1000.0;
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private async Task Cycle()
+    private void EnsureCycleStarted(CancellationToken token)
+    {
+        if (_cycleTask is { IsCompleted: false })
+            return;
+
+        _cycleTask = Cycle(token);
+    }
+
+    private async Task Cycle(CancellationToken token)
     {
         var current = _first;
 
-        while (!State.Token.IsCancellationRequested)
+        while (!token.IsCancellationRequested)
         {
             try
             {
                 if (_totalImages == 0)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(5), State.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(5), token);
                     _totalImages = await Api.GetImagesCount();
+
+                    if (_disposed || token.IsCancellationRequested)
+                        return;
+
                     continue;
                 }
 
                 current.Hide();
                 current = current == _first ? _second : _first;
                 var index = State.IncImageIndex(_totalImages);
-                current.Url = await Api.GetImageUrl(index);
+                var url = await Api.GetImageUrl(index);
+
+                if (_disposed || token.IsCancellationRequested)
+                    return;
+
+                current.Url = url;
                 current.Show();
 
                 await InvokeAsync(StateHasChanged);
-                await Task.Delay(TimeSpan.FromMilliseconds(State.Options.ImageSwitchIntervalMs), State.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(State.Options.ImageSwitchIntervalMs), token);
             }
             catch (OperationCanceledException)
             {
@@ -86,10 +117,21 @@
             }
             catch (Exception)
             {
-                try { await Task.Delay(TimeSpan.FromSeconds(1), State.Token); }
+                try { await Task.Delay(TimeSpan.FromSeconds(1), token); }
                 catch (OperationCanceledException) { return; }
             }
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        State.OptionsChanged -= OnOptionsChanged;
+        _componentCts?.Cancel();
+        _componentCts?.Dispose();
     }
 
     public class ImageHandle

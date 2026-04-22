@@ -12,6 +12,7 @@ namespace Meta.Online;
 public interface IOnlineTracker
 {
     void Touch(string? sessionId);
+    OnlineLiveData GetSnapshot();
 }
 
 [GenerateSerializer]
@@ -21,7 +22,6 @@ public class OnlineLiveData
     [Id(1)] public DateTime UpdatedAtUtc { get; set; }
     [Id(2)] public List<OnlineSessionEntry> Sessions { get; set; } = [];
     [Id(3)] public List<OnlineHistoryBucket> Hourly { get; set; } = [];
-    [Id(4)] public List<OnlineHistoryBucket> Daily { get; set; } = [];
 }
 
 [GenerateSerializer]
@@ -55,7 +55,6 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
     private static readonly TimeSpan PublishInterval = TimeSpan.FromSeconds(15);
     private const int MaxSessionIdLength = 128;
     private const int MaxHourlyBuckets = 24;
-    private const int MaxDailyBuckets = 30;
 
     private readonly ILiveState<OnlineLiveData> _liveState;
     private readonly IServiceEnvironment _environment;
@@ -63,7 +62,6 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
     private readonly object _sync = new();
     private readonly Dictionary<string, OnlineSessionEntry> _sessions = new(StringComparer.Ordinal);
     private readonly SortedDictionary<DateTime, OnlineHistoryBucket> _hourly = new();
-    private readonly SortedDictionary<DateTime, OnlineHistoryBucket> _daily = new();
 
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
@@ -99,6 +97,21 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
         }
     }
 
+    public OnlineLiveData GetSnapshot()
+    {
+        var now = DateTime.UtcNow;
+
+        lock (_sync)
+        {
+            Cleanup(now);
+
+            var count = _sessions.Count;
+            AddSample(_hourly, ToHourBucket(now), count, MaxHourlyBuckets);
+
+            return CreateSnapshot(now);
+        }
+    }
+
     private async Task Loop(IReadOnlyLifetime lifetime)
     {
         while (!lifetime.IsTerminated)
@@ -130,30 +143,7 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
 
     private async Task PublishSnapshot()
     {
-        var now = DateTime.UtcNow;
-        OnlineLiveData snapshot;
-
-        lock (_sync)
-        {
-            Cleanup(now);
-
-            var count = _sessions.Count;
-            AddSample(_hourly, ToHourBucket(now), count, MaxHourlyBuckets);
-            AddSample(_daily, ToDayBucket(now), count, MaxDailyBuckets);
-
-            snapshot = new OnlineLiveData
-            {
-                Count = count,
-                UpdatedAtUtc = now,
-                Sessions = _sessions.Values
-                                    .OrderByDescending(session => session.LastSeenAtUtc)
-                                    .ToList(),
-                Hourly = _hourly.Values.ToList(),
-                Daily = _daily.Values.ToList()
-            };
-        }
-
-        await _liveState.SetValue(snapshot);
+        await _liveState.SetValue(GetSnapshot());
     }
 
     private void Cleanup(DateTime now)
@@ -191,11 +181,6 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
         return new DateTime(value.Year, value.Month, value.Day, value.Hour, 0, 0, DateTimeKind.Utc);
     }
 
-    private static DateTime ToDayBucket(DateTime value)
-    {
-        return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Utc);
-    }
-
     private static string? NormalizeSessionId(string? value)
     {
         value = value?.Trim();
@@ -207,6 +192,19 @@ public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
             ? value
             : value[..MaxSessionIdLength];
     }
+
+    private OnlineLiveData CreateSnapshot(DateTime now)
+    {
+        return new OnlineLiveData
+        {
+            Count = _sessions.Count,
+            UpdatedAtUtc = now,
+            Sessions = _sessions.Values
+                                .OrderByDescending(session => session.LastSeenAtUtc)
+                                .ToList(),
+            Hourly = _hourly.Values.ToList()
+        };
+    }
 }
 
 public static class OnlineServicesExtensions
@@ -215,8 +213,14 @@ public static class OnlineServicesExtensions
     {
         builder.AddLiveState<OnlineLiveData>();
 
+        builder.AddStateCollection<OnlineDailyCollection, string, OnlineDailyState>()
+               .As<IOnlineDailyCollection>();
+
         builder.Add<OnlineTracker>()
                .As<IOnlineTracker>()
+               .As<ICoordinatorSetupCompleted>();
+
+        builder.Add<OnlineHistoryRecorder>()
                .As<ICoordinatorSetupCompleted>();
 
         return builder;

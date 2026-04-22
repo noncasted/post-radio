@@ -83,14 +83,29 @@ public class SessionState : IDisposable
         VolumeChanged?.Invoke();
     }
 
-    public SongDto? IncSongIndex()
+    public SongDto? PeekNextSong()
     {
         if (_playlistSongs.Count == 0)
             return null;
 
-        var next = _playlistSongs[_songIndex % _playlistSongs.Count];
-        _songIndex++;
-        return next;
+        return _playlistSongs[_songIndex % _playlistSongs.Count];
+    }
+
+    public void CommitNextSong(SongDto? song)
+    {
+        if (song == null || _playlistSongs.Count == 0)
+            return;
+
+        var currentIndex = _songIndex % _playlistSongs.Count;
+        if (_playlistSongs[currentIndex].Id == song.Id)
+        {
+            _songIndex++;
+            return;
+        }
+
+        var songIndex = _playlistSongs.FindIndex(candidate => candidate.Id == song.Id);
+        if (songIndex >= 0)
+            _songIndex = songIndex + 1;
     }
 
     public int IncImageIndex(int total)
