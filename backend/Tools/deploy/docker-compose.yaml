@@ -1,0 +1,60 @@
+# Coolify-deployed production compose topology.
+#
+# The sc-tunnel service brings up an AmneziaWG tunnel to an EU VPS inside the
+# container and exposes a SOCKS5 proxy (sc-tunnel:1080) that the silo uses
+# to reach api-v2.soundcloud.com and *.sndcdn.com from an RF-hosted
+# deployment where SoundCloud is blocked/throttled by ISPs and TSPU.
+#
+# AmneziaWG is the only protocol that still passes through cleanly — plain
+# WireGuard, SSH-forwarded, shadowsocks, and VLESS-Reality were all either
+# blocked or bandwidth-shaped when tested from RF ISPs.
+#
+# Required setup:
+#   - Put the AmneziaWG client .conf (the one you'd import into the
+#     AmneziaVPN app) at ./secrets/awg_config
+#   - docker-compose reads it as a file secret and mounts it into the
+#     container at /run/secrets/awg_config
+#
+# This file is a skeleton for the sc-tunnel wiring; integrate the remaining
+# services (silo, coordinator, gateways, postgres, pgbouncer, migrator) in
+# the same compose when the full deploy topology is settled.
+
+services:
+    sc-tunnel:
+        build:
+            context: ./sc-tunnel
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        # Privileged mode simplifies the AmneziaWG setup: awg-quick needs to write
+        # to /proc/sys sysctls (src_valid_mark) and manipulate ip rules / iptables,
+        # which hit RO / EPERM under a stricter profile even with NET_ADMIN.
+        privileged: true
+        devices:
+            - /dev/net/tun:/dev/net/tun
+        secrets:
+            - awg_config
+        network_mode: host
+        # Intentionally no `ports:` — SOCKS5 is only reachable from sibling
+        # containers on the `tunnel_net` network via DNS name `sc-tunnel`.
+
+    # Example wiring for the silo service. Replace/merge with the real silo
+    # definition when the prod compose is fleshed out.
+    #
+    # silo:
+    #     image: post-radio/silo:latest
+    #     environment:
+    #         Audio__Socks5Proxy: socks5://sc-tunnel:1080
+    #         Audio__PlaylistsEntryPoint: https://soundcloud.com/doomer-radio
+    #     depends_on:
+    #         sc-tunnel:
+    #             condition: service_healthy
+    #     networks:
+    #         - tunnel_net
+
+networks:
+    tunnel_net:
+        driver: bridge
+
+secrets:
+    awg_config:
+        file: ./secrets/awg_config
