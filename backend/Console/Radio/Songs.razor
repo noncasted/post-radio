@@ -1,4 +1,5 @@
 @page "/songs"
+@using System.Text
 @using global::Common.Extensions
 @using global::Common.Reactive
 @using Meta.Audio
@@ -11,9 +12,17 @@
     <div class="flex gap-2 items-center flex-wrap">
         <span class="text-sm text-muted-foreground">@Collection.Count song(s)</span>
         <div class="flex-1"></div>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunFetch">
+            <LucideIcon Name="list-plus" Size="14" class="mr-1" />
+            <span>Fetch</span>
+        </BbButton>
         <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadAudio">
             <LucideIcon Name="cloud-download" Size="14" class="mr-1" />
             <span>Load audio</span>
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunDownloadLookup">
+            <LucideIcon Name="file-down" Size="14" class="mr-1" />
+            <span>Download songs.json</span>
         </BbButton>
         <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadLookup">
             <LucideIcon Name="download" Size="14" class="mr-1" />
@@ -52,6 +61,7 @@
     [Inject] public required ISongsCollection Collection { get; init; }
     [Inject] public required IPlaylistLoader Loader { get; init; }
     [Inject] public required ISongDataLookup Lookup { get; init; }
+    [Inject] public required IJSRuntime JS { get; init; }
 
     private readonly ILifetime _lifetime = new Lifetime();
 
@@ -64,9 +74,37 @@
 
     private enum SortBy { Name, AddDate, Invalid }
 
+    private Task RunFetch() => RunOp("Fetching playlists", p => Loader.FetchAll(p));
     private Task RunSaveLookup() => RunOp("Saving", p => Lookup.Save(p));
     private Task RunLoadLookup() => RunOp("Loading", p => Lookup.Load(p));
     private Task RunLoadAudio() => RunOp("Loading audio", p => Loader.LoadAll(p));
+
+    private async Task RunDownloadLookup()
+    {
+        _busy = true;
+        _status = "Generating songs.json";
+        _log = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var json = Lookup.CreateJson();
+            var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "songs.json", base64, "application/json;charset=utf-8");
+            _status = "Success";
+            _log = $"Generated songs.json with {Collection.Count} song(s).";
+        }
+        catch (Exception ex)
+        {
+            _status = "Failed: " + ex.Message;
+            _log = _status;
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task RunOp(string label, Func<IOperationProgress, Task> action)
     {

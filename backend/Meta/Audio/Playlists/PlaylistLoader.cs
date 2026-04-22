@@ -10,6 +10,7 @@ namespace Meta.Audio;
 public interface IPlaylistLoader
 {
     Task Fetch(PlaylistData playlist, IOperationProgress progress);
+    Task FetchAll(IOperationProgress progress);
     Task Load(PlaylistData playlist, IOperationProgress progress);
     Task LoadAll(IOperationProgress progress);
 }
@@ -19,6 +20,7 @@ public class PlaylistLoader : IPlaylistLoader
     public PlaylistLoader(
         IOrleans orleans,
         SoundCloudClient soundCloud,
+        IPlaylistsCollection playlists,
         ISongsCollection songs,
         IMediaStorage mediaStorage,
         HttpClient http,
@@ -26,6 +28,7 @@ public class PlaylistLoader : IPlaylistLoader
     {
         _orleans = orleans;
         _soundCloud = soundCloud;
+        _playlists = playlists;
         _songs = songs;
         _mediaStorage = mediaStorage;
         _http = http;
@@ -36,12 +39,105 @@ public class PlaylistLoader : IPlaylistLoader
     private readonly ILogger<PlaylistLoader> _logger;
     private readonly IMediaStorage _mediaStorage;
     private readonly IOrleans _orleans;
+    private readonly IPlaylistsCollection _playlists;
     private readonly ISongsCollection _songs;
     private readonly SoundCloudClient _soundCloud;
 
     public async Task Fetch(PlaylistData playlist, IOperationProgress progress)
     {
         progress.SetStatus(OperationStatus.InProgress);
+
+        await FetchPlaylist(playlist, progress);
+
+        progress.SetStatus(OperationStatus.Success);
+    }
+
+    public async Task FetchAll(IOperationProgress progress)
+    {
+        progress.SetStatus(OperationStatus.InProgress);
+        progress.Log("Scanning all playlists for tracks...");
+
+        var playlists = _playlists
+                        .Select(kv => new PlaylistData
+                        {
+                            Id = kv.Key,
+                            Url = kv.Value.Url,
+                            Name = kv.Value.Name
+                        })
+                        .ToList();
+
+        progress.Log($"Found {playlists.Count} playlist(s).");
+        progress.SetProgress(0f);
+
+        var fetched = 0;
+        var failed = 0;
+
+        for (var i = 0; i < playlists.Count; i++)
+        {
+            var playlist = playlists[i];
+            var playlistName = string.IsNullOrWhiteSpace(playlist.Name) ? playlist.Url : playlist.Name;
+
+            try
+            {
+                progress.Log($"Fetching {i + 1} / {playlists.Count}: {playlistName}");
+                await FetchPlaylist(playlist, progress);
+                fetched++;
+            }
+            catch (Exception e)
+            {
+                failed++;
+
+                _logger.LogError(e,
+                    "[Audio] [Songs] Failed to fetch playlist {PlaylistId} ({PlaylistName})",
+                    playlist.Id,
+                    playlistName);
+                progress.Log($"Failed {i + 1} / {playlists.Count}: {playlistName}: {e.Message}");
+            }
+
+            progress.SetProgress((i + 1) / (float)Math.Max(1, playlists.Count));
+        }
+
+        progress.Log($"Fetch complete: {fetched} playlist(s), {failed} failed.");
+        progress.SetStatus(OperationStatus.Success);
+    }
+
+    public async Task Load(PlaylistData playlist, IOperationProgress progress)
+    {
+        progress.SetStatus(OperationStatus.InProgress);
+        progress.Log("Scanning playlist for unloaded songs...");
+
+        var pending = _songs
+                      .Where(kv => kv.Value.Playlists.Contains(playlist.Id) && !kv.Value.IsLoaded)
+                      .Select(kv => (Id: kv.Key, State: kv.Value))
+                      .ToList();
+
+        progress.Log($"Found {pending.Count} unloaded songs.");
+        await LoadPending(pending,
+            progress,
+            (state, e) => _logger.LogError(e,
+                "[Audio] [Playlist] Failed to download {Author} - {Name} (playlist {PlaylistId})",
+                state.Author, state.Name, playlist.Id));
+    }
+
+    public async Task LoadAll(IOperationProgress progress)
+    {
+        progress.SetStatus(OperationStatus.InProgress);
+        progress.Log("Scanning all songs for unloaded audio...");
+
+        var pending = _songs
+                      .Where(kv => !kv.Value.IsLoaded)
+                      .Select(kv => (Id: kv.Key, State: kv.Value))
+                      .ToList();
+
+        progress.Log($"Found {pending.Count} unloaded songs.");
+        await LoadPending(pending,
+            progress,
+            (state, e) => _logger.LogError(e,
+                "[Audio] [Songs] Failed to download {Author} - {Name}", state.Author, state.Name));
+    }
+
+    private async Task FetchPlaylist(PlaylistData playlist, IOperationProgress progress)
+    {
         progress.Log("Fetching playlist tracks...");
 
         var tracks = new List<SoundCloudExplode.Tracks.Track>();
@@ -106,42 +202,6 @@ public class PlaylistLoader : IPlaylistLoader
         }
 
         progress.Log($"Fetch complete: {toCreate.Count} new, {toAttach.Count} attached.");
-        progress.SetStatus(OperationStatus.Success);
-    }
-
-    public async Task Load(PlaylistData playlist, IOperationProgress progress)
-    {
-        progress.SetStatus(OperationStatus.InProgress);
-        progress.Log("Scanning playlist for unloaded songs...");
-
-        var pending = _songs
-                      .Where(kv => kv.Value.Playlists.Contains(playlist.Id) && !kv.Value.IsLoaded)
-                      .Select(kv => (Id: kv.Key, State: kv.Value))
-                      .ToList();
-
-        progress.Log($"Found {pending.Count} unloaded songs.");
-        await LoadPending(pending,
-            progress,
-            (state, e) => _logger.LogError(e,
-                "[Audio] [Playlist] Failed to download {Author} - {Name} (playlist {PlaylistId})",
-                state.Author, state.Name, playlist.Id));
-    }
-
-    public async Task LoadAll(IOperationProgress progress)
-    {
-        progress.SetStatus(OperationStatus.InProgress);
-        progress.Log("Scanning all songs for unloaded audio...");
-
-        var pending = _songs
-                      .Where(kv => !kv.Value.IsLoaded)
-                      .Select(kv => (Id: kv.Key, State: kv.Value))
-                      .ToList();
-
-        progress.Log($"Found {pending.Count} unloaded songs.");
-        await LoadPending(pending,
-            progress,
-            (state, e) => _logger.LogError(e,
-                "[Audio] [Songs] Failed to download {Author} - {Name}", state.Author, state.Name));
     }
 
     private async Task LoadPending(

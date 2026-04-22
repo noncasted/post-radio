@@ -12,6 +12,7 @@ public interface ISongDataLookup
 {
     Task Save(IOperationProgress progress);
     Task Load(IOperationProgress progress);
+    string CreateJson();
 }
 
 public class SongLookupInfo
@@ -58,15 +59,7 @@ public class SongDataLookup : ISongDataLookup
         progress.SetStatus(OperationStatus.InProgress);
         progress.Log($"Collecting {_songs.Count} songs...");
 
-        var data = _songs.ToDictionary(
-            kv => kv.Key,
-            kv => new SongLookupInfo
-            {
-                Id = kv.Key,
-                Url = kv.Value.Url,
-                Author = kv.Value.Author,
-                Name = kv.Value.Name
-            });
+        var data = CreateLookupData();
 
         Directory.CreateDirectory(_metadataDirectory);
 
@@ -77,6 +70,12 @@ public class SongDataLookup : ISongDataLookup
         _logger.LogInformation("[Audio] [Lookup] Saved {Count} entries to {File}", data.Count, _lookupFile);
         progress.Log($"Saved {data.Count} entries.");
         progress.SetStatus(OperationStatus.Success);
+    }
+
+    public string CreateJson()
+    {
+        var data = CreateLookupData();
+        return JsonSerializer.Serialize(data, JsonOptions);
     }
 
     private static string ResolveLookupFile(string? configuredPath)
@@ -183,5 +182,18 @@ public class SongDataLookup : ISongDataLookup
         _logger.LogInformation("[Audio] [Lookup] Applied {Applied}, skipped {Skipped}", applied, skipped);
         progress.Log($"Load complete: applied {applied}, skipped {skipped}.");
         progress.SetStatus(OperationStatus.Success);
+    }
+
+    private Dictionary<long, SongLookupInfo> CreateLookupData()
+    {
+        return _songs.ToDictionary(
+            kv => kv.Key,
+            kv => new SongLookupInfo
+            {
+                Id = kv.Key,
+                Url = kv.Value.Url,
+                Author = kv.Value.Author,
+                Name = kv.Value.Name
+            });
     }
 }
