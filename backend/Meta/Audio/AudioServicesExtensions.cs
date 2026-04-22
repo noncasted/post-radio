@@ -4,7 +4,6 @@ using Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SoundCloudExplode;
 
@@ -18,15 +17,6 @@ public static class AudioServicesExtensions
     {
         var audioSection = builder.Configuration.GetSection("Audio");
         builder.Services.Configure<AudioOptions>(audioSection);
-
-        // Diagnostic: log the resolved Socks5Proxy value at service-registration time so
-        // you can tell from the log whether the env var / appsettings actually reached this
-        // process. The value is read twice — once eagerly here, and again in
-        // CreateSoundCloudHandler when the primary handler is built.
-        var earlyProxy = audioSection["Socks5Proxy"];
-        Console.WriteLine(earlyProxy is null
-            ? "[Audio] [Init] Socks5Proxy: <not set> -> requests will go direct"
-            : $"[Audio] [Init] Socks5Proxy resolved from configuration = '{earlyProxy}'");
 
         builder.AddStateCollection<PlaylistsCollection, Guid, PlaylistState>()
                .As<IPlaylistsCollection>();
@@ -58,10 +48,7 @@ public static class AudioServicesExtensions
         builder.Services.AddSingleton(serviceProvider =>
         {
             var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-            var logger = serviceProvider.GetRequiredService<ILogger<SoundCloudClient>>();
-            var client = httpClientFactory.CreateClient(SoundCloudHttpClientName);
-            logger.LogInformation("[Audio] [SoundCloud] SoundCloudClient constructed with HttpClient hash={HttpClientHash}", client.GetHashCode());
-            return new SoundCloudClient(client);
+            return new SoundCloudClient(httpClientFactory.CreateClient(SoundCloudHttpClientName));
         });
 
         return builder;
@@ -70,31 +57,14 @@ public static class AudioServicesExtensions
     private static HttpMessageHandler CreateSoundCloudHandler(IServiceProvider serviceProvider)
     {
         var options = serviceProvider.GetRequiredService<IOptions<AudioOptions>>().Value;
-        var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Meta.Audio.Handler");
-        var handler = new SocketsHttpHandler
+
+        if (string.IsNullOrWhiteSpace(options.Socks5Proxy))
+            return new SocketsHttpHandler();
+
+        return new SocketsHttpHandler
         {
-            // Disable automatic proxy — SOCKS5 is handled manually via ConnectCallback below.
-            UseProxy = false
+            Proxy = new WebProxy(options.Socks5Proxy),
+            UseProxy = true
         };
-
-        if (!string.IsNullOrWhiteSpace(options.Socks5Proxy))
-        {
-            try
-            {
-                handler.ConnectCallback = Socks5ConnectCallback.Create(options.Socks5Proxy, logger);
-                logger.LogInformation("[Audio] [Handler] SOCKS5 proxy ENABLED via manual ConnectCallback: {Proxy}", options.Socks5Proxy);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "[Audio] [Handler] Failed to parse Socks5Proxy='{Proxy}' — falling back to direct connection", options.Socks5Proxy);
-            }
-        }
-        else
-        {
-            logger.LogWarning("[Audio] [Handler] SOCKS5 proxy NOT configured — requests go direct. " +
-                              "Set Audio:Socks5Proxy (e.g. 'socks5://127.0.0.1:1080') to route via the VPS tunnel.");
-        }
-
-        return handler;
     }
 }

@@ -1,0 +1,18 @@
+namespace Infrastructure.Execution;
+
+public enum TaskPriority
+{
+    Low,
+    Medium,
+    High,
+    Critical
+}
+
+public interface IPriorityTask
+{
+    string Id { get; }
+    TaskPriority Priority { get; }
+    TimeSpan Delay { get; }
+
+    Task Execute();
+}

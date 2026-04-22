@@ -1,0 +1,27 @@
+@using global::Infrastructure
+<div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+    <div class="flex items-center gap-2">
+        <div class="rounded-md bg-blue-500/15 p-1.5">
+            <LucideIcon Name="arrow-left-right" Size="14" class="text-blue-400" />
+        </div>
+        <h2 class="text-sm font-semibold">Transactions</h2>
+    </div>
+    <div class="flex flex-col">
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="timer" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Lock Wait (sec)</span>
+            <input type="number" @bind="Value.LockWaitSeconds" step="0.5"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5">
+            <LucideIcon Name="clock" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Stuck Grace Period (sec)</span>
+            <input type="number" @bind="Value.StuckGraceSeconds" step="1"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TransactionOptions Value { get; set; } = null!;
+}

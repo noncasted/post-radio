@@ -1,0 +1,9 @@
+<BbButton class="h-36 w-full text-2xl font-bold" @onclick="@(() => Navigation.NavigateTo(Target))">
+    @Name
+</BbButton>
+
+@code {
+    [Parameter] public required string Name { get; init; }
+    [Parameter] public required string Target { get; init; }
+    [Inject] public required IConsoleNavigation Navigation { get; init; }
+}

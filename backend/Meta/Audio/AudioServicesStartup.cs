@@ -31,27 +31,7 @@ public class AudioServicesStartup : ICoordinatorSetupCompleted
 
     public async Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
-        _logger.LogInformation(
-            "[Audio] [Startup] OnCoordinatorSetupCompleted begin. Socks5Proxy='{Proxy}', PlaylistsEntryPoint='{Entry}'",
-            _options.Socks5Proxy ?? "<null>",
-            _options.PlaylistsEntryPoint);
-
-        var started = DateTime.UtcNow;
-
-        try
-        {
-            await _soundCloud.InitializeAsync();
-            _logger.LogInformation(
-                "[Audio] [Startup] SoundCloudClient.InitializeAsync succeeded in {ElapsedMs}ms",
-                (long)(DateTime.UtcNow - started).TotalMilliseconds);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e,
-                "[Audio] [Startup] SoundCloudClient.InitializeAsync FAILED after {ElapsedMs}ms. This usually means the proxy is missing/misconfigured or the tunnel is down.",
-                (long)(DateTime.UtcNow - started).TotalMilliseconds);
-            throw;
-        }
+        await _soundCloud.InitializeAsync();
 
         if (string.IsNullOrWhiteSpace(_options.PlaylistsEntryPoint))
         {

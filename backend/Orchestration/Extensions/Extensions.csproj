@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsAspireSharedProject>true</IsAspireSharedProject>
+        <AssemblyName>Orchestration.Common</AssemblyName>
+        <RootNamespace>Orchestration</RootNamespace>
+        <NoWarn>$(NoWarn);CS0436</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet"/>
+        <PackageReference Include="Microsoft.Orleans.Sdk"/>
+        <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet"/>
+        <PackageReference Include="Microsoft.Orleans.Runtime"/>
+        <PackageReference Include="Microsoft.Orleans.Server"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Npgsql"/>
+        <PackageReference Include="Npgsql"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
+        <PackageReference Include="Microsoft.Extensions.Http.Resilience"/>
+        <PackageReference Include="Microsoft.Extensions.ServiceDiscovery"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OpenTelemetry.Api"/>
+        <PackageReference Include="OpenTelemetry.Api.ProviderBuilderExtensions"/>
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting"/>
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore"/>
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http"/>
+        <PackageReference Include="OpenTelemetry.Instrumentation.Runtime"/>
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Cluster\Cluster.csproj"/>
+        <ProjectReference Include="..\..\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Infrastructure.csproj"/>
+        <ProjectReference Include="..\..\Meta\Meta.csproj"/>
+        <ProjectReference Include="..\..\Tools\Generators\Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+        <Using Include="Meta.Audio"/>
+        <Using Include="Meta.Images"/>
+        <Using Include="Meta.Online"/>
+    </ItemGroup>
+
+</Project>

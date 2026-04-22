@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <AssemblyName>Console</AssemblyName>
+        <RootNamespace>Console</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BlazorBlueprint.Components"/>
+        <PackageReference Include="BlazorBlueprint.Primitives"/>
+        <PackageReference Include="BlazorBlueprint.Icons.Lucide"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Orchestration\Extensions\Extensions.csproj"/>
+        <ProjectReference Include="..\Meta\Meta.csproj"/>
+        <ProjectReference Include="..\Infrastructure\Infrastructure.csproj"/>
+        <ProjectReference Include="..\Common\Common.csproj"/>
+        <ProjectReference Include="..\Cluster\Cluster.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <UpToDateCheckInput Remove="Game\Analytics\CardAnalytics.razor" />
+    </ItemGroup>
+
+
+</Project>

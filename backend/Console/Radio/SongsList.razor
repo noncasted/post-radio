@@ -1,0 +1,254 @@
+@using global::Common.Reactive
+@using global::Infrastructure
+@using global::Meta.Audio
+
+<div class="flex flex-col gap-4">
+    <BbInput Value="@_search" ValueChanged="@OnSearchChanged" Placeholder="Search by name or author..." />
+
+    <div class="rounded-lg border bg-card divide-y">
+        @foreach (var (id, state) in _pageSongs)
+        {
+            var isExpanded = _expandedId == id;
+            var draft = _drafts.TryGetValue(id, out var d) ? d : null;
+
+            <div class="flex flex-col">
+                <div class="p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30"
+                     @onclick="@(() => ToggleExpand(id, state))">
+                    <span class="rounded-md bg-primary/10 p-2">
+                        <LucideIcon Name="music" Size="14" class="text-primary" />
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium truncate">
+                            @(string.IsNullOrEmpty(state.Author) ? "Unknown" : state.Author) — @(string.IsNullOrEmpty(state.Name) ? "Untitled" : state.Name)
+                        </div>
+                        @if (ShowUrl)
+                        {
+                            <div class="text-xs text-muted-foreground truncate">@state.Url</div>
+                        }
+                    </div>
+                    @if (state.IsLoaded)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-emerald-500/15 text-emerald-600 px-2 py-0.5 text-xs">
+                            <LucideIcon Name="check" Size="12" /> loaded
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-amber-500/15 text-amber-600 px-2 py-0.5 text-xs">
+                            <LucideIcon Name="clock" Size="12" /> pending
+                        </span>
+                    }
+                    @if (ShowDate)
+                    {
+                        <span class="text-xs text-muted-foreground">@(state.AddDate == default ? "" : state.AddDate.ToString("dd.MM.yyyy"))</span>
+                    }
+                    <a href="@state.Url" target="_blank" class="rounded p-1.5 hover:bg-muted" @onclick:stopPropagation>
+                        <LucideIcon Name="external-link" Size="14" />
+                    </a>
+                    <LucideIcon Name="@(isExpanded ? "chevron-up" : "chevron-down")" Size="14" class="text-muted-foreground" />
+                </div>
+
+                @if (isExpanded && draft != null)
+                {
+                    <div class="p-4 bg-muted/20 border-t flex flex-col gap-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="flex flex-col gap-1">
+                                <BbLabel>Author</BbLabel>
+                                <BbInput Value="@draft.Author" ValueChanged="@((string v) => draft.Author = v)" />
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <BbLabel>Title</BbLabel>
+                                <BbInput Value="@draft.Name" ValueChanged="@((string v) => draft.Name = v)" />
+                            </div>
+                        </div>
+                        <div class="flex gap-2 justify-end">
+                            <BbButton Variant="ButtonVariant.Ghost" @onclick="@(() => CancelEdit(id))">Cancel</BbButton>
+                            <BbButton Disabled="@_saving" @onclick="@(() => SaveEdit(id, state))">
+                                @if (_saving && _savingId == id)
+                                {
+                                    <LucideIcon Name="loader" Size="14" class="mr-2 animate-spin" />
+                                }
+                                <span>Save</span>
+                            </BbButton>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_pageSongs.Count == 0)
+        {
+            <div class="text-center text-sm text-muted-foreground py-8">
+                @(Source.Count == 0 ? EmptyText : "No songs match the search")
+            </div>
+        }
+    </div>
+
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-muted-foreground">Per page</span>
+            <select class="h-8 rounded-md border bg-background px-2 text-xs" value="@_pageSize" @onchange="OnPageSizeChanged">
+                @foreach (var size in PageSizes)
+                {
+                    <option value="@size" selected="@(size == _pageSize)">@size</option>
+                }
+            </select>
+            <span class="text-xs text-muted-foreground">@_filtered.Count songs</span>
+        </div>
+
+        @if (_totalPages > 1)
+        {
+            <div class="flex items-center gap-1">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          Disabled="@(_page == 0)" @onclick="PrevPage">
+                    <LucideIcon Name="chevron-left" Size="14" />
+                </BbButton>
+                <span class="text-xs text-muted-foreground px-2">@(_page + 1) / @_totalPages</span>
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          Disabled="@(_page >= _totalPages - 1)" @onclick="NextPage">
+                    <LucideIcon Name="chevron-right" Size="14" />
+                </BbButton>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<KeyValuePair<long, SongState>> Source { get; set; } = Array.Empty<KeyValuePair<long, SongState>>();
+    [Parameter] public bool ShowUrl { get; set; } = true;
+    [Parameter] public bool ShowDate { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "No songs";
+
+    [Inject] public required IOrleans Orleans { get; init; }
+
+    private static readonly int[] PageSizes = { 10, 30, 50, 100 };
+
+    private List<KeyValuePair<long, SongState>> _filtered = new();
+    private List<KeyValuePair<long, SongState>> _pageSongs = new();
+    private string _search = string.Empty;
+    private int _pageSize = 30;
+    private int _page;
+    private int _totalPages = 1;
+
+    private long? _expandedId;
+    private readonly Dictionary<long, Draft> _drafts = new();
+    private bool _saving;
+    private long _savingId;
+
+    protected override void OnParametersSet()
+    {
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        var query = _search?.Trim();
+
+        if (string.IsNullOrEmpty(query))
+        {
+            _filtered = Source.ToList();
+        }
+        else
+        {
+            _filtered = Source
+                .Where(kv =>
+                    (kv.Value.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (kv.Value.Author?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+        }
+
+        _totalPages = _filtered.Count == 0 ? 1 : (_filtered.Count + _pageSize - 1) / _pageSize;
+        if (_page >= _totalPages) _page = Math.Max(0, _totalPages - 1);
+        _pageSongs = _filtered.Skip(_page * _pageSize).Take(_pageSize).ToList();
+    }
+
+    private void OnSearchChanged(string value)
+    {
+        _search = value;
+        _page = 0;
+        ApplyFilter();
+    }
+
+    private void OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size))
+        {
+            _pageSize = size;
+            _page = 0;
+            ApplyFilter();
+        }
+    }
+
+    private void PrevPage()
+    {
+        if (_page <= 0) return;
+        _page--;
+        _pageSongs = _filtered.Skip(_page * _pageSize).Take(_pageSize).ToList();
+    }
+
+    private void NextPage()
+    {
+        if (_page >= _totalPages - 1) return;
+        _page++;
+        _pageSongs = _filtered.Skip(_page * _pageSize).Take(_pageSize).ToList();
+    }
+
+    private void ToggleExpand(long id, SongState state)
+    {
+        if (_expandedId == id)
+        {
+            _expandedId = null;
+            _drafts.Remove(id);
+            return;
+        }
+
+        _expandedId = id;
+        _drafts[id] = new Draft { Author = state.Author, Name = state.Name };
+    }
+
+    private void CancelEdit(long id)
+    {
+        _expandedId = null;
+        _drafts.Remove(id);
+    }
+
+    private async Task SaveEdit(long id, SongState state)
+    {
+        if (!_drafts.TryGetValue(id, out var draft))
+            return;
+
+        _saving = true;
+        _savingId = id;
+        StateHasChanged();
+
+        try
+        {
+            var grain = Orleans.GetGrain<ISong>(id);
+            await grain.UpdateData(new SongData
+            {
+                Id = id,
+                Author = draft.Author,
+                Name = draft.Name,
+                Url = state.Url,
+                Playlists = state.Playlists,
+                AddDate = state.AddDate,
+                IsLoaded = state.IsLoaded
+            });
+
+            _expandedId = null;
+            _drafts.Remove(id);
+        }
+        finally
+        {
+            _saving = false;
+            _savingId = 0;
+            StateHasChanged();
+        }
+    }
+
+    private class Draft
+    {
+        public string Author { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+}

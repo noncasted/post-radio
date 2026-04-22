@@ -57,25 +57,11 @@ var console = builder
 var frontend = builder.AddProject<Frontend>("frontend")
                       .WithReference(meta);
 
-// Optional SOCKS5 proxy for SoundCloud (read from appsettings.local.json, gitignored).
-// AudioServicesStartup runs in every cluster participant (silo, coordinator, meta, console)
-// because AddBase() wires AddAudioServices() into every service — each project initialises
-// its own SoundCloudClient singleton. Forward the proxy env to all of them so the "Fetch
-// songs" action from the console reaches SoundCloud through the tunnel as well.
-var audioProxy = configuration["Audio:Socks5Proxy"];
-
-Console.WriteLine(string.IsNullOrWhiteSpace(audioProxy)
-    ? "[AppHost] Audio:Socks5Proxy NOT set in appsettings.local.json — child services will run without proxy."
-    : $"[AppHost] Audio:Socks5Proxy = '{audioProxy}' — forwarding to silo/coordinator/meta/console.");
-
 foreach (var project in new[] { silo, coordinator, meta, console })
 {
     project.WithEnvironment("Minio__Endpoint", "localhost:9000")
            .WithEnvironment("Minio__AccessKey", "minioadmin")
            .WithEnvironment("Minio__SecretKey", "minioadmin");
-
-    if (!string.IsNullOrWhiteSpace(audioProxy))
-        project.WithEnvironment("Audio__Socks5Proxy", audioProxy);
 }
 
 SetupDB();

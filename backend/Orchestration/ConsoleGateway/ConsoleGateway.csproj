@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <ItemGroup>
+        <!-- The mcr.microsoft.com/dotnet/sdk image does not auto-restore
+             Microsoft.AspNetCore.App.Internal.Assets, which is the package that
+             actually contains _framework/blazor.web.js. Without an explicit
+             reference the publish output ends up missing the Blazor framework
+             JS and the admin console 404s on its own bootstrap script. -->
+        <PackageReference Include="Microsoft.AspNetCore.App.Internal.Assets"/>
+        <PackageReference Include="BlazorBlueprint.Components"/>
+        <PackageReference Include="BlazorBlueprint.Primitives"/>
+        <PackageReference Include="BlazorBlueprint.Icons.Lucide"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Extensions\Extensions.csproj"/>
+        <ProjectReference Include="..\..\Console\Console.csproj"/>
+        <ProjectReference Include="..\..\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\Infrastructure\Infrastructure.csproj"/>
+    </ItemGroup>
+
+</Project>

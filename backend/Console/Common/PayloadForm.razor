@@ -1,0 +1,88 @@
+@using System.Reflection
+@using System.Text.RegularExpressions
+<div class="flex flex-col gap-2 mb-3">
+    @foreach (var prop in _properties)
+    {
+        var propName = prop.Name;
+        var displayName = FormatPropertyName(propName);
+        <div class="flex flex-col gap-1">
+            <BbLabel>@displayName</BbLabel>
+            <BbInput Value="@_values[propName]"
+                     ValueChanged="@((string val) => OnValueChanged(propName, val))"
+                     Placeholder="@displayName"
+                     Type="@GetInputType(prop.PropertyType)" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public required object Payload { get; set; }
+    [Parameter] public required EventCallback<object> PayloadChanged { get; set; }
+
+    private PropertyInfo[] _properties = Array.Empty<PropertyInfo>();
+    private readonly Dictionary<string, string> _values = new();
+
+    protected override void OnInitialized()
+    {
+        _properties = Payload.GetType().GetProperties(
+            BindingFlags.Public | BindingFlags.Instance);
+
+        foreach (var prop in _properties)
+        {
+            var value = prop.GetValue(Payload);
+            _values[prop.Name] = value?.ToString() ?? "";
+        }
+    }
+
+    private async Task OnValueChanged(string propName, string newValue)
+    {
+        _values[propName] = newValue;
+        await ApplyChanges();
+    }
+
+    private async Task ApplyChanges()
+    {
+        try
+        {
+            foreach (var prop in _properties)
+            {
+                if (!_values.TryGetValue(prop.Name, out var strValue) || string.IsNullOrEmpty(strValue))
+                    continue;
+
+                var convertedValue = Convert.ChangeType(strValue, prop.PropertyType);
+
+                if (prop.CanWrite)
+                {
+                    prop.SetValue(Payload, convertedValue);
+                }
+                else
+                {
+                    var fieldName = $"<{prop.Name}>k__BackingField";
+                    var field = Payload.GetType().GetField(fieldName,
+                        BindingFlags.NonPublic | BindingFlags.Instance);
+
+                    field?.SetValue(Payload, convertedValue);
+                }
+            }
+
+            await PayloadChanged.InvokeAsync(Payload);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating payload: {ex.Message}");
+        }
+    }
+
+    private BlazorBlueprint.Components.InputType GetInputType(Type propertyType)
+    {
+        return propertyType == typeof(int) || propertyType == typeof(long) ||
+               propertyType == typeof(float) || propertyType == typeof(double)
+            ? InputType.Number
+            : InputType.Text;
+    }
+
+    private string FormatPropertyName(string name)
+    {
+        return Regex.Replace(name, "([A-Z])", " $1").Trim();
+    }
+}

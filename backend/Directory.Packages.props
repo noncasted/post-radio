@@ -1,0 +1,68 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.5.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.5.0" />
+    <PackageVersion Include="MudBlazor" Version="9.0.0-rc.1" />
+    <PackageVersion Include="Blazor.Bootstrap" Version="3.4.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Npgsql" Version="10.0.2" />
+    <PackageVersion Include="Aspire.Npgsql" Version="13.2.2" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.2.2" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.2.2" />
+    <PackageVersion Include="Aspire.Hosting.Docker" Version="13.2.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="MemoryPack" Version="1.21.4" />
+    <PackageVersion Include="MemoryPack.Core" Version="1.21.4" />
+    <PackageVersion Include="Minio" Version="6.0.3" />
+    <PackageVersion Include="SoundCloudExplode" Version="1.6.7" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Orleans.Runtime" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Api.ProviderBuilderExtensions" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="BlazorBlueprint.Components" Version="3.9.6" />
+    <PackageVersion Include="BlazorBlueprint.Primitives" Version="3.9.3" />
+    <PackageVersion Include="BlazorBlueprint.Icons.Lucide" Version="2.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.App.Internal.Assets" Version="10.0.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Diagnostics.Runtime" Version="3.1.456003" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="FluentAssertions" Version="8.9.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.11.0" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.1.0" />
+  </ItemGroup>
+</Project>

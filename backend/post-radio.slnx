@@ -1,0 +1,24 @@
+<Solution>
+    <Folder Name="/Frontend/">
+        <Project Path="Frontend/Shared/Shared.csproj" />
+        <Project Path="Frontend/Client/Client.csproj" />
+        <Project Path="Frontend/Server/Server.csproj" />
+    </Folder>
+    <Folder Name="/Tools/">
+        <Project Path="Tools/DeploySetup/DeploySetup.csproj" />
+        <Project Path="Tools/Generators/Generators.csproj" />
+    </Folder>
+    <Folder Name="/Orchestration/">
+        <Project Path="Orchestration/Aspire/Aspire.csproj" />
+        <Project Path="Orchestration/ConsoleGateway/ConsoleGateway.csproj" />
+        <Project Path="Orchestration/Coordinator/Coordinator.csproj" />
+        <Project Path="Orchestration/Extensions/Extensions.csproj" />
+        <Project Path="Orchestration/MetaGateway/MetaGateway.csproj" />
+        <Project Path="Orchestration/Silo/Silo.csproj" />
+    </Folder>
+    <Project Path="Cluster/Cluster.csproj" />
+    <Project Path="Common/Common.csproj" />
+    <Project Path="Console/Console.csproj" />
+    <Project Path="Infrastructure/Infrastructure.csproj" />
+    <Project Path="Meta/Meta.csproj" />
+</Solution>

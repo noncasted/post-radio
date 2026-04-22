@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "MultiEdit(.claude/**)",
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Skill",
+      "Agent",
+      "mcp__unityMCP__*",
+      "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics"
+    ]
+  }
+}

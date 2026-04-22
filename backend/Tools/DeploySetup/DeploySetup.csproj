@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <AssemblyName>DeploySetup</AssemblyName>
+        <RootNamespace>DeploySetup</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Npgsql"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Sql\PostgreSQL-Main.sql" />
+        <EmbeddedResource Include="Sql\PostgreSQL-Clustering.sql" />
+        <EmbeddedResource Include="Sql\PostgreSQL-Supplemental.sql" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Common\Common.csproj"/>
+        <ProjectReference Include="..\..\Orchestration\Extensions\Extensions.csproj"/>
+    </ItemGroup>
+
+</Project>

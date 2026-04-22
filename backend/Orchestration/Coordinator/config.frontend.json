@@ -1,0 +1,8 @@
+{
+  "$type": "Cluster.Configs.FrontendOptions, Cluster",
+  "BaseVolume": 0.5,
+  "MinVolume": 0.1,
+  "MaxVolume": 1.0,
+  "ImageSwitchIntervalMs": 8000,
+  "ImageFadeMs": 1000
+}

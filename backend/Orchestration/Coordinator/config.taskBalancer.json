@@ -1,0 +1,8 @@
+{
+  "$type": "Infrastructure.Execution.TaskBalancerOptions, Infrastructure",
+  "EmptyDelayMs": 500,
+  "NextDelayMs": 100,
+  "IterationScore": 1,
+  "ExceptionPenalty": 50,
+  "ConcurrentTasks": 10
+}

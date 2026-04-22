@@ -1,8 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <AssemblyName>Infrastructure.StorableActions.Batchers.Interfaces</AssemblyName>
-        <RootNamespace>Infrastructure.StorableActions</RootNamespace>
-    </PropertyGroup>
-
-</Project>

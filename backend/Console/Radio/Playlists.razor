@@ -1,0 +1,104 @@
+@page "/playlists"
+@using global::Common.Reactive
+@using Meta.Audio
+@implements IDisposable
+
+<PageTitle>Playlists</PageTitle>
+<PageHeader Title="Playlists" />
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-4">
+    <div class="flex gap-2 items-center">
+        <BbButton @onclick="ToggleCreate">
+            <LucideIcon Name="plus" Size="16" class="mr-2" />
+            New playlist
+        </BbButton>
+        <span class="text-sm text-muted-foreground">@Collection.Count playlist(s)</span>
+    </div>
+
+    @if (_showCreate)
+    {
+        <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+            <h3 class="text-sm font-semibold">Create playlist</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1">
+                    <BbLabel>Name</BbLabel>
+                    <BbInput @bind-Value="_newName" placeholder="My mix" />
+                </div>
+                <div class="flex flex-col gap-1">
+                    <BbLabel>SoundCloud URL</BbLabel>
+                    <BbInput @bind-Value="_newUrl" placeholder="https://soundcloud.com/..." />
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <BbButton Variant="ButtonVariant.Ghost" @onclick="ToggleCreate">Cancel</BbButton>
+                <BbButton Disabled="@(!IsFormValid)" @onclick="CreatePlaylist">Create</BbButton>
+            </div>
+        </div>
+    }
+
+    <div class="grid grid-cols-3 gap-3">
+        @foreach (var (id, state) in Collection)
+        {
+            <div class="rounded-lg border bg-card p-4 flex flex-col gap-2 cursor-pointer transition-all hover:shadow-md hover:border-primary/40"
+                 @onclick="@(() => NavigateToPlaylist(id))">
+                <div class="flex items-center gap-2">
+                    <div class="rounded-md bg-primary/10 p-2">
+                        <LucideIcon Name="list-music" Size="16" class="text-primary" />
+                    </div>
+                    <span class="text-base font-semibold truncate">@(string.IsNullOrEmpty(state.Name) ? "Untitled" : state.Name)</span>
+                </div>
+                <div class="text-xs text-muted-foreground truncate">@state.Url</div>
+            </div>
+        }
+    </div>
+
+    @if (Collection.Count == 0)
+    {
+        <div class="text-center text-sm text-muted-foreground py-8">No playlists yet</div>
+    }
+</div>
+
+@code {
+    [Inject] public required IPlaylistsCollection Collection { get; init; }
+    [Inject] public required IPlaylistFactory Factory { get; init; }
+    [Inject] public required IConsoleNavigation Navigation { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    private bool _showCreate;
+    private string _newName = string.Empty;
+    private string _newUrl = string.Empty;
+
+    private bool IsFormValid => !string.IsNullOrWhiteSpace(_newName) && !string.IsNullOrWhiteSpace(_newUrl);
+
+    protected override void OnInitialized()
+    {
+        Collection.Updated.Advise(_lifetime, () => InvokeAsync(StateHasChanged));
+    }
+
+    private void ToggleCreate()
+    {
+        _showCreate = !_showCreate;
+        if (_showCreate)
+        {
+            _newName = string.Empty;
+            _newUrl = string.Empty;
+        }
+    }
+
+    private async Task CreatePlaylist()
+    {
+        if (!IsFormValid)
+            return;
+
+        await Factory.Create(_newUrl, _newName);
+        _showCreate = false;
+    }
+
+    private void NavigateToPlaylist(Guid id)
+    {
+        Navigation.NavigateTo(string.Format(ConsoleConstants.Pages.PlaylistDetail, id));
+    }
+
+    public void Dispose() => _lifetime.Terminate();
+}

@@ -1,0 +1,30 @@
+@using Cluster.State
+@using global::Common.Extensions
+@using global::Common.Reactive
+@inherits UiComponent
+
+<div class="flex flex-col gap-3">
+    <h2 class="text-sm font-semibold">Status</h2>
+    <div class="grid grid-cols-3 gap-3">
+        <StartupStatusTile />
+        <FeatureStatusTile Label="Connections" Value="_state.AcceptingConnections" />
+        <FeatureStatusTile Label="Side Effects" Value="_state.SideEffectsEnabled" />
+    </div>
+</div>
+
+@code {
+    [Inject] public IClusterFeatures ClusterFeatures { get; set; } = null!;
+
+    private ClusterFeaturesState _state = new();
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        ClusterFeatures.View(lifetime, state =>
+        {
+            _state = state;
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        return Task.CompletedTask;
+    }
+}

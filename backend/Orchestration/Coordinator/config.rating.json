@@ -1,0 +1,5 @@
+{
+  "$type": "Shared.RatingOptions, Shared",
+  "WinRating": 25,
+  "LossRating": 15
+}

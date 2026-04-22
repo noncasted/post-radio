@@ -1,0 +1,26 @@
+<div class="group rounded-lg border bg-card text-card-foreground shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-primary/40"
+     @onclick="@(() => Navigation.NavigateTo(Target))">
+    <div class="p-6 flex flex-col gap-4">
+        <div class="flex items-center gap-3">
+            <div class="rounded-lg bg-primary/10 p-2.5">
+                <LucideIcon Name="@Icon" Size="20" class="text-primary" />
+            </div>
+            <span class="text-lg font-semibold">@Title</span>
+        </div>
+        <p class="text-sm text-muted-foreground leading-relaxed">@Description</p>
+    </div>
+    <div class="px-6 pb-5">
+        <span class="inline-flex items-center gap-1 text-sm text-primary font-medium group-hover:gap-2 transition-all">
+            Open
+            <LucideIcon Name="arrow-right" Size="14" />
+        </span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public required string Icon { get; init; }
+    [Parameter] public required string Title { get; init; }
+    [Parameter] public required string Description { get; init; }
+    [Parameter] public required string Target { get; init; }
+    [Inject] public required IConsoleNavigation Navigation { get; init; }
+}

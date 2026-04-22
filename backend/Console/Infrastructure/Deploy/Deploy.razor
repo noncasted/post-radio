@@ -1,0 +1,82 @@
+@page "/deploy"
+@using Cluster.Deploy
+@using global::Common.Reactive
+@inherits UiComponent
+
+<PageTitle>Deploy</PageTitle>
+<PageHeader Title="Deploy"/>
+
+<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-4">
+    <div class="rounded-lg border bg-card p-6 flex flex-col gap-4">
+        <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Current</h2>
+
+        <div class="flex flex-col gap-1 text-sm">
+            <div><span class="text-muted-foreground">Deploy id:</span> <span class="font-mono">@_currentDeployId</span></div>
+        </div>
+    </div>
+
+    <div class="rounded-lg border bg-card p-6 flex flex-col gap-4">
+        <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Cleanup</h2>
+
+        <div class="text-sm text-muted-foreground">
+            Removes persisted state records from previous deploys (deploy meta, service discovery, cluster features).
+            The current deploy is preserved.
+        </div>
+
+        <button class="btn btn-destructive self-start" disabled="@_isRunning" @onclick="RunCleanup">
+            @if (_isRunning)
+            {
+                <LucideIcon Name="loader-circle" Size="16" class="animate-spin mr-2"/>
+                <span>Cleaning...</span>
+            }
+            else
+            {
+                <span>Cleanup deploy states</span>
+            }
+        </button>
+
+        @if (_lastResult != null)
+        {
+            <div class="text-sm rounded border bg-muted/30 p-3">
+                Removed <b>@_lastResult.Removed</b> records across <b>@_lastResult.RemovedDeployIds.Count</b> deploys.
+                Kept: <span class="font-mono">@_lastResult.KeptDeployId</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] public IDeployContext DeployContext { get; set; } = null!;
+    [Inject] public IDeployCleanup DeployCleanup { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+
+    private Guid _currentDeployId = Guid.Empty;
+    private bool _isRunning;
+    private DeployCleanupResult? _lastResult;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        _currentDeployId = DeployContext.DeployId;
+        return Task.CompletedTask;
+    }
+
+    private async Task RunCleanup()
+    {
+        _isRunning = true;
+        _lastResult = null;
+
+        try
+        {
+            _lastResult = await DeployCleanup.Run();
+            ToastService.Success($"Removed {_lastResult.Removed} records", "Cleanup done");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[Deploy] Cleanup failed: {ex.Message}", "Error");
+        }
+        finally
+        {
+            _isRunning = false;
+        }
+    }
+}

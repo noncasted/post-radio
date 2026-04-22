@@ -1,0 +1,44 @@
+# Build artefacts
+**/bin/
+**/obj/
+**/out/
+**/.vs/
+**/.vscode/
+**/.idea/
+
+# Keep root ./publish/ — it is populated by tools/publish-local.sh and used by Dockerfile.prebuilt.
+# Nested publish folders (under projects) are already excluded by **/bin/.
+
+# Aspire publish artefacts
+**/aspire-output/
+
+# Unity client is not needed for backend images
+client/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# Docs / tasks
+docs/
+**/*.md
+
+# Editor state
+**/.DS_Store
+**/*.user
+**/*.userprefs
+**/*.swp
+**/*.swo
+
+# Tests (not referenced by production services)
+backend/Tools/Tests/
+
+# Local config
+**/appsettings.local.json
+**/launchSettings.json
+
+# Telemetry / logs
+.telemetry/
+**/*.log

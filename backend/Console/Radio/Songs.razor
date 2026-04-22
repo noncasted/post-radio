@@ -1,0 +1,132 @@
+@page "/songs"
+@using global::Common.Extensions
+@using global::Common.Reactive
+@using Meta.Audio
+@implements IDisposable
+
+<PageTitle>Songs</PageTitle>
+<PageHeader Title="Songs" />
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-4">
+    <div class="flex gap-2 items-center flex-wrap">
+        <span class="text-sm text-muted-foreground">@Collection.Count song(s)</span>
+        <div class="flex-1"></div>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadLookup">
+            <LucideIcon Name="download" Size="14" class="mr-1" />
+            <span>Load data from lookup</span>
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunSaveLookup">
+            <LucideIcon Name="save" Size="14" class="mr-1" />
+            <span>Save data to lookup</span>
+        </BbButton>
+        <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">Name</BbButton>
+        <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">Date</BbButton>
+        <BbButton Variant="@(_sortBy == SortBy.Invalid ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Invalid))">Invalid</BbButton>
+    </div>
+
+    @if (_busy || !string.IsNullOrEmpty(_log))
+    {
+        <div class="rounded-lg border bg-card p-3 flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-xs">
+                @if (_busy)
+                {
+                    <LucideIcon Name="loader" Size="14" class="animate-spin" />
+                }
+                <span class="text-muted-foreground">@_status</span>
+            </div>
+            @if (!string.IsNullOrEmpty(_log))
+            {
+                <pre class="rounded bg-muted p-2 text-xs font-mono max-h-48 overflow-auto whitespace-pre-wrap">@_log</pre>
+            }
+        </div>
+    }
+
+    <SongsList Source="@_sorted" ShowUrl="true" ShowDate="true" EmptyText="No songs yet" />
+</div>
+
+@code {
+    [Inject] public required ISongsCollection Collection { get; init; }
+    [Inject] public required ISongDataLookup Lookup { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    private SortBy _sortBy = SortBy.AddDate;
+    private List<KeyValuePair<long, SongState>> _sorted = new();
+
+    private bool _busy;
+    private string _status = string.Empty;
+    private string _log = string.Empty;
+
+    private enum SortBy { Name, AddDate, Invalid }
+
+    private Task RunSaveLookup() => RunOp("Saving", p => Lookup.Save(p));
+    private Task RunLoadLookup() => RunOp("Loading", p => Lookup.Load(p));
+
+    private async Task RunOp(string label, Func<IOperationProgress, Task> action)
+    {
+        _busy = true;
+        _status = label;
+        _log = string.Empty;
+        StateHasChanged();
+
+        var progress = new OperationProgress();
+        progress.Message.Advise(_lifetime, (_, msg) => {
+            _log += msg + "\n";
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await action(progress);
+            _status = progress.Status.Value.ToString();
+        }
+        catch (Exception ex)
+        {
+            _status = "Failed: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Reload();
+        Collection.Updated.Advise(_lifetime, () => InvokeAsync(() => { Reload(); StateHasChanged(); }));
+    }
+
+    private void Reload()
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            try
+            {
+                IEnumerable<KeyValuePair<long, SongState>> query = _sortBy switch
+                {
+                    SortBy.Name => Collection.OrderBy(kv => kv.Value.Name),
+                    SortBy.AddDate => Collection.OrderByDescending(kv => kv.Value.AddDate),
+                    SortBy.Invalid => Collection.Where(kv => string.IsNullOrWhiteSpace(kv.Value.Author)).OrderByDescending(kv => kv.Value.AddDate),
+                    _ => Collection
+                };
+
+                _sorted = query.ToList();
+                return;
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        _sorted = new List<KeyValuePair<long, SongState>>();
+    }
+
+    private void SetSort(SortBy sort)
+    {
+        _sortBy = sort;
+        Reload();
+    }
+
+    public void Dispose() => _lifetime.Terminate();
+}

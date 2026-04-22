@@ -1,0 +1,151 @@
+@page "/playlists/{PlaylistId:guid}"
+@using global::Common.Extensions
+@using global::Common.Reactive
+@using global::Meta.Audio
+@implements IDisposable
+
+<PageTitle>@_name</PageTitle>
+<PageHeader Title="@_name" />
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-4">
+    <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <div class="flex flex-col gap-1">
+            <div class="text-xs text-muted-foreground uppercase tracking-wide">Source</div>
+            <div class="text-sm font-mono break-all">@_url</div>
+            <div class="text-xs text-muted-foreground">
+                @_songs.Count song(s), @_loadedCount loaded, @(_songs.Count - _loadedCount) pending
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <BbButton Disabled="@_busy" @onclick="RunFetch">
+                @if (_busy && _currentOp == "fetch")
+                {
+                    <LucideIcon Name="loader" Size="16" class="mr-2 animate-spin" />
+                    <span>Fetching...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="list-plus" Size="16" class="mr-2" />
+                    <span>Fetch songs</span>
+                }
+            </BbButton>
+            <BbButton Disabled="@_busy" @onclick="RunLoad">
+                @if (_busy && _currentOp == "load")
+                {
+                    <LucideIcon Name="loader" Size="16" class="mr-2 animate-spin" />
+                    <span>Loading...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="cloud-download" Size="16" class="mr-2" />
+                    <span>Load audio</span>
+                }
+            </BbButton>
+            <span class="text-xs text-muted-foreground">@_status</span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_log))
+        {
+            <pre class="rounded bg-muted p-3 text-xs font-mono max-h-64 overflow-auto whitespace-pre-wrap">@_log</pre>
+        }
+    </div>
+
+    <SongsList Source="@_songs" ShowUrl="false" EmptyText="No songs loaded for this playlist yet" />
+</div>
+
+@code {
+    [Parameter] public Guid PlaylistId { get; set; }
+
+    [Inject] public required IPlaylistsCollection Playlists { get; init; }
+    [Inject] public required ISongsCollection Songs { get; init; }
+    [Inject] public required IPlaylistLoader Loader { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    private string _name = "Playlist";
+    private string _url = string.Empty;
+    private List<KeyValuePair<long, SongState>> _songs = new();
+    private int _loadedCount;
+
+    private bool _busy;
+    private string _currentOp = string.Empty;
+    private string _status = string.Empty;
+    private string _log = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        Reload();
+        Playlists.Updated.Advise(_lifetime, () => InvokeAsync(() => { Reload(); StateHasChanged(); }));
+        Songs.Updated.Advise(_lifetime, () => InvokeAsync(() => { Reload(); StateHasChanged(); }));
+    }
+
+    private void Reload()
+    {
+        if (Playlists.TryGetValue(PlaylistId, out var playlist))
+        {
+            _name = string.IsNullOrEmpty(playlist.Name) ? "Untitled" : playlist.Name;
+            _url = playlist.Url;
+        }
+
+        _songs = SafeSnapshot(Songs, kv => kv.Value.Playlists.Contains(PlaylistId));
+        _loadedCount = _songs.Count(kv => kv.Value.IsLoaded);
+    }
+
+    private Task RunFetch() => RunOp("fetch", (data, progress) => Loader.Fetch(data, progress));
+    private Task RunLoad() => RunOp("load", (data, progress) => Loader.Load(data, progress));
+
+    private async Task RunOp(string op, Func<PlaylistData, IOperationProgress, Task> action)
+    {
+        if (!Playlists.TryGetValue(PlaylistId, out var playlist))
+            return;
+
+        _busy = true;
+        _currentOp = op;
+        _status = "Running";
+        _log = string.Empty;
+        StateHasChanged();
+
+        var progress = new OperationProgress();
+        progress.Message.Advise(_lifetime, (_, msg) => {
+            _log += msg + "\n";
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            var data = new PlaylistData
+            {
+                Id = PlaylistId,
+                Url = playlist.Url,
+                Name = playlist.Name
+            };
+
+            await action(data, progress);
+            _status = progress.Status.Value.ToString();
+        }
+        catch (Exception ex)
+        {
+            _status = "Failed: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            _currentOp = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    private static List<KeyValuePair<long, SongState>> SafeSnapshot(
+        ISongsCollection source, Func<KeyValuePair<long, SongState>, bool> predicate)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            try { return source.Where(predicate).ToList(); }
+            catch (InvalidOperationException) { }
+        }
+        return new List<KeyValuePair<long, SongState>>();
+    }
+
+    public void Dispose() => _lifetime.Terminate();
+}

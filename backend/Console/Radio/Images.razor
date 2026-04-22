@@ -1,0 +1,33 @@
+@page "/images"
+@using global::Meta.Images
+
+<PageTitle>Images</PageTitle>
+<PageHeader Title="Images" />
+
+<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-4">
+    <div class="rounded-lg border bg-card p-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="rounded-md bg-primary/10 p-2.5">
+                <LucideIcon Name="image" Size="20" class="text-primary" />
+            </div>
+            <div>
+                <div class="text-sm font-semibold">Stored images</div>
+                <div class="text-xs text-muted-foreground">@Collection.Count file(s) in bucket</div>
+            </div>
+        </div>
+        <BbButton @onclick="RefreshImages">
+            <LucideIcon Name="refresh-cw" Size="16" class="mr-2" />
+            Refresh
+        </BbButton>
+    </div>
+</div>
+
+@code {
+    [Inject] public required IImagesCollection Collection { get; init; }
+
+    private async Task RefreshImages()
+    {
+        await Collection.Refresh();
+        StateHasChanged();
+    }
+}

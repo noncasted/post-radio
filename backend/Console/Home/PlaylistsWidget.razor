@@ -1,0 +1,51 @@
+@using global::Common.Reactive
+@using Meta.Audio
+@implements IDisposable
+
+<div class="flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold">Playlists</h2>
+        <span class="text-xs text-muted-foreground">@Collection.Count total</span>
+    </div>
+
+    <div class="rounded-lg border bg-card divide-y max-h-72 overflow-y-auto">
+        @foreach (var (id, state) in Collection)
+        {
+            <div class="p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/40"
+                 @onclick="@(() => NavigateToPlaylist(id))">
+                <span class="rounded-md bg-primary/10 p-2">
+                    <LucideIcon Name="list-music" Size="14" class="text-primary" />
+                </span>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate">@(string.IsNullOrEmpty(state.Name) ? "Untitled" : state.Name)</div>
+                    <div class="text-xs text-muted-foreground truncate">@state.Url</div>
+                </div>
+                <LucideIcon Name="chevron-right" Size="14" class="text-muted-foreground" />
+            </div>
+        }
+
+        @if (Collection.Count == 0)
+        {
+            <div class="text-center text-sm text-muted-foreground py-8">No playlists yet</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] public required IPlaylistsCollection Collection { get; init; }
+    [Inject] public required IConsoleNavigation Navigation { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    protected override void OnInitialized()
+    {
+        Collection.Updated.Advise(_lifetime, () => InvokeAsync(StateHasChanged));
+    }
+
+    private void NavigateToPlaylist(Guid id)
+    {
+        Navigation.NavigateTo(string.Format(ConsoleConstants.Pages.PlaylistDetail, id));
+    }
+
+    public void Dispose() => _lifetime.Terminate();
+}

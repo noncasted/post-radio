@@ -1,8 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <AssemblyName>Infrastructure.Loop.ServiceLoop</AssemblyName>
-        <RootNamespace>Infrastructure.Loop</RootNamespace>
-    </PropertyGroup>
-
-</Project>

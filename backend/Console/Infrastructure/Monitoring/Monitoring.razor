@@ -1,0 +1,144 @@
+@page "/monitoring"
+@using Console.Infrastructure.Monitoring
+
+<PageTitle>Monitoring</PageTitle>
+<PageHeader Title="Monitoring"/>
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-6">
+
+    <div class="rounded-lg border bg-card p-6 flex flex-col gap-4">
+        <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Heap Snapshots</h2>
+
+        <div class="text-sm text-muted-foreground">
+            Reports are written to <span class="font-mono text-xs">@Storage.Directory</span>.
+        </div>
+
+        <div class="flex flex-col gap-4">
+            <div class="flex items-start gap-4">
+                <div class="min-w-[180px]">
+                    <BbButton Disabled="@_isCollecting" @onclick="CollectQuick">
+                        @(_isCollecting && !_lastWasDeep ? "Collecting..." : "Quick collect")
+                    </BbButton>
+                </div>
+                <div class="text-xs text-muted-foreground pt-2">
+                    GC stats only (WorkingSet, Gen0-POH, GC totals). Safe to run on live cluster, ~milliseconds per service.
+                </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+                <div class="min-w-[180px]">
+                    <BbButton Variant="ButtonVariant.Destructive" Disabled="@_isCollecting" @onclick="ConfirmDeep">
+                        @(_isCollecting && _lastWasDeep ? "Collecting..." : "Dead ass collect")
+                    </BbButton>
+                </div>
+                <div class="text-xs text-muted-foreground pt-2">
+                    Full ClrMD heap walk on every service — top-150 types by bytes.
+                    <strong class="text-destructive">WILL crash the cluster</strong>: fork stalls Orleans silos and breaks socket pools.
+                    Only run when a redeploy is acceptable immediately after.
+                </div>
+            </div>
+        </div>
+
+        @if (_error != null)
+        {
+            <div class="text-sm text-destructive rounded border border-destructive/30 bg-destructive/10 p-3">@_error</div>
+        }
+    </div>
+
+    @if (_reports.Count > 0)
+    {
+        <div class="rounded-lg border">
+            <table class="w-full text-sm">
+                <thead>
+                <tr class="border-b bg-muted/50">
+                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Timestamp (UTC)</th>
+                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">File</th>
+                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Size</th>
+                    <th class="h-10 px-4 text-left font-medium text-muted-foreground"></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var report in _reports)
+                {
+                    <tr class="border-b last:border-b-0 hover:bg-muted/30">
+                        <td class="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">@report.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="px-4 py-2.5 text-xs font-mono">@report.FileName</td>
+                        <td class="px-4 py-2.5 text-xs font-mono">@HeapReportFormatter.FormatBytes(report.SizeBytes)</td>
+                        <td class="px-4 py-2.5 text-xs">
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" @onclick="() => Download(report)">
+                                Download
+                            </BbButton>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (!_isCollecting)
+    {
+        <div class="text-sm text-muted-foreground text-center py-8">
+            No reports yet. Click <strong>Quick collect</strong> to take safe snapshots.
+        </div>
+    }
+
+</div>
+
+@code {
+    [Inject] public HeapReportCollector Collector { get; set; } = null!;
+    [Inject] public IHeapReportStorage Storage { get; set; } = null!;
+    [Inject] public IJSRuntime JS { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+
+    private IReadOnlyList<HeapReport> _reports = [];
+    private bool _isCollecting;
+    private bool _lastWasDeep;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _reports = Storage.List();
+    }
+
+    private Task CollectQuick() => Run(deep: false);
+
+    private async Task ConfirmDeep()
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            "Deep collect will likely crash the cluster (fork stalls Orleans silos and breaks socket pools). " +
+            "Continue only if a redeploy immediately after is acceptable.");
+
+        if (confirmed)
+            await Run(deep: true);
+    }
+
+    private async Task Run(bool deep)
+    {
+        _isCollecting = true;
+        _lastWasDeep = deep;
+        _error = null;
+
+        try
+        {
+            await Collector.CollectAll(deep);
+            _reports = Storage.List();
+            ToastService.Success(deep ? "Deep snapshots collected" : "Snapshots collected from all services", "Done");
+        }
+        catch (Exception ex)
+        {
+            _error = $"[HeapReport] Collection failed: {ex.Message}";
+            ToastService.Error(_error, "Error");
+        }
+        finally
+        {
+            _isCollecting = false;
+        }
+    }
+
+    private async Task Download(HeapReport report)
+    {
+        var bytes = Storage.ReadBytes(report.FileName);
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFileFromBase64", report.FileName, base64, "text/plain;charset=utf-8");
+    }
+}

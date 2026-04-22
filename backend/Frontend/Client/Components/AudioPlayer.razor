@@ -1,0 +1,133 @@
+@using Frontend.Client.Services
+@using Frontend.Shared
+@inject IJSRuntime Js
+@inject IRadioApi Api
+@implements IDisposable
+
+<audio id="audio" src="@_audioUrl"></audio>
+
+<script>
+    window.audioHelper = {
+        setAudioElement: (dotnetHelper) => {
+            const audio = document.getElementById("audio");
+            audio.ontimeupdate = () => {
+                if (audio.currentTime == null || isNaN(audio.currentTime)) return;
+                if (audio.duration == null || isNaN(audio.duration)) return;
+                dotnetHelper.invokeMethodAsync("OnAudioProgress", audio.currentTime, audio.duration);
+            };
+        },
+    };
+
+    async function play() {
+        const audio = document.getElementById("audio");
+        audio.currentTime = 0;
+        try { await audio.play(); } catch (e) {
+            if (e.name !== 'AbortError') console.error("play error:", e);
+        }
+    }
+
+    function stop() {
+        const audio = document.getElementById("audio");
+        audio.pause();
+        audio.currentTime = 0;
+    }
+
+    function setVolume(v) { document.getElementById("audio").volume = v; }
+</script>
+
+@code {
+    [Parameter] public required SessionState State { get; set; }
+
+    private const double StartOverTime = 1;
+
+    private string _audioUrl = string.Empty;
+    private DateTime _lastTimeUpdate;
+    private DotNetObjectReference<AudioPlayer>? _dotNetRef;
+
+    protected override void OnInitialized()
+    {
+        State.Started += () => _ = Loop();
+        State.SkipRequested += () => _ = SetNext();
+        State.PlaylistChanged += () => _ = SetNext();
+        State.VolumeChanged += () => _ = OnVolumeChanged(State.Volume);
+    }
+
+    private async Task Loop()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        var updateTimeSpan = TimeSpan.FromSeconds(10);
+
+        await Js.InvokeVoidAsync("audioHelper.setAudioElement", _dotNetRef);
+        await OnVolumeChanged(State.Volume);
+
+        while (!State.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("stop");
+                var url = _audioUrl;
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(100, State.Token);
+                await Js.InvokeVoidAsync("play");
+
+                while (Check())
+                    await Task.Delay(500, State.Token);
+
+                if (_audioUrl == url)
+                    await SetNext();
+
+                bool Check()
+                {
+                    if (_audioUrl != url) return false;
+                    if (DateTime.UtcNow - _lastTimeUpdate >= updateTimeSpan) return false;
+                    return !State.Token.IsCancellationRequested;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                try { await Task.Delay(TimeSpan.FromSeconds(5), State.Token); _ = SetNext(); }
+                catch (OperationCanceledException) { return; }
+            }
+        }
+    }
+
+    private async Task OnVolumeChanged(double value)
+    {
+        var ratio = Math.Clamp(value / 100, 0, 1);
+        var options = State.Options;
+        var volume = options.MinVolume + ratio * (options.MaxVolume - options.MinVolume);
+        await Js.InvokeVoidAsync("setVolume", Math.Clamp(volume, 0, 1));
+    }
+
+    [JSInvokable]
+    public void OnAudioProgress(double currentTime, double duration)
+    {
+        _lastTimeUpdate = DateTime.UtcNow;
+        var diff = duration - currentTime;
+        if (diff < StartOverTime)
+            _ = SetNext();
+    }
+
+    private async Task SetNext()
+    {
+        var song = State.IncSongIndex();
+        State.SetCurrentSong(song);
+
+        if (song == null)
+        {
+            _audioUrl = string.Empty;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _audioUrl = await Api.GetSongStreamUrl(song.Id);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => _dotNetRef?.Dispose();
+}

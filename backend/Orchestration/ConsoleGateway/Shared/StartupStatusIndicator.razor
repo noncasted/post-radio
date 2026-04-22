@@ -1,0 +1,40 @@
+@using Common.Extensions
+@using Common.Reactive
+@using Infrastructure.Startup
+@using UiComponent = Console.UiComponent
+@inherits UiComponent
+
+<button class="flex items-center gap-1.5 text-sm rounded-md px-2 py-1 hover:bg-muted transition-colors" @onclick="OnClick" title="@(_isInitialized ? "Server ready" : _currentStageName)">
+    @if (_isInitialized) {
+        <LucideIcon Name="circle-check" Size="16" class="text-green-500"/>
+        <span class="hidden lg:inline text-green-500">Ready</span>
+    }
+    else {
+        <LucideIcon Name="loader-circle" Size="16" class="animate-spin text-primary"/>
+        <span class="hidden lg:inline max-w-[160px] truncate text-primary">@_currentStageName</span>
+    }
+</button>
+
+@code {
+    [Inject] public IClusterParticipantContext ClusterParticipantContext { get; set; } = null!;
+
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private bool _isInitialized;
+    private string _currentStageName = "Starting...";
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime) {
+        ClusterParticipantContext.IsInitialized.View(lifetime, value => {
+            _isInitialized = value;
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        ClusterParticipantContext.CurrentStageIndex.View(lifetime, index => {
+            var stages = ClusterParticipantContext.Stages;
+            _currentStageName = index < stages.Count ? stages[index] : "Starting...";
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        return Task.CompletedTask;
+    }
+}

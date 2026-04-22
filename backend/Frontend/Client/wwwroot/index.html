@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Post Radio</title>
+    <base href="/" />
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0f; color: #e8e8ef; font-family: system-ui, -apple-system, sans-serif; }
+        #app { min-height: 100%; }
+        .splash {
+            position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 1.25rem;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 70%);
+        }
+        .splash .ring {
+            width: 64px; height: 64px; border-radius: 50%;
+            border: 3px solid rgba(120, 120, 220, 0.15);
+            border-top-color: #7a7aff;
+            animation: splash-spin 900ms linear infinite;
+        }
+        .splash .title {
+            font-size: 1.1rem; letter-spacing: 0.25em; text-transform: uppercase;
+            color: #a8a8c8; opacity: 0.85;
+            animation: splash-pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes splash-spin { to { transform: rotate(360deg); } }
+        @keyframes splash-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        #blazor-error-ui {
+            background: lightyellow;
+            bottom: 0;
+            box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+            display: none;
+            left: 0;
+            padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+            position: fixed;
+            width: 100%;
+            z-index: 1000;
+        }
+        #blazor-error-ui .dismiss {
+            cursor: pointer;
+            position: absolute;
+            right: 0.75rem;
+            top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+    <div class="splash">
+        <div class="ring"></div>
+        <div class="title">Post Radio</div>
+    </div>
+</div>
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script>
+        (function () {
+            var HIDE_MS = 5000;
+            var timer = null;
+            function show() {
+                document.body.classList.remove('controls-hidden');
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(function () {
+                    document.body.classList.add('controls-hidden');
+                }, HIDE_MS);
+            }
+            window.addEventListener('mousemove', show, { passive: true });
+            window.addEventListener('touchstart', show, { passive: true });
+            window.addEventListener('keydown', show);
+            show();
+        })();
+    </script>
+</body>
+</html>

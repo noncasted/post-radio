@@ -1,0 +1,16 @@
+<div class="rounded-lg border bg-card p-3 flex items-center justify-between">
+    <span class="text-sm font-medium">@Label</span>
+    @if (Value)
+    {
+        <LucideIcon Name="check" Size="16" class="text-green-500" />
+    }
+    else
+    {
+        <LucideIcon Name="x" Size="16" class="text-red-500" />
+    }
+</div>
+
+@code {
+    [Parameter] public required string Label { get; init; }
+    [Parameter] public required bool Value { get; init; }
+}

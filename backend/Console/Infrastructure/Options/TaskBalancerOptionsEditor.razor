@@ -1,0 +1,45 @@
+@using global::Infrastructure.Execution
+<div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+    <div class="flex items-center gap-2">
+        <div class="rounded-md bg-violet-500/15 p-1.5">
+            <LucideIcon Name="gauge" Size="14" class="text-violet-400" />
+        </div>
+        <h2 class="text-sm font-semibold">Task Balancer</h2>
+    </div>
+    <div class="flex flex-col">
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="timer" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Empty Queue Delay (ms)</span>
+            <input type="number" @bind="Value.EmptyDelayMs"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="skip-forward" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Next Task Delay (ms)</span>
+            <input type="number" @bind="Value.NextDelayMs"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="plus" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Iteration Score</span>
+            <input type="number" @bind="Value.IterationScore"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="minus" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Exception Penalty</span>
+            <input type="number" @bind="Value.ExceptionPenalty"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5">
+            <LucideIcon Name="layers" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Concurrent Tasks</span>
+            <input type="number" @bind="Value.ConcurrentTasks"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TaskBalancerOptions Value { get; set; } = null!;
+}

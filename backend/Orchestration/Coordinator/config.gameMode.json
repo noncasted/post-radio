@@ -1,0 +1,22 @@
+{
+  "$type": "Shared.GameModeOptions, Shared",
+  "LastManStanding": {
+    "$type": "Shared.LastManStandingModeOptions, Shared",
+    "PlayerHealth": 3,
+    "PlayerMoves": 5,
+    "PlayerStartMana": 1,
+    "HandSize": 5,
+    "DeckSize": 10,
+    "RoundTime": 30
+  },
+  "TimeLimited": {
+    "$type": "Shared.TimeLimitedModeOptions, Shared",
+    "PlayerHealth": 3,
+    "PlayerMoves": 5,
+    "PlayerStartMana": 1,
+    "HandSize": 5,
+    "DeckSize": 10,
+    "RoundTime": 120,
+    "TimeGainPerAction": 5
+  }
+}

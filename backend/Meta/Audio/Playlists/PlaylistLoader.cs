@@ -43,26 +43,10 @@ public class PlaylistLoader : IPlaylistLoader
         progress.SetStatus(OperationStatus.InProgress);
         progress.Log("Fetching playlist tracks...");
 
-        _logger.LogInformation(
-            "[Audio] [Playlist] Fetch start. Url='{Url}', SoundCloudClient.ClientId='{ClientId}'",
-            playlist.Url,
-            _soundCloud.ClientId ?? "<null>");
-
         var tracks = new List<SoundCloudExplode.Tracks.Track>();
 
-        try
-        {
-            await foreach (var track in _soundCloud.Playlists.GetTracksAsync(playlist.Url))
-                tracks.Add(track);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e,
-                "[Audio] [Playlist] Fetch FAILED at GetTracksAsync. Url='{Url}', ClientId='{ClientId}'. " +
-                "If this is a 401 after a proxy is configured, the tunnel is probably up but the extracted ClientId is stale — the SoundCloudClient was likely initialised before the proxy was applied, or a prior init grabbed a bad client_id.",
-                playlist.Url, _soundCloud.ClientId ?? "<null>");
-            throw;
-        }
+        await foreach (var track in _soundCloud.Playlists.GetTracksAsync(playlist.Url))
+            tracks.Add(track);
 
         progress.Log($"Received {tracks.Count} tracks from playlist.");
 

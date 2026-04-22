@@ -12,6 +12,7 @@
 /backend/**/[Oo]bj/
 /backend/Orchestration/Aspire/appsettings.local.json
 .telemetry/
+/images-dump/
 /publish/
 /backend/Tools/deploy/.env.local
 .env.local
@@ -115,7 +116,3 @@ ExportedObj/
 /client/.idea/
 /backend/.idea/
 .omc/
-
-# Deploy/tunnel secrets
-**/secrets.local.json
-**/secrets/

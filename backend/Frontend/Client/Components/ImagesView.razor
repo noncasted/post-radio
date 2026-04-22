@@ -1,0 +1,102 @@
+@using Frontend.Client.Services
+@inject IRadioApi Api
+
+<div class="image-container">
+    <img style="position: fixed; left: 0; z-index: -1" src="@_first.Url" class="@($"{_first.State} blurry sub")" />
+    <img style="position: fixed; left: 50%; z-index: -1" src="@_first.Url" class="@($"{_first.State} blurry sub")" />
+    <img style="z-index: 1" src="@_first.Url" class="@($"{_first.State} main")" />
+    <img style="position: fixed; left: 0; z-index: -1" src="@_second.Url" class="@($"{_second.State} blurry sub")" />
+    <img style="position: fixed; left: 50%; z-index: -1" src="@_second.Url" class="@($"{_second.State} blurry sub")" />
+    <img style="z-index: 1" src="@_second.Url" class="@($"{_second.State} main")" />
+</div>
+
+<style>
+    .image-container {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #0a0a14;
+    }
+    .image {
+        position: absolute;
+        object-fit: cover;
+        object-position: center;
+        transition: opacity @(_fadeSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))s ease-in-out;
+    }
+    .sub { height: 100%; width: 50%; }
+    .main { height: 115%; }
+    .hidden { opacity: 0; }
+    .visible { opacity: 1; }
+    .blurry { filter: blur(18px); }
+</style>
+
+@code {
+    [Parameter] public required SessionState State { get; set; }
+
+    private readonly ImageHandle _first = new();
+    private readonly ImageHandle _second = new();
+    private int _totalImages;
+    private double _fadeSeconds = 1.0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _fadeSeconds = State.Options.ImageFadeMs / 1000.0;
+        State.OptionsChanged += OnOptionsChanged;
+        _totalImages = await Api.GetImagesCount();
+        _ = Cycle();
+    }
+
+    private void OnOptionsChanged()
+    {
+        _fadeSeconds = State.Options.ImageFadeMs / 1000.0;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Cycle()
+    {
+        var current = _first;
+
+        while (!State.Token.IsCancellationRequested)
+        {
+            try
+            {
+                if (_totalImages == 0)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), State.Token);
+                    _totalImages = await Api.GetImagesCount();
+                    continue;
+                }
+
+                current.Hide();
+                current = current == _first ? _second : _first;
+                var index = State.IncImageIndex(_totalImages);
+                current.Url = await Api.GetImageUrl(index);
+                current.Show();
+
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(TimeSpan.FromMilliseconds(State.Options.ImageSwitchIntervalMs), State.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception)
+            {
+                try { await Task.Delay(TimeSpan.FromSeconds(1), State.Token); }
+                catch (OperationCanceledException) { return; }
+            }
+        }
+    }
+
+    public class ImageHandle
+    {
+        public string State { get; private set; } = "image fade-in hidden";
+        public string Url { get; set; } = string.Empty;
+        public void Show() => State = "image fade-in visible";
+        public void Hide() => State = "image fade-in hidden";
+    }
+}

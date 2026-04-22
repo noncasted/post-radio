@@ -1,0 +1,45 @@
+@using global::Infrastructure
+<div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+    <div class="flex items-center gap-2">
+        <div class="rounded-md bg-orange-500/15 p-1.5">
+            <LucideIcon Name="zap" Size="14" class="text-orange-400" />
+        </div>
+        <h2 class="text-sm font-semibold">Side Effects</h2>
+    </div>
+    <div class="flex flex-col">
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="timer" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Scan Delay (ms)</span>
+            <input type="number" @bind="Value.ScanDelay"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="timer" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Empty Scan Delay (ms)</span>
+            <input type="number" @bind="Value.EmptyScanDelay"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="layers" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Concurrent Executions</span>
+            <input type="number" @bind="Value.ConcurrentExecutions"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5 border-b border-border/60">
+            <LucideIcon Name="refresh-cw" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Max Retry Count</span>
+            <input type="number" @bind="Value.MaxRetryCount"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+        <div class="flex items-center gap-3 py-1.5">
+            <LucideIcon Name="clock" Size="12" class="text-muted-foreground shrink-0" />
+            <span class="text-sm flex-1">Incremental Retry Delay (sec × retry)</span>
+            <input type="number" @bind="Value.IncrementalRetryDelay" step="0.5"
+                   class="w-24 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SideEffectsOptions Value { get; set; } = null!;
+}

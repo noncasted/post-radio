@@ -1,0 +1,37 @@
+@using Frontend.Client.Services
+
+@if (!_started)
+{
+    <button class="start-btn" @onclick="StartFromClick">Play</button>
+}
+
+<style>
+    .start-btn {
+        position: fixed;
+        left: 50%; top: 50%;
+        transform: translate(-50%, -50%);
+        height: 70px; width: 300px;
+        font-size: 2rem;
+        background: #7e6fff;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        z-index: 100;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+    .start-btn:hover { background: #6a5cff; }
+</style>
+
+@code {
+    [Parameter] public required SessionState State { get; set; }
+
+    private bool _started;
+
+    private Task StartFromClick()
+    {
+        _started = true;
+        State.InvokeStart();
+        return InvokeAsync(StateHasChanged);
+    }
+}

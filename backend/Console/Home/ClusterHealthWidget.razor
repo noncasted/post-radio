@@ -1,0 +1,95 @@
+@using Cluster.Discovery
+@using global::Common.Extensions
+@using global::Common.Reactive
+@inherits UiComponent
+
+<div class="flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold">Cluster</h2>
+        <span class="text-xs text-muted-foreground">@_services.Count services</span>
+    </div>
+
+    <div class="grid grid-cols-5 gap-2">
+        @foreach (var tag in _tagOrder)
+        {
+            var count = _grouped.GetValueOrDefault(tag, 0);
+            var status = GetTagStatus(tag);
+
+            <div class="rounded-lg border p-3 flex flex-col items-center gap-1">
+                <div class="rounded-md @(StatusBg(status)) p-1.5">
+                    <LucideIcon Name="@TagIcon(tag)" Size="14" class="@(StatusText(status))"/>
+                </div>
+                <span class="text-xs font-medium">@tag</span>
+                <span class="text-lg font-bold">@count</span>
+            </div>
+        }
+    </div>
+
+    @if (_staleServices.Count > 0)
+    {
+        <div class="text-xs text-amber-500">
+            @_staleServices.Count stale service(s) detected
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] public IServiceDiscovery ServiceDiscovery { get; set; } = null!;
+
+    private static readonly ServiceTag[] _tagOrder =
+        [ServiceTag.Coordinator, ServiceTag.Meta, ServiceTag.Silo, ServiceTag.Console];
+
+    private IReadOnlyList<IServiceOverview> _services = [];
+    private Dictionary<ServiceTag, int> _grouped = new();
+    private List<IServiceOverview> _staleServices = new();
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        RefreshLoop(lifetime).NoAwait();
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshLoop(IReadOnlyLifetime lifetime)
+    {
+        while (lifetime.IsTerminated == false)
+        {
+            Refresh();
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(5000, lifetime.Token);
+        }
+    }
+
+    private void Refresh()
+    {
+        _services = ServiceDiscovery.Entries.Values.ToList();
+        _grouped = _services.GroupBy(s => s.Tag).ToDictionary(g => g.Key, g => g.Count());
+        _staleServices = _services.Where(s => DateTime.UtcNow - s.UpdateTime > TimeSpan.FromSeconds(20)).ToList();
+    }
+
+    private string GetTagStatus(ServiceTag tag)
+    {
+        if (!_grouped.ContainsKey(tag) || _grouped[tag] == 0) return "inactive";
+        if (_services.Any(s => s.Tag == tag && DateTime.UtcNow - s.UpdateTime > TimeSpan.FromSeconds(20))) return "warning";
+        return "healthy";
+    }
+
+    private static string TagIcon(ServiceTag tag) => tag switch {
+        ServiceTag.Coordinator => "crown",
+        ServiceTag.Meta => "users",
+        ServiceTag.Silo => "database",
+        ServiceTag.Console => "monitor",
+        _ => "circle"
+    };
+
+    private static string StatusBg(string status) => status switch {
+        "healthy" => "bg-green-500/15",
+        "warning" => "bg-amber-500/15",
+        _ => "bg-muted"
+    };
+
+    private static string StatusText(string status) => status switch {
+        "healthy" => "text-green-400",
+        "warning" => "text-amber-400",
+        _ => "text-muted-foreground"
+    };
+}

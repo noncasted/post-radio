@@ -1,0 +1,39 @@
+@using global::Common.Extensions
+@using global::Common.Reactive
+@using global::Infrastructure.Startup
+@inherits UiComponent
+
+<div class="rounded-lg border bg-card p-3 flex items-center justify-between">
+    <span class="text-sm font-medium">Server</span>
+    @if (_isInitialized) {
+        <LucideIcon Name="check" Size="16" class="text-green-500"/>
+    }
+    else {
+        <div class="flex items-center gap-1.5">
+            <span class="text-xs text-muted-foreground truncate max-w-[100px]">@_currentStageName</span>
+            <LucideIcon Name="loader-circle" Size="16" class="animate-spin text-primary"/>
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] public IClusterParticipantContext ClusterParticipantContext { get; set; } = null!;
+
+    private bool _isInitialized;
+    private string _currentStageName = "Starting...";
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime) {
+        ClusterParticipantContext.IsInitialized.View(lifetime, value => {
+            _isInitialized = value;
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        ClusterParticipantContext.CurrentStageIndex.View(lifetime, index => {
+            var stages = ClusterParticipantContext.Stages;
+            _currentStageName = index < stages.Count ? stages[index] : "Starting...";
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        return Task.CompletedTask;
+    }
+}

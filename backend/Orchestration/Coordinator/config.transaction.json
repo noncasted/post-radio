@@ -1,0 +1,5 @@
+{
+  "$type": "Infrastructure.TransactionOptions, Infrastructure",
+  "LockWaitSeconds": 3.0,
+  "StuckGraceSeconds": 30.0
+}

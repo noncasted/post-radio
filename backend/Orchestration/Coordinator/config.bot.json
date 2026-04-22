@@ -1,0 +1,8 @@
+{
+  "$type": "Shared.BotConfigOptions, Shared",
+  "MatchmakingApplyThreshold": 3.0,
+  "ActionDelay": 0.3,
+  "FlagsPerRound": 3,
+  "CellsOpenPerRound": 3,
+  "CardsUsePerRound": 2
+}

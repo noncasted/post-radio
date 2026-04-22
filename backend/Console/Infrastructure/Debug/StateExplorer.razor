@@ -1,0 +1,256 @@
+@page "/debug/state"
+@using System.Text.Json
+@using global::Common
+@using global::Infrastructure.State
+
+<PageTitle>State Explorer</PageTitle>
+<PageHeader Title="State Explorer"/>
+
+<div class="container mx-auto max-w-4xl px-4 py-4 flex flex-col gap-6">
+
+    <div class="rounded-lg border bg-card p-6 flex flex-col gap-4">
+        <div class="flex gap-4 items-end">
+            <div class="flex flex-col gap-1.5 flex-1 relative" @onfocusout="OnDropdownFocusOut" tabindex="-1">
+                <label class="text-xs font-medium text-muted-foreground">State Type</label>
+                <div class="relative">
+                    <input type="text"
+                           @bind:get="_searchText"
+                           @bind:set="OnSearchChanged"
+                           @onfocusin="() => _dropdownOpen = true"
+                           placeholder="Search state type..."
+                           class="h-9 w-full rounded-md border border-input bg-transparent px-3 pr-8 text-sm shadow-sm"/>
+                    <div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <LucideIcon Name="chevron-down" Size="14" class="text-muted-foreground"/>
+                    </div>
+                </div>
+
+                @if (_dropdownOpen)
+                {
+                    <div class="absolute top-full left-0 right-0 z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-popover shadow-lg">
+                        @if (_filteredGroups.Count == 0)
+                        {
+                            <div class="px-3 py-4 text-center text-xs text-muted-foreground">No matches</div>
+                        }
+                        else
+                        {
+                            @foreach (var group in _filteredGroups)
+                            {
+                                <div class="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider sticky top-0 bg-popover border-b">
+                                    @group.Key
+                                </div>
+                                @foreach (var info in group.Items)
+                                {
+                                    var isSelected = info.TableName == _selectedTable;
+                                    <div class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent @(isSelected ? "bg-accent" : "")"
+                                         @onclick="() => SelectState(info)">
+                                        <span class="flex-1">@info.Name</span>
+                                        <span class="text-[10px] text-muted-foreground">@info.KeyType</span>
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="flex flex-col gap-1.5 flex-1">
+                <label class="text-xs font-medium text-muted-foreground">Grain Key</label>
+                <input type="text" @bind="_grainKey" placeholder="GUID or string key..."
+                       class="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"/>
+            </div>
+
+            <BbButton @onclick="Load" Disabled="@(_isLoading || string.IsNullOrEmpty(_selectedTable) || string.IsNullOrEmpty(_grainKey))">
+                <LucideIcon Name="search" Size="16" class="mr-2"/>
+                Load
+            </BbButton>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="flex items-center justify-center py-16">
+            <LucideIcon Name="loader-circle" Size="32" class="animate-spin text-primary"/>
+        </div>
+        return;
+    }
+
+    @if (_notFound)
+    {
+        <BbAlert Variant="AlertVariant.Warning">
+            <ChildContent>
+                <BbAlertTitle>Not Found</BbAlertTitle>
+                <BbAlertDescription>No state found for key "@_grainKey" in table "@_selectedTable"</BbAlertDescription>
+            </ChildContent>
+        </BbAlert>
+        return;
+    }
+
+    @if (_json != null)
+    {
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Result</h2>
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" @onclick="CopyJson">
+                    <LucideIcon Name="copy" Size="14" class="mr-1"/>
+                    Copy
+                </BbButton>
+            </div>
+            <div class="rounded-lg border bg-muted/30 p-4 overflow-auto max-h-[600px]">
+                <pre class="text-xs font-mono whitespace-pre-wrap break-all">@_json</pre>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [Inject] public IStateStorage Storage { get; set; } = null!;
+    [Inject] public ToastService ToastService { get; set; } = null!;
+    [Inject] public IJSRuntime JS { get; set; } = null!;
+
+    private IReadOnlyList<GrainStateInfo> _stateTypes = [];
+    private string _selectedTable = string.Empty;
+    private string _grainKey = string.Empty;
+    private string? _json;
+    private bool _isLoading;
+    private bool _notFound;
+    private bool _dropdownOpen;
+    private string _searchText = string.Empty;
+    private List<StateGroup> _filteredGroups = [];
+
+    private record StateGroup(string Key, List<GrainStateInfo> Items);
+
+    protected override void OnInitialized()
+    {
+        _stateTypes = Storage.Registry.All.OrderBy(s => s.Name).ToList();
+        UpdateFilteredGroups();
+    }
+
+    private void OnSearchChanged(string? value)
+    {
+        _searchText = value ?? string.Empty;
+        _dropdownOpen = true;
+        UpdateFilteredGroups();
+    }
+
+    private void UpdateFilteredGroups()
+    {
+        var filtered = string.IsNullOrWhiteSpace(_searchText)
+            ? _stateTypes
+            : _stateTypes.Where(s => s.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        _filteredGroups = filtered
+            .GroupBy(s => s.KeyType.ToString())
+            .OrderBy(g => g.Key)
+            .Select(g => new StateGroup(g.Key, g.OrderBy(s => s.Name).ToList()))
+            .ToList();
+    }
+
+    private void SelectState(GrainStateInfo info)
+    {
+        _selectedTable = info.TableName;
+        _searchText = $"{info.Name} ({info.KeyType})";
+        _dropdownOpen = false;
+    }
+
+    private void OnDropdownFocusOut()
+    {
+        Task.Delay(150).ContinueWith(_ => InvokeAsync(() => {
+            _dropdownOpen = false;
+            StateHasChanged();
+        }));
+    }
+
+    private async Task Load()
+    {
+        _isLoading = true;
+        _json = null;
+        _notFound = false;
+
+        try
+        {
+            var info = _stateTypes.FirstOrDefault(s => s.TableName == _selectedTable);
+            if (info == null)
+            {
+                ToastService.Error("Unknown state type", "Error");
+                return;
+            }
+
+            object key;
+            switch (info.KeyType)
+            {
+                case GrainKeyType.Guid or GrainKeyType.GuidAndString:
+                    if (!Guid.TryParse(_grainKey, out var guidKey))
+                    {
+                        ToastService.Error("Invalid GUID format", "Error");
+                        return;
+                    }
+                    key = guidKey;
+                    break;
+                case GrainKeyType.String:
+                    key = _grainKey;
+                    break;
+                case GrainKeyType.Integer or GrainKeyType.IntegerAndString:
+                    if (!long.TryParse(_grainKey, out var longKey))
+                    {
+                        ToastService.Error("Invalid integer format", "Error");
+                        return;
+                    }
+                    key = longKey;
+                    break;
+                default:
+                    ToastService.Error($"Unsupported key type: {info.KeyType}", "Error");
+                    return;
+            }
+
+            var identity = new StateIdentity
+            {
+                Key = key,
+                Type = info.Name,
+                Extension = null,
+                TableName = info.TableName
+            };
+
+            var raw = await Storage.ReadRawJson(identity);
+
+            if (string.IsNullOrEmpty(raw))
+            {
+                _notFound = true;
+            }
+            else
+            {
+                _json = FormatJson(raw);
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"[StateExplorer] {ex.Message}", "Error");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CopyJson()
+    {
+        if (_json != null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _json);
+            ToastService.Success("Copied to clipboard", "Done");
+        }
+    }
+
+    private static string FormatJson(string json)
+    {
+        try
+        {
+            var element = JsonSerializer.Deserialize<JsonElement>(json);
+            return JsonSerializer.Serialize(element, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+}

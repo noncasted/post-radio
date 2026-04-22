@@ -120,3 +120,16 @@ SC доступен).
 | `backend/Tools/deploy/README.md` | **новый файл** |
 | `backend/Tools/deploy/secrets/awg_config` | **новый файл** (gitignored), AmneziaWG client config |
 | `.gitignore` | добавлены паттерны `**/secrets.local.json`, `**/secrets/` |
+
+### 20:10 Начало отката tunneling-изменений
+Продолжаю существующий workflow. Проверил `_info.md` и текущие grep-находки: tunnel-код локализован в `backend/Meta/Audio/*`, `backend/Orchestration/Aspire/Program.cs`, `backend/Tools/deploy/*`, `backend/Tools/DeploySetup/secrets.local.json` и добавленных строках `.gitignore`.
+Решение: откатывать точечно через редактирование/удаление tunnel-артефактов, не делать `git reset`/массовый checkout, потому что в рабочем дереве есть большая незакоммиченная миграция в `backend/`.
+
+### 20:12 Локальный cleanup tunnel-артефактов
+Удалил ручной `Socks5ConnectCallback`, весь `backend/Tools/deploy/` с `sc-tunnel`/compose/secrets и `backend/Tools/DeploySetup/secrets.local.json` с tunnel-кредами. В коде убрал диагностические логи/форвардинг `Audio__Socks5Proxy` через Aspire; `Audio.Socks5Proxy` оставлен как null-by-default аварийный выключатель без sidecar-завязок.
+
+### 20:13 Проверка после отката
+Запустил `dotnet build backend/post-radio.slnx --no-restore`: сборка успешна, 0 ошибок. Осталось существующее предупреждение `CS4014` в `backend/Meta/Images/ImagesCollection.cs(41,9)`, не связано с tunnel-откатом.
+
+### 20:14 Итог зафиксирован
+Заполнил `soundcloud-tunnel_result.md`: локальный репозиторий очищен от tunnel-кода и tunnel-deploy артефактов. Внешняя VPS/Amnezia очистка оставлена отдельным нерешённым пунктом, потому что это destructive external-production действие.

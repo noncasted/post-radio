@@ -1,0 +1,8 @@
+{
+  "$type": "Infrastructure.SideEffectsOptions, Infrastructure",
+  "ScanDelay": 50,
+  "EmptyScanDelay": 500,
+  "ConcurrentExecutions": 50,
+  "MaxRetryCount": 5,
+  "IncrementalRetryDelay": 30.0
+}

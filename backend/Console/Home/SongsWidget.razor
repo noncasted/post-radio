@@ -1,0 +1,150 @@
+@using global::Common.Reactive
+@using Meta.Audio
+@implements IDisposable
+
+<div class="flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold">Songs</h2>
+        <span class="text-xs text-muted-foreground">@Collection.Count total</span>
+    </div>
+
+    <BbInput Value="@_search" ValueChanged="@OnSearchChanged" Placeholder="Search by name, author or url..." />
+
+    <div class="rounded-lg border">
+        <table class="w-full text-sm">
+            <thead>
+            <tr class="border-b bg-muted/50">
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Author</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Name</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground">URL</th>
+                <th class="h-10 px-4 text-left font-medium text-muted-foreground w-28">Added</th>
+                <th class="h-10 px-4 w-10"></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var (_, state) in _pageSongs)
+            {
+                <tr class="border-b last:border-b-0 hover:bg-muted/30">
+                    <td class="px-4 py-2.5 font-medium">@(string.IsNullOrEmpty(state.Author) ? "Unknown" : state.Author)</td>
+                    <td class="px-4 py-2.5">@(string.IsNullOrEmpty(state.Name) ? "Untitled" : state.Name)</td>
+                    <td class="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-xs">@state.Url</td>
+                    <td class="px-4 py-2.5 text-muted-foreground text-xs">
+                        @(state.AddDate == default ? "—" : state.AddDate.ToString("dd.MM.yyyy"))
+                    </td>
+                    <td class="px-4 py-2.5">
+                        <a href="@state.Url" target="_blank" class="rounded p-1.5 hover:bg-muted inline-flex">
+                            <LucideIcon Name="external-link" Size="14" />
+                        </a>
+                    </td>
+                </tr>
+            }
+
+            @if (_pageSongs.Count == 0)
+            {
+                <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">No songs found</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_totalPages > 1)
+    {
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-muted-foreground">@_filtered.Count songs</span>
+            <div class="flex items-center gap-1">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          Disabled="@(_page == 0)"
+                          @onclick="PrevPage">
+                    <LucideIcon Name="chevron-left" Size="14" />
+                </BbButton>
+                <span class="text-xs text-muted-foreground px-2">@(_page + 1) / @_totalPages</span>
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
+                          Disabled="@(_page >= _totalPages - 1)"
+                          @onclick="NextPage">
+                    <LucideIcon Name="chevron-right" Size="14" />
+                </BbButton>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] public required ISongsCollection Collection { get; init; }
+
+    private const int PageSize = 15;
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    private List<KeyValuePair<long, SongState>> _all = new();
+    private List<KeyValuePair<long, SongState>> _filtered = new();
+    private List<KeyValuePair<long, SongState>> _pageSongs = new();
+    private string _search = string.Empty;
+    private int _page;
+    private int _totalPages = 1;
+
+    protected override void OnInitialized()
+    {
+        Reload();
+        Collection.Updated.Advise(_lifetime, () =>
+        {
+            Reload();
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void Reload()
+    {
+        _all = Collection
+            .OrderByDescending(kv => kv.Value.AddDate)
+            .ToList();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        var query = _search?.Trim();
+
+        if (string.IsNullOrEmpty(query))
+        {
+            _filtered = _all;
+        }
+        else
+        {
+            _filtered = _all
+                .Where(kv =>
+                    (kv.Value.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (kv.Value.Author?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (kv.Value.Url?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+        }
+
+        _totalPages = _filtered.Count == 0 ? 1 : (_filtered.Count + PageSize - 1) / PageSize;
+        if (_page >= _totalPages) _page = 0;
+        _pageSongs = _filtered.Skip(_page * PageSize).Take(PageSize).ToList();
+    }
+
+    private void OnSearchChanged(string value)
+    {
+        _search = value;
+        _page = 0;
+        ApplyFilter();
+    }
+
+    private void PrevPage()
+    {
+        if (_page <= 0) return;
+        _page--;
+        _pageSongs = _filtered.Skip(_page * PageSize).Take(PageSize).ToList();
+    }
+
+    private void NextPage()
+    {
+        if (_page >= _totalPages - 1) return;
+        _page++;
+        _pageSongs = _filtered.Skip(_page * PageSize).Take(PageSize).ToList();
+    }
+
+    public void Dispose() => _lifetime.Terminate();
+}

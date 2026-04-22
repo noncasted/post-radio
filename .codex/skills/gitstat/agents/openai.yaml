@@ -1,0 +1,3 @@
+interface:
+  display_name: "Gitstat"
+  short_description: "Help with Gitstat tasks and workflows"

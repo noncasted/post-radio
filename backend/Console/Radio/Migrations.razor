@@ -1,0 +1,87 @@
+@page "/migrations"
+@using global::Common.Extensions
+@using global::Common.Reactive
+@using global::Infrastructure
+@using Meta.Audio
+@implements IDisposable
+
+<PageTitle>Migrations</PageTitle>
+<PageHeader Title="Migrations" />
+
+<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-4">
+    <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+            <div class="rounded-md bg-amber-500/15 p-1.5">
+                <LucideIcon Name="database" Size="14" class="text-amber-400" />
+            </div>
+            <h3 class="text-sm font-semibold">Metadata Migration</h3>
+        </div>
+        <p class="text-xs text-muted-foreground">
+            Updates song metadata (author and name) from JSON files in the Playlists folder.
+        </p>
+
+        <div class="flex items-center gap-3">
+            <BbButton Disabled="@_running" @onclick="Run">
+                @if (_running)
+                {
+                    <LucideIcon Name="loader" Size="16" class="mr-2 animate-spin" />
+                    <span>Running...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="play" Size="16" class="mr-2" />
+                    <span>Run</span>
+                }
+            </BbButton>
+            <span class="text-xs text-muted-foreground">@_status</span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_log))
+        {
+            <pre class="rounded bg-muted p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap">@_log</pre>
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] public required ISongsCollection SongsCollection { get; init; }
+    [Inject] public required IOrleans Orleans { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+
+    private bool _running;
+    private string _status = "Idle";
+    private string _log = string.Empty;
+
+    public void Dispose() => _lifetime.Terminate();
+
+    private async Task Run()
+    {
+        _running = true;
+        _status = "Running";
+        _log = string.Empty;
+        StateHasChanged();
+
+        var progress = new OperationProgress();
+        progress.Message.Advise(_lifetime, (_, msg) => {
+            _log += msg + "\n";
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            var migration = new MetaDataMigration(SongsCollection, Orleans);
+            await migration.Execute(progress);
+            _status = progress.Status.Value.ToString();
+        }
+        catch (Exception ex)
+        {
+            _status = "Failed: " + ex.Message;
+        }
+        finally
+        {
+            _running = false;
+            StateHasChanged();
+        }
+    }
+}

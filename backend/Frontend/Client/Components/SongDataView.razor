@@ -1,0 +1,37 @@
+@using Frontend.Client.Services
+
+<div class="song-title">@State.CurrentSong?.Name</div>
+<div class="song-author">@State.CurrentSong?.Author</div>
+
+<style>
+    .song-title {
+        position: fixed;
+        left: 20px;
+        bottom: 70px;
+        font-size: 3rem;
+        font-weight: 500;
+        color: #fff;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+        z-index: 10;
+        pointer-events: none;
+    }
+    .song-author {
+        position: fixed;
+        left: 20px;
+        bottom: 20px;
+        font-size: 1.25rem;
+        color: #eee;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+        z-index: 10;
+        pointer-events: none;
+    }
+</style>
+
+@code {
+    [Parameter] public required SessionState State { get; set; }
+
+    protected override void OnInitialized()
+    {
+        State.CurrentSongChanged += () => InvokeAsync(StateHasChanged);
+    }
+}

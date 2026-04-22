@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1.7
+#
+# Runtime-only image expecting a pre-published service directory under ${PUBLISH_DIR}
+# relative to the build context (repo root). Use ./tools/publish-local.sh to populate
+# ./publish/<Name>/ first.
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+
+ARG PUBLISH_DIR
+ARG ASSEMBLY_NAME
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY ${PUBLISH_DIR}/ ./
+
+RUN test -n "${ASSEMBLY_NAME}" || (echo "ASSEMBLY_NAME build-arg is required" && exit 1)
+
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+
+EXPOSE 8080
+
+ENV TARGET_DLL=${ASSEMBLY_NAME}.dll
+ENTRYPOINT ["sh", "-c", "exec dotnet $TARGET_DLL"]
