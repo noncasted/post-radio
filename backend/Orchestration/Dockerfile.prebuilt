@@ -15,6 +15,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 COPY ${PUBLISH_DIR}/ ./
+COPY tools/metadata/ ./tools/metadata/
+
+RUN test -f ./tools/metadata/songs.json || (echo "tools/metadata/songs.json is required in runtime image" && exit 1)
 
 RUN test -n "${ASSEMBLY_NAME}" || (echo "ASSEMBLY_NAME build-arg is required" && exit 1)
 

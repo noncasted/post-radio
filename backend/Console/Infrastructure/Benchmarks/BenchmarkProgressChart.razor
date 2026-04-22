@@ -1,0 +1,133 @@
+@using global::Benchmarks
+@if (_chartData.Count == 0)
+{
+    return;
+}
+
+<BbAreaChart Data="@_chartData" Height="300px">
+    <BbXAxis DataKey="key"/>
+    <BbYAxis ShowGrid="false"/>
+    <BbChartTooltip/>
+    <BbChartLegend/>
+    @for (var i = 0; i < _seriesCount; i++)
+    {
+        var dataKey = $"s{i}";
+        var label = _seriesLabels[i];
+        var color = $"var(--chart-{(i % 10) + 1})";
+        <BbArea @key="dataKey" DataKey="@dataKey" Name="@label" Color="@color" Curve="CurveType.Smooth"/>
+    }
+</BbAreaChart>
+
+@code {
+    [Parameter, EditorRequired] public string MetricName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<BenchmarkState> States { get; set; } = [];
+
+    private List<ChartRow> _chartData = [];
+    private List<string> _seriesLabels = [];
+    private int _seriesCount;
+
+    protected override void OnParametersSet()
+    {
+        BuildChartData();
+    }
+
+    private void BuildChartData()
+    {
+        _chartData = [];
+        _seriesLabels = [];
+        _seriesCount = 0;
+
+        if (States.Count == 0)
+            return;
+
+        _seriesCount = Math.Min(States.Count, 10);
+
+        for (var i = 0; i < _seriesCount; i++)
+            _seriesLabels.Add(States[i].Date.ToString("MM/dd HH:mm:ss"));
+
+        var maxSteps = States.Take(_seriesCount).Max(s => s.Records.Count);
+        if (maxSteps == 0)
+            return;
+
+        var cumulativeCounts = new int[_seriesCount];
+
+        for (var step = 0; step < maxSteps; step++)
+        {
+            for (var i = 0; i < _seriesCount; i++)
+            {
+                var records = States[i].Records;
+                if (step < records.Count)
+                    cumulativeCounts[i] += records[step].Count;
+            }
+
+            var maxCumulative = cumulativeCounts.Take(_seriesCount).Max();
+            var row = new ChartRow { key = maxCumulative.ToString() };
+
+            for (var i = 0; i < _seriesCount; i++)
+            {
+                var records = States[i].Records;
+                var rate = 0;
+
+                if (step < records.Count)
+                {
+                    var record = records[step];
+                    rate = record.Time.TotalSeconds > 0
+                        ? (int)(record.Count / record.Time.TotalSeconds)
+                        : record.Count;
+                }
+
+                switch (i)
+                {
+                    case 0:
+                        row.s0 = rate;
+                        break;
+                    case 1:
+                        row.s1 = rate;
+                        break;
+                    case 2:
+                        row.s2 = rate;
+                        break;
+                    case 3:
+                        row.s3 = rate;
+                        break;
+                    case 4:
+                        row.s4 = rate;
+                        break;
+                    case 5:
+                        row.s5 = rate;
+                        break;
+                    case 6:
+                        row.s6 = rate;
+                        break;
+                    case 7:
+                        row.s7 = rate;
+                        break;
+                    case 8:
+                        row.s8 = rate;
+                        break;
+                    case 9:
+                        row.s9 = rate;
+                        break;
+                }
+            }
+
+            _chartData.Add(row);
+        }
+    }
+
+    private class ChartRow
+    {
+        public string key { get; set; } = "";
+        public int s0 { get; set; }
+        public int s1 { get; set; }
+        public int s2 { get; set; }
+        public int s3 { get; set; }
+        public int s4 { get; set; }
+        public int s5 { get; set; }
+        public int s6 { get; set; }
+        public int s7 { get; set; }
+        public int s8 { get; set; }
+        public int s9 { get; set; }
+    }
+
+}

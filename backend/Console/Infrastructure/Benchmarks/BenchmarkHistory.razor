@@ -1,0 +1,155 @@
+@using global::Benchmarks
+@if (_history.Count == 0)
+{
+    <p class="text-sm text-muted-foreground">No previous runs</p>
+    return;
+}
+
+<div class="flex flex-col gap-3">
+    <div class="flex items-end gap-0.5 h-12">
+        @foreach (var item in _chartData)
+        {
+            var heightPercent = item.MaxValue > 0 ? (item.Value / item.MaxValue * 100) : 0;
+            var barColor = item.Success ? "bg-primary" : "bg-destructive";
+            <div class="flex-1 flex flex-col items-center justify-end gap-0.5">
+                <div class="@barColor rounded-t w-full min-w-[4px] transition-all"
+                     style="height: @($"{heightPercent:F0}%"); min-height: 2px"
+                     title="@($"{item.Value:F1} {MetricName} — {item.Timestamp:g}")">
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="border rounded-md overflow-hidden">
+        <table class="w-full text-xs">
+            <thead>
+                <tr class="border-b bg-muted/50">
+                    <th class="px-2 py-1.5 text-left font-medium">Date</th>
+                    <th class="px-2 py-1.5 text-right font-medium">@MetricName</th>
+                    <th class="px-2 py-1.5 text-right font-medium">Duration</th>
+                    <th class="px-2 py-1.5 text-right font-medium">Delta</th>
+                    <th class="px-2 py-1.5 text-center font-medium">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border/60">
+                @for (var i = 0; i < _history.Count; i++)
+                {
+                    var run = _history[i];
+                    var metric = GetMetricValue(run);
+                    var isFirst = i == 0;
+                    var delta = GetDelta(i);
+                    var deltaClass = delta > 0 ? "text-green-500" : delta < 0 ? "text-destructive" : "text-muted-foreground";
+                    var highlight = isFirst && IsCurrentRun ? "bg-primary/5" : "";
+                    <tr class="@highlight">
+                        <td class="px-2 py-1.5 text-muted-foreground">@run.Date.ToString("MM/dd HH:mm")</td>
+                        <td class="px-2 py-1.5 text-right font-mono">@FormatMetric(metric)</td>
+                        <td class="px-2 py-1.5 text-right text-muted-foreground">@FormatDuration(run.Duration)</td>
+                        <td class="px-2 py-1.5 text-right font-mono @deltaClass">
+                            @if (delta != 0)
+                            {
+                                @($"{(delta > 0 ? "+" : "")}{delta:F1}%")
+                            }
+                            else
+                            {
+                                <span class="text-muted-foreground">-</span>
+                            }
+                        </td>
+                        <td class="px-2 py-1.5 text-center">
+                            @if (run.Success)
+                            {
+                                <LucideIcon Name="circle-check" Size="12" class="text-green-500 inline" />
+                            }
+                            else
+                            {
+                                <LucideIcon Name="circle-x" Size="12" class="text-destructive inline" />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string MetricName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<BenchmarkState> History { get; set; } = [];
+    [Parameter] public bool IsCurrentRun { get; set; }
+
+    private IReadOnlyList<BenchmarkState> _history = [];
+    private List<ChartItem> _chartData = [];
+
+    protected override void OnParametersSet()
+    {
+        _history = History;
+        BuildChart();
+    }
+
+    private void BuildChart()
+    {
+        if (_history.Count == 0)
+        {
+            _chartData = [];
+            return;
+        }
+
+        var values = _history.Select(GetMetricValue).ToList();
+        var maxValue = values.Max();
+        if (maxValue <= 0) maxValue = 1;
+
+        _chartData = _history
+            .Reverse()
+            .Select(h => new ChartItem
+            {
+                Value = GetMetricValue(h),
+                MaxValue = maxValue,
+                Success = h.Success,
+                Timestamp = h.Date
+            })
+            .ToList();
+    }
+
+    private static double GetMetricValue(BenchmarkState state)
+    {
+        if (state.Records.Count == 0 || state.Duration.TotalSeconds <= 0)
+            return 0;
+
+        var totalCount = state.Records.Sum(r => r.Count);
+        return totalCount / state.Duration.TotalSeconds;
+    }
+
+    private double GetDelta(int index)
+    {
+        if (index + 1 >= _history.Count) return 0;
+        var current = GetMetricValue(_history[index]);
+        var previous = GetMetricValue(_history[index + 1]);
+        if (previous == 0) return 0;
+        return (current - previous) / previous * 100;
+    }
+
+    private static string FormatMetric(double value)
+    {
+        return value switch
+        {
+            >= 10000 => $"{value / 1000:F1}k",
+            >= 100 => $"{value:F0}",
+            >= 1 => $"{value:F1}",
+            _ => $"{value:F2}"
+        };
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        return duration.TotalMinutes >= 1
+            ? $"{(int)duration.TotalMinutes}:{duration.Seconds:D2}"
+            : $"{duration.TotalSeconds:F1}s";
+    }
+
+    private record ChartItem
+    {
+        public double Value { get; init; }
+        public double MaxValue { get; init; }
+        public bool Success { get; init; }
+        public DateTime Timestamp { get; init; }
+    }
+}

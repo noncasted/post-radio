@@ -31,6 +31,5 @@ public static class ConsoleConstants
         public const string PlaylistDetail = "/playlists/{0}";
         public const string Songs = "/songs";
         public const string Images = "/images";
-        public const string Migrations = "/migrations";
     }
 }

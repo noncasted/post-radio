@@ -42,6 +42,7 @@
         <ProjectReference Include="..\..\Common\Common.csproj"/>
         <ProjectReference Include="..\..\Infrastructure\Infrastructure.csproj"/>
         <ProjectReference Include="..\..\Meta\Meta.csproj"/>
+        <ProjectReference Include="..\..\Tools\Benchmarks\Benchmarks.csproj"/>
         <ProjectReference Include="..\..\Tools\Generators\Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
         <Using Include="Meta.Audio"/>
         <Using Include="Meta.Images"/>

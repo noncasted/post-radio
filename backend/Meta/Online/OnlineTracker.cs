@@ -1,79 +1,211 @@
+using Cluster.Deploy;
+using Cluster.Discovery;
 using Common;
 using Common.Extensions;
 using Common.Reactive;
 using Infrastructure;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Meta.Online;
 
-public interface IOnlineListener : IViewableProperty<int>
-{
-}
-
 public interface IOnlineTracker
 {
-    void Track(IReadOnlyLifetime lifetime);
-}
-
-public class OnlineTrackerQueueId : IDurableQueueId
-{
-    public string ToRaw() => "online-tracker";
+    void Touch(string? sessionId);
 }
 
 [GenerateSerializer]
-public class OnlineTrackerPayload
+public class OnlineLiveData
 {
-    [Id(0)] public required int Value { get; init; }
+    [Id(0)] public int Count { get; set; }
+    [Id(1)] public DateTime UpdatedAtUtc { get; set; }
+    [Id(2)] public List<OnlineSessionEntry> Sessions { get; set; } = [];
+    [Id(3)] public List<OnlineHistoryBucket> Hourly { get; set; } = [];
+    [Id(4)] public List<OnlineHistoryBucket> Daily { get; set; } = [];
+}
+
+[GenerateSerializer]
+public class OnlineSessionEntry
+{
+    [Id(0)] public string SessionId { get; set; } = string.Empty;
+    [Id(1)] public DateTime StartedAtUtc { get; set; }
+    [Id(2)] public DateTime LastSeenAtUtc { get; set; }
+}
+
+[GenerateSerializer]
+public class OnlineHistoryBucket
+{
+    [Id(0)] public DateTime BucketStartUtc { get; set; }
+    [Id(1)] public int PeakCount { get; set; }
 }
 
 public class OnlineTracker : IOnlineTracker, ICoordinatorSetupCompleted
 {
-    public OnlineTracker(IMessaging messaging)
+    public OnlineTracker(
+        ILiveState<OnlineLiveData> liveState,
+        IServiceEnvironment environment,
+        ILogger<OnlineTracker> logger)
     {
-        _messaging = messaging;
+        _liveState = liveState;
+        _environment = environment;
+        _logger = logger;
     }
 
-    private readonly IMessaging _messaging;
-    private readonly OnlineTrackerQueueId _queueId = new();
+    private static readonly TimeSpan OnlineTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan PublishInterval = TimeSpan.FromSeconds(15);
+    private const int MaxSessionIdLength = 128;
+    private const int MaxHourlyBuckets = 24;
+    private const int MaxDailyBuckets = 30;
 
-    private int _count;
+    private readonly ILiveState<OnlineLiveData> _liveState;
+    private readonly IServiceEnvironment _environment;
+    private readonly ILogger<OnlineTracker> _logger;
+    private readonly object _sync = new();
+    private readonly Dictionary<string, OnlineSessionEntry> _sessions = new(StringComparer.Ordinal);
+    private readonly SortedDictionary<DateTime, OnlineHistoryBucket> _hourly = new();
+    private readonly SortedDictionary<DateTime, OnlineHistoryBucket> _daily = new();
 
     public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
     {
+        if (_environment.Tag != ServiceTag.Meta)
+            return Task.CompletedTask;
+
         Loop(lifetime).NoAwait();
         return Task.CompletedTask;
     }
 
-    public void Track(IReadOnlyLifetime lifetime)
+    public void Touch(string? sessionId)
     {
-        Interlocked.Increment(ref _count);
-        lifetime.Listen(() => Interlocked.Decrement(ref _count));
+        sessionId = NormalizeSessionId(sessionId);
+        if (sessionId == null)
+            return;
+
+        var now = DateTime.UtcNow;
+
+        lock (_sync)
+        {
+            if (_sessions.TryGetValue(sessionId, out var session))
+            {
+                session.LastSeenAtUtc = now;
+                return;
+            }
+
+            _sessions[sessionId] = new OnlineSessionEntry
+            {
+                SessionId = sessionId,
+                StartedAtUtc = now,
+                LastSeenAtUtc = now
+            };
+        }
     }
 
     private async Task Loop(IReadOnlyLifetime lifetime)
     {
         while (!lifetime.IsTerminated)
         {
-            await _messaging.PushDirectQueue(_queueId, new OnlineTrackerPayload { Value = _count });
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            try
+            {
+                await PublishSnapshot();
+                await Task.Delay(PublishInterval, lifetime.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "[OnlineTracker] Failed to publish online state");
+
+                try
+                {
+                    await Task.Delay(PublishInterval, lifetime.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
         }
     }
-}
 
-public class OnlineListener : ViewableProperty<int>, IOnlineListener, ICoordinatorSetupCompleted
-{
-    public OnlineListener(IMessaging messaging) : base(0)
+    private async Task PublishSnapshot()
     {
-        _messaging = messaging;
+        var now = DateTime.UtcNow;
+        OnlineLiveData snapshot;
+
+        lock (_sync)
+        {
+            Cleanup(now);
+
+            var count = _sessions.Count;
+            AddSample(_hourly, ToHourBucket(now), count, MaxHourlyBuckets);
+            AddSample(_daily, ToDayBucket(now), count, MaxDailyBuckets);
+
+            snapshot = new OnlineLiveData
+            {
+                Count = count,
+                UpdatedAtUtc = now,
+                Sessions = _sessions.Values
+                                    .OrderByDescending(session => session.LastSeenAtUtc)
+                                    .ToList(),
+                Hourly = _hourly.Values.ToList(),
+                Daily = _daily.Values.ToList()
+            };
+        }
+
+        await _liveState.SetValue(snapshot);
     }
 
-    private readonly IMessaging _messaging;
-    private readonly OnlineTrackerQueueId _queueId = new();
-
-    public Task OnCoordinatorSetupCompleted(IReadOnlyLifetime lifetime)
+    private void Cleanup(DateTime now)
     {
-        _messaging.ListenDurableQueue<OnlineTrackerPayload>(lifetime, _queueId, payload => Set(payload.Value));
-        return Task.CompletedTask;
+        var cutoff = now - OnlineTtl;
+        var expired = _sessions
+            .Where(kv => kv.Value.LastSeenAtUtc < cutoff)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var key in expired)
+            _sessions.Remove(key);
+    }
+
+    private static void AddSample(
+        SortedDictionary<DateTime, OnlineHistoryBucket> buckets,
+        DateTime bucketStart,
+        int count,
+        int maxBuckets)
+    {
+        if (!buckets.TryGetValue(bucketStart, out var bucket))
+        {
+            bucket = new OnlineHistoryBucket { BucketStartUtc = bucketStart };
+            buckets.Add(bucketStart, bucket);
+        }
+
+        bucket.PeakCount = Math.Max(bucket.PeakCount, count);
+
+        while (buckets.Count > maxBuckets)
+            buckets.Remove(buckets.Keys.First());
+    }
+
+    private static DateTime ToHourBucket(DateTime value)
+    {
+        return new DateTime(value.Year, value.Month, value.Day, value.Hour, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static DateTime ToDayBucket(DateTime value)
+    {
+        return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static string? NormalizeSessionId(string? value)
+    {
+        value = value?.Trim();
+
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return value.Length <= MaxSessionIdLength
+            ? value
+            : value[..MaxSessionIdLength];
     }
 }
 
@@ -81,12 +213,10 @@ public static class OnlineServicesExtensions
 {
     public static IHostApplicationBuilder AddOnlineServices(this IHostApplicationBuilder builder)
     {
+        builder.AddLiveState<OnlineLiveData>();
+
         builder.Add<OnlineTracker>()
                .As<IOnlineTracker>()
-               .As<ICoordinatorSetupCompleted>();
-
-        builder.Add<OnlineListener>()
-               .As<IOnlineListener>()
                .As<ICoordinatorSetupCompleted>();
 
         return builder;

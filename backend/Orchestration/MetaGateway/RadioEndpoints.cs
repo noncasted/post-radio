@@ -2,6 +2,7 @@ using Cluster.Configs;
 using Common;
 using Meta.Audio;
 using Meta.Images;
+using Meta.Online;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 
@@ -22,12 +23,17 @@ public static class RadioEndpoints
         group.MapGet("/media/audio/{id:long}", GetAudioFile);
         group.MapGet("/media/images/{key}", GetImageFile);
         group.MapGet("/options", GetOptions);
+        group.MapPost("/presence/touch", TouchPresence);
 
         return builder;
     }
 
-    private static FrontendOptionsDto GetOptions([FromServices] IFrontendConfig config)
+    private static FrontendOptionsDto GetOptions(
+        [FromServices] IFrontendConfig config,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context)
     {
+        Touch(onlineTracker, context);
         var value = config.Value;
 
         return new FrontendOptionsDto
@@ -39,8 +45,12 @@ public static class RadioEndpoints
         };
     }
 
-    private static IReadOnlyList<PlaylistDto> ListPlaylists([FromServices] IPlaylistsCollection collection)
+    private static IReadOnlyList<PlaylistDto> ListPlaylists(
+        [FromServices] IPlaylistsCollection collection,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context)
     {
+        Touch(onlineTracker, context);
         return collection
                .Select(kv => new PlaylistDto { Id = kv.Key, Name = kv.Value.Name, Url = kv.Value.Url })
                .ToList();
@@ -49,8 +59,11 @@ public static class RadioEndpoints
     private static IReadOnlyList<SongDto> ListSongs(
         [FromServices] ISongsCollection collection,
         [FromServices] IMediaStorage storage,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context,
         [FromQuery] Guid? playlistId)
     {
+        Touch(onlineTracker, context);
         var source = playlistId.HasValue
             ? collection.Where(kv => kv.Value.Playlists.Contains(playlistId.Value))
             : collection;
@@ -71,26 +84,41 @@ public static class RadioEndpoints
 
     private static string GetSongStream(
         [FromServices] IMediaStorage storage,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context,
         long id)
     {
-        return storage.GetAudioUrl(id);
+        var sessionId = Touch(onlineTracker, context);
+        return AppendSessionId(storage.GetAudioUrl(id), sessionId);
     }
 
-    private static IResult GetAudioFile([FromServices] IMediaStorage storage, long id)
+    private static IResult GetAudioFile(
+        [FromServices] IMediaStorage storage,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context,
+        long id)
     {
         var path = storage.GetAudioPath(id);
 
-        return File.Exists(path)
-            ? Results.File(path, "audio/mpeg", enableRangeProcessing: true)
-            : Results.NotFound();
+        if (!File.Exists(path))
+            return Results.NotFound();
+
+        Touch(onlineTracker, context);
+        return Results.File(path, "audio/mpeg", enableRangeProcessing: true);
     }
 
-    private static IResult GetImageFile([FromServices] IMediaStorage storage, string key)
+    private static IResult GetImageFile(
+        [FromServices] IMediaStorage storage,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context,
+        string key)
     {
         var path = storage.GetImagePath(key);
 
         if (!File.Exists(path))
             return Results.NotFound();
+
+        Touch(onlineTracker, context);
 
         if (!ContentTypes.TryGetContentType(path, out var contentType))
             contentType = "application/octet-stream";
@@ -98,14 +126,60 @@ public static class RadioEndpoints
         return Results.File(path, contentType, enableRangeProcessing: true);
     }
 
-    private static ImagesCountDto ListImages([FromServices] IImagesCollection collection)
+    private static ImagesCountDto ListImages(
+        [FromServices] IImagesCollection collection,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context)
     {
+        Touch(onlineTracker, context);
         return new ImagesCountDto { Count = collection.Count };
     }
 
-    private static Task<string> GetImageUrl([FromServices] IImagesCollection collection, int index)
+    private static async Task<string> GetImageUrl(
+        [FromServices] IImagesCollection collection,
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context,
+        int index)
     {
-        return collection.GetUrl(index);
+        var sessionId = Touch(onlineTracker, context);
+        return AppendSessionId(await collection.GetUrl(index), sessionId);
+    }
+
+    private static IResult TouchPresence(
+        [FromServices] IOnlineTracker onlineTracker,
+        HttpContext context)
+    {
+        Touch(onlineTracker, context);
+        return Results.NoContent();
+    }
+
+    private static string? Touch(IOnlineTracker onlineTracker, HttpContext context)
+    {
+        var sessionId = GetSessionId(context);
+        onlineTracker.Touch(sessionId);
+        return sessionId;
+    }
+
+    private static string? GetSessionId(HttpContext context)
+    {
+        if (context.Request.Query.TryGetValue("sid", out var querySessionId))
+            return querySessionId.ToString();
+
+        if (context.Request.Headers.TryGetValue("X-Radio-Session-Id", out var headerSessionId))
+            return headerSessionId.ToString();
+
+        return context.Request.Cookies.TryGetValue("Radio.SessionId", out var cookieSessionId)
+            ? cookieSessionId
+            : null;
+    }
+
+    private static string AppendSessionId(string url, string? sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+            return url;
+
+        var separator = url.Contains('?') ? "&" : "?";
+        return $"{url}{separator}sid={Uri.EscapeDataString(sessionId)}";
     }
 }
 

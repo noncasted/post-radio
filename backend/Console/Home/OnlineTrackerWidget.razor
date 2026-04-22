@@ -1,0 +1,163 @@
+@using Cluster.Deploy
+@using Meta.Online
+@using global::Common.Extensions
+@using global::Common.Reactive
+@inherits UiComponent
+
+<div class="rounded-lg border bg-card p-3 flex flex-col gap-3">
+    <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="rounded-lg bg-green-500/15 p-2">
+                <LucideIcon Name="activity" Size="18" class="text-green-400" />
+            </div>
+            <div>
+                <h2 class="text-sm font-semibold">Online tracker</h2>
+                <p class="text-xs text-muted-foreground">Active users in the last 5 minutes</p>
+            </div>
+        </div>
+
+        <div class="text-right">
+            <div class="text-2xl font-bold leading-none">@_state.Count</div>
+            <div class="text-xs text-muted-foreground">@FormatUpdatedAt()</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-md border bg-background/40 p-2.5">
+            <div class="text-xs text-muted-foreground">Current</div>
+            <div class="mt-0.5 text-lg font-semibold">@_state.Count</div>
+        </div>
+        <div class="rounded-md border bg-background/40 p-2.5">
+            <div class="text-xs text-muted-foreground">Peak in view</div>
+            <div class="mt-0.5 text-lg font-semibold">@_peak</div>
+        </div>
+    </div>
+
+    <div class="min-h-[125px]">
+        <BbAreaChart Data="@_chartData" Height="125px">
+            <BbXAxis DataKey="Label" />
+            <BbYAxis ShowGrid="false" />
+            <BbChartTooltip />
+            <BbArea DataKey="Count" Name="Users" Color="var(--chart-2)" Curve="CurveType.Smooth" />
+        </BbAreaChart>
+    </div>
+
+    <div class="flex items-center justify-center gap-2">
+        <BbButton Size="ButtonSize.Small"
+                  Variant="@(_mode == ChartMode.Hourly ? ButtonVariant.Default : ButtonVariant.Outline)"
+                  @onclick="@(() => SetMode(ChartMode.Hourly))">
+            Hours
+        </BbButton>
+        <BbButton Size="ButtonSize.Small"
+                  Variant="@(_mode == ChartMode.Daily ? ButtonVariant.Default : ButtonVariant.Outline)"
+                  @onclick="@(() => SetMode(ChartMode.Daily))">
+            Days
+        </BbButton>
+    </div>
+</div>
+
+@code {
+    [Inject] public ILiveState<OnlineLiveData> Online { get; set; } = null!;
+
+    private OnlineLiveData _state = new();
+    private ChartMode _mode = ChartMode.Hourly;
+    private List<OnlineChartRow> _chartData = [];
+    private int _peak;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime)
+    {
+        Online.View(lifetime, state =>
+        {
+            _state = state;
+            BuildChartData();
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private void SetMode(ChartMode mode)
+    {
+        _mode = mode;
+        BuildChartData();
+    }
+
+    private void BuildChartData()
+    {
+        var now = DateTime.UtcNow;
+
+        _chartData = _mode switch
+        {
+            ChartMode.Hourly => BuildRows(
+                _state.Hourly,
+                ToHourBucket(now).AddHours(-23),
+                24,
+                TimeSpan.FromHours(1),
+                value => value.ToLocalTime().ToString("HH:mm")),
+
+            ChartMode.Daily => BuildRows(
+                _state.Daily,
+                ToDayBucket(now).AddDays(-13),
+                14,
+                TimeSpan.FromDays(1),
+                value => value.ToLocalTime().ToString("dd.MM")),
+
+            _ => []
+        };
+
+        _peak = _chartData.Count == 0 ? 0 : _chartData.Max(row => row.Count);
+    }
+
+    private static List<OnlineChartRow> BuildRows(
+        IReadOnlyList<OnlineHistoryBucket> buckets,
+        DateTime start,
+        int count,
+        TimeSpan step,
+        Func<DateTime, string> label)
+    {
+        var lookup = buckets.ToDictionary(bucket => bucket.BucketStartUtc, bucket => bucket.PeakCount);
+        var rows = new List<OnlineChartRow>(count);
+
+        for (var i = 0; i < count; i++)
+        {
+            var bucketStart = start + step * i;
+            rows.Add(new OnlineChartRow
+            {
+                Label = label(bucketStart),
+                Count = lookup.GetValueOrDefault(bucketStart, 0)
+            });
+        }
+
+        return rows;
+    }
+
+    private string FormatUpdatedAt()
+    {
+        if (_state.UpdatedAtUtc == default)
+            return "no data";
+
+        return $"{_state.UpdatedAtUtc.ToLocalTime():HH:mm:ss}";
+    }
+
+    private static DateTime ToHourBucket(DateTime value)
+    {
+        return new DateTime(value.Year, value.Month, value.Day, value.Hour, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static DateTime ToDayBucket(DateTime value)
+    {
+        return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private enum ChartMode
+    {
+        Hourly,
+        Daily
+    }
+
+    private class OnlineChartRow
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+}

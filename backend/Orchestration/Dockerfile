@@ -76,6 +76,9 @@ WORKDIR /app
 RUN test -n "${ASSEMBLY_NAME}" || (echo "ASSEMBLY_NAME build-arg is required" && exit 1)
 
 COPY --from=publish-all /app/out/${ASSEMBLY_NAME}/ .
+COPY --from=publish-all /src/tools/metadata/ ./tools/metadata/
+
+RUN test -f ./tools/metadata/songs.json || (echo "tools/metadata/songs.json is required in runtime image" && exit 1)
 
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 ENV ASPNETCORE_ENVIRONMENT=Production

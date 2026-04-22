@@ -1,6 +1,7 @@
 @page "/images"
 @using global::Common
 @using global::Meta.Images
+@implements IDisposable
 
 <PageTitle>Images</PageTitle>
 @if (_isLoading)
@@ -79,7 +80,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
             <div class="text-xs text-muted-foreground">
-                Showing @PageStart-@PageEnd of @_images.Count, 12 per page
+                Showing @PageStart-@PageEnd of @_images.Count, @PageSize per page
             </div>
 
             <div class="flex items-center gap-2">
@@ -99,7 +100,7 @@
 
 @if (_isUploadOpen)
 {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" @onclick="CloseUpload">
+    <div class="image-upload-overlay fixed inset-0 z-50 flex items-center justify-center p-4" @onclick="CloseUpload">
         <div class="w-full max-w-2xl rounded-lg border bg-card shadow-lg" @onclick:stopPropagation>
             <div class="flex items-start justify-between gap-4 border-b p-4">
                 <div class="flex items-center gap-3">
@@ -128,11 +129,12 @@
                         </div>
                         <span class="text-xs text-muted-foreground">Files</span>
                     </div>
-                    <InputFile OnChange="UploadFiles"
-                               multiple
-                               accept="image/*"
-                               disabled="@_isUploading"
-                               class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                    <input id="@FilesUploadInputId"
+                           type="file"
+                           multiple
+                           accept="image/*"
+                           disabled="@_isUploading"
+                           class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                 </div>
 
                 <div class="relative rounded-lg border bg-background p-4 transition-all hover:border-primary/40 hover:bg-muted/30">
@@ -146,13 +148,14 @@
                         </div>
                         <span class="text-xs text-muted-foreground">Folder</span>
                     </div>
-                    <InputFile OnChange="UploadFiles"
-                               multiple
-                               accept="image/*"
-                               webkitdirectory="webkitdirectory"
-                               directory="directory"
-                               disabled="@_isUploading"
-                               class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                    <input id="@FolderUploadInputId"
+                           type="file"
+                           multiple
+                           accept="image/*"
+                           webkitdirectory="webkitdirectory"
+                           directory="directory"
+                           disabled="@_isUploading"
+                           class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                 </div>
             </div>
 
@@ -228,8 +231,8 @@
 
 <style>
     .images-page-shell {
-        max-width: 76rem;
-        height: calc(100vh - 7.25rem);
+        max-width: 108rem;
+        height: calc(100vh - 5.75rem);
         overflow: hidden;
     }
 
@@ -241,9 +244,9 @@
         display: grid;
         flex: 1 1 auto;
         min-height: 0;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         grid-template-rows: repeat(3, minmax(0, 1fr));
-        gap: 0.75rem;
+        gap: 0.5rem;
     }
 
 
@@ -274,6 +277,11 @@
         background: rgb(0 0 0 / 0.72);
         backdrop-filter: blur(4px);
         cursor: zoom-out;
+    }
+
+    .image-upload-overlay {
+        background: rgb(0 0 0 / 0.72);
+        backdrop-filter: blur(4px);
     }
 
     .image-preview-panel {
@@ -338,23 +346,27 @@
     [Inject] public required IJSRuntime JS { get; init; }
     [Inject] public required ToastService ToastService { get; init; }
 
-    private const int PageSize = 12;
+    private const int PageSize = 21;
     private const int MaxUploadFiles = 10000;
     private const long MaxUploadFileSize = 250L * 1024L * 1024L;
+    private const string FilesUploadInputId = "images-files-upload-input";
+    private const string FolderUploadInputId = "images-folder-upload-input";
+    private const string UploadEndpoint = "/console/media/images/upload";
 
     private List<MediaImage> _images = new();
     private List<MediaImage> _pageImages = new();
     private MediaImage? _selectedImage;
+    private DotNetObjectReference<Images>? _uploadCallback;
     private bool _isLoading = true;
     private bool _isUploadOpen;
     private bool _isUploading;
     private bool _isPasting;
+    private bool _uploadInputsRegistered;
     private string _uploadStatus = string.Empty;
     private string _uploadFileName = string.Empty;
     private string _error = string.Empty;
     private long _uploadBytesDone;
     private long _uploadBytesTotal;
-    private long _lastUploadProgressRenderMs;
     private int _page;
     private int _totalPages = 1;
 
@@ -369,6 +381,26 @@
     {
         await RefreshImages();
         _isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_isUploadOpen || _uploadInputsRegistered)
+            return;
+
+        _uploadCallback ??= DotNetObjectReference.Create(this);
+
+        try
+        {
+            await JS.InvokeVoidAsync("registerImageUploadInput", FilesUploadInputId, UploadEndpoint, _uploadCallback, MaxUploadFileSize, MaxUploadFiles);
+            await JS.InvokeVoidAsync("registerImageUploadInput", FolderUploadInputId, UploadEndpoint, _uploadCallback, MaxUploadFileSize, MaxUploadFiles);
+            _uploadInputsRegistered = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"[Images] Upload picker initialization failed: {ex.Message}";
+            ToastService.Error(_error, "Upload failed");
+        }
     }
 
     private void NavigateHome()
@@ -425,12 +457,14 @@
     {
         ResetUploadProgress();
         _isUploadOpen = true;
+        _uploadInputsRegistered = false;
     }
 
     private void CloseUpload()
     {
         if (_isUploading) return;
         _isUploadOpen = false;
+        _uploadInputsRegistered = false;
     }
 
     private void OpenPreview(MediaImage image)
@@ -503,65 +537,78 @@
         }
     }
 
-    private async Task UploadFiles(InputFileChangeEventArgs e)
+    [JSInvokable]
+    public Task OnHttpUploadStarted(int fileCount, long totalBytes)
     {
-        var files = e.GetMultipleFiles(MaxUploadFiles);
-        if (files.Count == 0)
-            return;
-
         _isUploading = true;
         _error = string.Empty;
         _uploadBytesDone = 0;
-        _uploadBytesTotal = files.Sum(file => file.Size);
-        _lastUploadProgressRenderMs = 0;
-        _uploadStatus = $"Preparing {files.Count} file(s)...";
+        _uploadBytesTotal = totalBytes;
+        _uploadStatus = $"Preparing {fileCount} file(s)...";
         _uploadFileName = string.Empty;
 
-        var uploaded = 0;
-        var failed = 0;
+        return InvokeAsync(StateHasChanged);
+    }
 
-        for (var index = 0; index < files.Count; index++)
-        {
-            var file = files[index];
-            _uploadFileName = $"{index + 1} / {files.Count}: {file.Name}";
-            _uploadStatus = $"Uploading {uploaded + failed + 1} of {files.Count}";
-            StateHasChanged();
+    [JSInvokable]
+    public Task OnHttpUploadProgress(long bytesDone, long totalBytes, int fileIndex, int fileCount, string fileName)
+    {
+        if (!_isUploading && _uploadBytesTotal > 0)
+            return Task.CompletedTask;
 
-            try
-            {
-                await using var stream = file.OpenReadStream(MaxUploadFileSize);
-                await using var progressStream = new UploadProgressStream(stream, OnUploadBytesRead);
-                await Storage.SaveImage(file.Name, progressStream);
-                uploaded++;
-            }
-            catch (Exception ex)
-            {
-                failed++;
-                _error = $"[Images] Failed to upload {file.Name}: {ex.Message}";
-            }
+        _isUploading = true;
+        _uploadBytesDone = Math.Clamp(bytesDone, 0, totalBytes);
+        _uploadBytesTotal = totalBytes;
+        _uploadStatus = $"Uploading {fileIndex} of {fileCount}";
+        _uploadFileName = $"{fileIndex} / {fileCount}: {fileName}";
 
-            _uploadStatus = $"Uploaded {uploaded} of {files.Count} file(s)" + (failed > 0 ? $", failed {failed}" : "");
-            StateHasChanged();
-        }
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnHttpUploadCompleted(int uploaded, int failed, string errorMessage)
+    {
+        _isUploading = false;
+        _uploadBytesDone = _uploadBytesTotal;
+        _uploadStatus = $"Uploaded {uploaded} image(s)" + (failed > 0 ? $", failed {failed}" : "");
+        _uploadFileName = failed > 0 ? "Finished with errors" : "Finished";
+
+        if (!string.IsNullOrWhiteSpace(errorMessage))
+            _error = $"[Images] {errorMessage}";
 
         try
         {
             await Collection.Refresh();
             ApplyImages(Collection.Images);
-            ToastService.Success($"Uploaded {uploaded} image(s)" + (failed > 0 ? $", failed {failed}" : ""), "Done");
         }
         catch (Exception ex)
         {
             _error = $"[Images] Upload refresh failed: {ex.Message}";
             ToastService.Error(_error, "Error");
-        }
-        finally
-        {
-            _isUploading = false;
-            _uploadStatus = $"Uploaded {uploaded} image(s)" + (failed > 0 ? $", failed {failed}" : "");
-            _uploadFileName = failed > 0 ? "Finished with errors" : "Finished";
             StateHasChanged();
+            return;
         }
+
+        if (uploaded > 0 && failed == 0)
+            ToastService.Success($"Uploaded {uploaded} image(s)", "Done");
+        else if (uploaded > 0)
+            ToastService.Warning($"Uploaded {uploaded} image(s), failed {failed}", "Upload finished");
+        else
+            ToastService.Error(string.IsNullOrWhiteSpace(errorMessage) ? "No images were uploaded." : errorMessage, "Upload failed");
+
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnHttpUploadFailed(string errorMessage)
+    {
+        _isUploading = false;
+        _error = $"[Images] Upload failed: {errorMessage}";
+        _uploadStatus = "Upload failed";
+        _uploadFileName = string.Empty;
+        ToastService.Error(_error, "Upload failed");
+
+        return InvokeAsync(StateHasChanged);
     }
 
     private void ResetUploadProgress()
@@ -570,22 +617,6 @@
         _uploadFileName = string.Empty;
         _uploadBytesDone = 0;
         _uploadBytesTotal = 0;
-        _lastUploadProgressRenderMs = 0;
-    }
-
-    private void OnUploadBytesRead(int bytesRead)
-    {
-        if (bytesRead <= 0)
-            return;
-
-        _uploadBytesDone += bytesRead;
-
-        var now = Environment.TickCount64;
-        if (now - _lastUploadProgressRenderMs < 100 && _uploadBytesDone < _uploadBytesTotal)
-            return;
-
-        _lastUploadProgressRenderMs = now;
-        _ = InvokeAsync(StateHasChanged);
     }
 
     private static bool TryGetPastedImageUrl(string? clipboardText, out Uri uri, out string fileName, out string error)
@@ -721,72 +752,8 @@
         return $"/console/media/images/{Uri.EscapeDataString(image.Key)}/download";
     }
 
-
-    private sealed class UploadProgressStream : Stream
+    public void Dispose()
     {
-        public UploadProgressStream(Stream inner, Action<int> onBytesRead)
-        {
-            _inner = inner;
-            _onBytesRead = onBytesRead;
-        }
-
-        private readonly Stream _inner;
-        private readonly Action<int> _onBytesRead;
-
-        public override bool CanRead => _inner.CanRead;
-        public override bool CanSeek => _inner.CanSeek;
-        public override bool CanWrite => false;
-        public override long Length => _inner.Length;
-
-        public override long Position
-        {
-            get => _inner.Position;
-            set => _inner.Position = value;
-        }
-
-        public override void Flush() => _inner.Flush();
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var read = _inner.Read(buffer, offset, count);
-            _onBytesRead(read);
-            return read;
-        }
-
-        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            var read = await _inner.ReadAsync(buffer.AsMemory(offset, count), cancellationToken);
-            _onBytesRead(read);
-            return read;
-        }
-
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-        {
-            var read = await _inner.ReadAsync(buffer, cancellationToken);
-            _onBytesRead(read);
-            return read;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
-        public override void SetLength(long value) => _inner.SetLength(value);
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-                _inner.Dispose();
-
-            base.Dispose(disposing);
-        }
-
-        public override async ValueTask DisposeAsync()
-        {
-            await _inner.DisposeAsync();
-            await base.DisposeAsync();
-        }
+        _uploadCallback?.Dispose();
     }
 }

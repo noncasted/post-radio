@@ -1,3 +1,4 @@
+using Benchmarks;
 using Cluster;
 using Cluster.Configs;
 using Cluster.Coordination;
@@ -81,6 +82,20 @@ public static class ProjectsSetupExtensions
 
             builder.Services.AddHttpClient("meta", c => c.BaseAddress = new Uri("http://meta"));
 
+            var testsAssembly = typeof(IClusterTest).Assembly;
+
+            foreach (var type in testsAssembly.GetTypes())
+            {
+                if (type.IsAbstract || type.IsInterface)
+                    continue;
+
+                if (!typeof(IClusterTest).IsAssignableFrom(type))
+                    continue;
+
+                builder.Services.AddSingleton(type);
+                builder.Services.AddSingleton(typeof(IClusterTest), sp => sp.GetRequiredService(type));
+            }
+
             return builder;
         }
 
@@ -109,6 +124,7 @@ public static class ProjectsSetupExtensions
                 .AddClusterFeatures()
                 .AddConfigs()
                 .AddSideEffects()
+                .AddTests()
                 .AddStates()
                 .AddMonitoring()
                 .AddHeapDiagnostics()
@@ -152,9 +168,56 @@ public static class ProjectsSetupExtensions
         {
             builder.Services
                    .AddRazorComponents()
-                   .AddInteractiveServerComponents();
+                   .AddInteractiveServerComponents()
+                   .AddHubOptions(options => {
+                       options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+                   });
 
             return builder;
+        }
+
+        private IHostApplicationBuilder AddTests()
+        {
+            builder.Add<BenchmarkRunner>();
+            builder.Add<BenchmarkStorage>();
+            builder.Add<ClusterTestUtils>();
+
+            var testsAssembly = typeof(IClusterTest).Assembly;
+
+            foreach (var type in testsAssembly.GetTypes())
+            {
+                if (type.IsAbstract || type.IsInterface)
+                    continue;
+
+                if (!IsTestNodeType(type))
+                    continue;
+
+                builder.Services.AddSingleton(type);
+                builder.Services.AddSingleton(typeof(ICoordinatorSetupCompleted), sp => sp.GetRequiredService(type));
+            }
+
+            builder.Add<StateMigrationTest.MigrationTestStep_V0>()
+                   .As<IStateMigrationStep>();
+
+            builder.Add<StateMigrationTest.MigrationTestStep_V1>()
+                   .As<IStateMigrationStep>();
+
+            return builder;
+        }
+
+        private static bool IsTestNodeType(Type type)
+        {
+            var current = type.BaseType;
+
+            while (current != null)
+            {
+                if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(BenchmarkNode<>))
+                    return true;
+
+                current = current.BaseType;
+            }
+
+            return false;
         }
     }
 }

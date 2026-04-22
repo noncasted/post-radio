@@ -13,6 +13,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Orchestration\Extensions\Extensions.csproj"/>
+        <ProjectReference Include="..\Tools\Benchmarks\Benchmarks.csproj"/>
         <ProjectReference Include="..\Meta\Meta.csproj"/>
         <ProjectReference Include="..\Infrastructure\Infrastructure.csproj"/>
         <ProjectReference Include="..\Common\Common.csproj"/>

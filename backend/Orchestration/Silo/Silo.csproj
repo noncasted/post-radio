@@ -21,6 +21,7 @@
         <ProjectReference Include="..\..\Common\Common.csproj"/>
         <ProjectReference Include="..\..\Infrastructure\Infrastructure.csproj"/>
         <ProjectReference Include="..\..\Meta\Meta.csproj"/>
+        <ProjectReference Include="..\..\Tools\Benchmarks\Benchmarks.csproj"/>
         <ProjectReference Include="..\Extensions\Extensions.csproj" />
     </ItemGroup>
 

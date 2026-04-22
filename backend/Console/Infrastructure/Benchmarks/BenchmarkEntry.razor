@@ -1,0 +1,253 @@
+@using global::Benchmarks
+@using global::Common.Extensions
+@using global::Common.Reactive
+@implements IDisposable
+
+<div class="flex flex-col py-2.5">
+    <div class="flex items-center gap-2 min-w-0">
+        <button class="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                @onclick="@(() => _expanded = !_expanded)">
+            <LucideIcon Name="@(_expanded ? "chevron-down" : "chevron-right")" Size="14" />
+        </button>
+
+        @if (_operation.Status.Value is OperationStatus.Preparing or OperationStatus.InProgress)
+        {
+            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" @onclick="Cancel">Cancel</BbButton>
+        }
+        else
+        {
+            <BbButton Size="ButtonSize.Small" @onclick="Start">Run</BbButton>
+        }
+
+        <div class="flex w-4 shrink-0 justify-center">
+            @switch (_operation.Status.Value)
+            {
+                case OperationStatus.NotStarted:
+                    <LucideIcon Name="circle" Size="14" class="text-muted-foreground" />
+                    break;
+                case OperationStatus.Preparing:
+                    <LucideIcon Name="loader-circle" Size="14" class="animate-spin text-yellow-500" />
+                    break;
+                case OperationStatus.InProgress:
+                    <LucideIcon Name="loader-circle" Size="14" class="animate-spin text-primary" />
+                    break;
+                case OperationStatus.Success:
+                    <LucideIcon Name="circle-check" Size="14" class="text-green-500" />
+                    break;
+                case OperationStatus.Failed:
+                    <LucideIcon Name="circle-x" Size="14" class="text-destructive" />
+                    break;
+                case OperationStatus.Cancelled:
+                    <LucideIcon Name="circle-minus" Size="14" class="text-muted-foreground" />
+                    break;
+            }
+        </div>
+
+        <span class="w-48 shrink-0 truncate text-sm font-medium" title="@Test.Title">@Test.Title</span>
+
+        <div class="flex items-center gap-2 w-36 shrink-0">
+            @if (Test.LastResult != null && Test.LastResult.MetricValue > 0)
+            {
+                <span class="font-mono text-xs font-semibold">@FormatMetric(Test.LastResult.MetricValue)</span>
+                <span class="text-xs text-muted-foreground">@Test.MetricName</span>
+            }
+            @if (_deltaPercent != 0)
+            {
+                var deltaClass = _deltaPercent > 0 ? "text-green-500" : "text-destructive";
+                var arrow = _deltaPercent > 0 ? "trending-up" : "trending-down";
+                <span class="flex items-center gap-0.5 text-xs font-mono @deltaClass">
+                    <LucideIcon Name="@arrow" Size="12" />
+                    @($"{(_deltaPercent > 0 ? "+" : "")}{_deltaPercent:F1}%")
+                </span>
+            }
+        </div>
+
+        <div class="flex flex-1 items-center gap-2 min-w-0">
+            <div class="relative h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+                <div class="h-full rounded-full transition-all @GetProgressBarClass()"
+                     style="width: @($"{_operation.Progress.Value * 100:F0}%")">
+                </div>
+            </div>
+            <div class="w-16 shrink-0 text-right">
+                <span class="text-xs">@($"{_operation.Progress.Value * 100:F0}%")</span>
+                @if (_operation.StartTime != DateTime.MinValue)
+                {
+                    <p class="text-xs text-muted-foreground">@FormatDuration()</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (_operation.Status.Value == OperationStatus.Failed && !string.IsNullOrEmpty(_operation.Message.Value))
+    {
+        <div class="mt-1 pl-8">
+            <span class="text-xs text-destructive">@_operation.Message.Value</span>
+        </div>
+    }
+
+    @if (_expanded)
+    {
+        <div class="mt-3 pl-8 flex flex-col gap-3">
+            @if (Test.Payload != null)
+            {
+                <div class="max-w-sm">
+                    <PayloadForm Payload="Test.Payload" PayloadChanged="val => Test.Payload = val" />
+                </div>
+            }
+
+            @if (_chartStates.Count > 0)
+            {
+                <BenchmarkProgressChart MetricName="@Test.MetricName" States="_chartStates" />
+            }
+
+            <BenchmarkHistory MetricName="@Test.MetricName" History="_history" IsCurrentRun="@(Test.LastResult != null)" />
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IClusterTest Test { get; set; } = null!;
+    [Parameter, EditorRequired] public BenchmarkRunner Runner { get; set; } = null!;
+    [Parameter] public EventCallback<OperationStatus> StatusChanged { get; set; }
+
+    [Inject] public BenchmarkStorage BenchmarkStorage { get; set; } = null!;
+
+    public OperationStatus Status => _operation.Status.Value;
+
+    private bool _expanded;
+    private IOperationProgress _operation = new OperationProgress();
+    private Timer? _timer;
+    private ILifetime _subscriptionLifetime = new Lifetime();
+    private IReadOnlyList<BenchmarkState> _history = [];
+    private IReadOnlyList<BenchmarkState> _chartStates = [];
+    private double _deltaPercent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _timer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+        Runner.Completed.Advise(_subscriptionLifetime, title =>
+        {
+            if (title == Test.Title)
+                InvokeAsync(OnCompleted).NoAwait();
+        });
+
+        // Restore running benchmark state from BenchmarkRunner
+        var runInfo = Runner.GetRunInfo(Test.Title);
+        if (runInfo != null)
+            AttachToProgress(runInfo.Progress);
+
+        await LoadHistory();
+    }
+
+    public void Run()
+    {
+        var progress = Runner.Start(Test);
+        AttachToProgress(progress);
+    }
+
+    public void Cancel()
+    {
+        Runner.Cancel(Test.Title);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        _subscriptionLifetime.Terminate();
+    }
+
+    private void AttachToProgress(IOperationProgress progress)
+    {
+        _operation = progress;
+
+        progress.Progress.View(_subscriptionLifetime, () => InvokeAsync(StateHasChanged));
+        progress.Status.View(_subscriptionLifetime, () =>
+        {
+            InvokeAsync(() => StatusChanged.InvokeAsync(progress.Status.Value)).NoAwait();
+        });
+        progress.Message.View(_subscriptionLifetime, () => InvokeAsync(StateHasChanged));
+    }
+
+    private async Task OnCompleted()
+    {
+        await LoadHistory();
+    }
+
+    private async Task LoadHistory()
+    {
+        _history = await BenchmarkStorage.GetAll(Test.Title);
+        _chartStates = _history.Where(s => s.Records.Count > 0).Take(10).ToList();
+
+        if (_history.Count >= 2)
+        {
+            var current = GetMetricValue(_history[0]);
+            var previous = GetMetricValue(_history[1]);
+            _deltaPercent = previous > 0 ? (current - previous) / previous * 100 : 0;
+        }
+        else
+        {
+            _deltaPercent = 0;
+        }
+
+        if (_history.Count > 0)
+        {
+            var latest = _history[0];
+            Test.LastResult = new BenchmarkResult
+            {
+                BenchmarkName = latest.Name,
+                MetricValue = GetMetricValue(latest),
+                DurationMs = (long)latest.Duration.TotalMilliseconds,
+                Success = latest.Success,
+                Timestamp = latest.Date
+            };
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static double GetMetricValue(BenchmarkState state)
+    {
+        if (state.Records.Count == 0 || state.Duration.TotalSeconds <= 0)
+            return 0;
+
+        var totalCount = state.Records.Sum(r => r.Count);
+        return totalCount / state.Duration.TotalSeconds;
+    }
+
+    private string GetProgressBarClass() => _operation.Status.Value switch
+    {
+        OperationStatus.Success => "bg-green-500",
+        OperationStatus.Failed => "bg-destructive",
+        OperationStatus.Cancelled => "bg-muted-foreground",
+        _ => "bg-primary"
+    };
+
+    private string FormatDuration()
+    {
+        if (_operation.StartTime == DateTime.MinValue)
+            return "00:00";
+
+        var duration = _operation.EndTime != DateTime.MinValue
+            ? _operation.EndTime - _operation.StartTime
+            : DateTime.UtcNow - _operation.StartTime;
+
+        return duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}"
+            : $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+    }
+
+    private static string FormatMetric(double value)
+    {
+        return value switch
+        {
+            >= 10000 => $"{value / 1000:F1}k",
+            >= 100 => $"{value:F0}",
+            >= 1 => $"{value:F1}",
+            _ => $"{value:F2}"
+        };
+    }
+
+    private void Start() => Run();
+}

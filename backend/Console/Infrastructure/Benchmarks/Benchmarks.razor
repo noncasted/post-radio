@@ -1,28 +1,289 @@
 @page "/benchmarks"
+@using global::Benchmarks
+@using global::Common.Extensions
+@using global::Common.Reactive
+@using global::Infrastructure.Startup
+@inherits UiComponent
 
 <PageTitle>Benchmarks</PageTitle>
-<PageHeader Title="Benchmarks"/>
+<PageHeader Title="Benchmarks" />
 
-<div class="container mx-auto max-w-4xl px-4 py-4 flex flex-col gap-6">
-    <div class="rounded-lg border bg-card p-6 flex flex-col gap-4">
-        <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-primary/10 p-2.5">
-                <LucideIcon Name="flask-conical" Size="20" class="text-primary" />
-            </div>
-            <div>
-                <h2 class="text-lg font-semibold">Benchmark dashboard</h2>
-                <p class="text-sm text-muted-foreground">This route is wired for the infrastructure dashboard.</p>
-            </div>
+@if (!_isInitialized)
+{
+    <div class="flex items-center justify-center py-16">
+        <LucideIcon Name="loader-circle" Size="32" class="animate-spin text-primary"/>
+    </div>
+    return;
+}
+
+<div class="sticky top-[6.5rem] z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div class="container mx-auto max-w-3xl px-4 py-2.5 flex items-center gap-4">
+        @if (_runningCount > 0 || Runner.HasQueued())
+        {
+            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive" @onclick="CancelAll">Cancel All</BbButton>
+        }
+        else
+        {
+            <BbButton Size="ButtonSize.Small" @onclick="RunAll">Run All</BbButton>
+        }
+        <div class="flex items-center gap-4 text-xs">
+            <span class="flex items-center gap-1.5 text-muted-foreground">
+                <LucideIcon Name="circle" Size="12" />
+                @_pendingCount pending
+            </span>
+            <span class="flex items-center gap-1.5 text-yellow-500">
+                <LucideIcon Name="loader-circle" Size="12" />
+                @_runningCount running
+            </span>
+            <span class="flex items-center gap-1.5 text-green-500">
+                <LucideIcon Name="circle-check" Size="12" />
+                @_passedCount passed
+            </span>
+            <span class="flex items-center gap-1.5 text-destructive">
+                <LucideIcon Name="circle-x" Size="12" />
+                @_failedCount failed
+            </span>
         </div>
-
-        <div class="text-sm text-muted-foreground leading-relaxed">
-            Benchmark records are stored through the state system. Use the State Explorer for raw benchmark state until
-            a dedicated benchmark runner/results UI is added here.
-        </div>
-
-        <a href="@ConsoleConstants.Pages.StateExplorer" class="inline-flex items-center gap-1 text-sm text-primary font-medium">
-            Open State Explorer
-            <LucideIcon Name="arrow-right" Size="14" />
-        </a>
     </div>
 </div>
+
+<div class="container mx-auto max-w-3xl px-4 py-4 flex flex-col gap-6">
+    @foreach (var group in ClusterTests.GroupBy(t => t.Group))
+    {
+        var groupTests = group.ToList();
+        var hasSubgroups = groupTests.Any(t => !string.IsNullOrEmpty(t.Subgroup));
+        <div class="flex flex-col">
+            <div class="flex items-center justify-between pb-2 border-b border-border">
+                <button class="flex items-center gap-2 text-left transition-colors hover:text-foreground/80"
+                        @onclick="@(() => ToggleGroup(group.Key))">
+                    <LucideIcon Name="@(IsGroupOpen(group.Key) ? "chevron-down" : "chevron-right")" Size="14" class="text-muted-foreground shrink-0" />
+                    <span class="font-semibold text-sm">@group.Key</span>
+                </button>
+                @if (IsGroupRunning(groupTests))
+                {
+                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive"
+                              @onclick="@(() => CancelGroup(groupTests))">
+                        Cancel
+                    </BbButton>
+                }
+                else
+                {
+                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline"
+                              @onclick="@(() => RunGroup(groupTests))">
+                        Run All
+                    </BbButton>
+                }
+            </div>
+            @if (IsGroupOpen(group.Key))
+            {
+                @if (hasSubgroups)
+                {
+                    <div class="flex flex-col gap-3 pt-2">
+                        @foreach (var subgroup in groupTests.GroupBy(t => t.Subgroup).OrderBy(s => s.Key))
+                        {
+                            var subTests = subgroup.ToList();
+                            var subKey = $"{group.Key}/{subgroup.Key}";
+                            <div class="flex flex-col pl-4">
+                                <div class="flex items-center justify-between pb-1.5 border-b border-border/40">
+                                    <button class="flex items-center gap-2 text-left transition-colors hover:text-foreground/80"
+                                            @onclick="@(() => ToggleGroup(subKey))">
+                                        <LucideIcon Name="@(IsGroupOpen(subKey) ? "chevron-down" : "chevron-right")" Size="12" class="text-muted-foreground shrink-0" />
+                                        <span class="font-medium text-xs text-muted-foreground">@subgroup.Key</span>
+                                    </button>
+                                    @if (IsGroupRunning(subTests))
+                                    {
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Destructive"
+                                                  @onclick="@(() => CancelGroup(subTests))">
+                                            Cancel
+                                        </BbButton>
+                                    }
+                                    else
+                                    {
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline"
+                                                  @onclick="@(() => RunGroup(subTests))">
+                                            Run
+                                        </BbButton>
+                                    }
+                                </div>
+                                @if (IsGroupOpen(subKey))
+                                {
+                                    <div class="flex flex-col divide-y divide-border/60">
+                                        @foreach (var test in subTests)
+                                        {
+                                            <BenchmarkEntry @ref="_entries[test]" Test="test" Runner="Runner" StatusChanged="OnStatusChanged" />
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="flex flex-col divide-y divide-border/60">
+                        @foreach (var test in groupTests)
+                        {
+                            <BenchmarkEntry @ref="_entries[test]" Test="test" Runner="Runner" StatusChanged="OnStatusChanged" />
+                        }
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] public IEnumerable<IClusterTest> ClusterTests { get; set; } = [];
+    [Inject] public IClusterParticipantContext ParticipantContext { get; set; } = null!;
+    [Inject] public BenchmarkRunner Runner { get; set; } = null!;
+
+    private readonly Dictionary<IClusterTest, BenchmarkEntry?> _entries = new();
+    private readonly Dictionary<string, bool> _groupOpen = new();
+
+    private bool _isInitialized;
+    private int _pendingCount;
+    private int _runningCount;
+    private int _passedCount;
+    private int _failedCount;
+
+    protected override Task OnSetup(IReadOnlyLifetime lifetime) {
+        ParticipantContext.IsInitialized.View(lifetime, value => {
+            _isInitialized = value;
+            InvokeAsync(StateHasChanged).NoAwait();
+        });
+        return Task.CompletedTask;
+    }
+
+    protected override void OnParametersSet()
+    {
+        foreach (var test in ClusterTests)
+        {
+            _entries.TryAdd(test, null);
+            _groupOpen.TryAdd(test.Group, false);
+
+            if (!string.IsNullOrEmpty(test.Subgroup))
+                _groupOpen.TryAdd($"{test.Group}/{test.Subgroup}", false);
+        }
+
+        // Open groups that have running benchmarks
+        foreach (var info in Runner.GetRunning())
+        {
+            _groupOpen[info.Test.Group] = true;
+
+            if (!string.IsNullOrEmpty(info.Test.Subgroup))
+                _groupOpen[$"{info.Test.Group}/{info.Test.Subgroup}"] = true;
+        }
+
+        RecalculateCounts();
+    }
+
+    private void ToggleGroup(string key)
+    {
+        _groupOpen[key] = !_groupOpen.GetValueOrDefault(key);
+    }
+
+    private bool IsGroupOpen(string key)
+    {
+        return _groupOpen.GetValueOrDefault(key);
+    }
+
+    private void RecalculateCounts()
+    {
+        _pendingCount = 0;
+        _runningCount = 0;
+        _passedCount = 0;
+        _failedCount = 0;
+
+        foreach (var entry in _entries.Values)
+        {
+            if (entry == null)
+            {
+                _pendingCount++;
+                continue;
+            }
+            switch (entry.Status)
+            {
+                case OperationStatus.NotStarted:
+                    _pendingCount++;
+                    break;
+                case OperationStatus.Preparing:
+                case OperationStatus.InProgress:
+                    _runningCount++;
+                    break;
+                case OperationStatus.Success:
+                    _passedCount++;
+                    break;
+                case OperationStatus.Failed:
+                    _failedCount++;
+                    break;
+                case OperationStatus.Cancelled:
+                    _pendingCount++;
+                    break;
+            }
+        }
+    }
+
+    private void OnStatusChanged(OperationStatus _)
+    {
+        RecalculateCounts();
+        InvokeAsync(StateHasChanged).NoAwait();
+    }
+
+    private async Task RunAll()
+    {
+        Runner.CancelAll();
+        RecalculateCounts();
+
+        foreach (var key in _groupOpen.Keys)
+            _groupOpen[key] = true;
+        StateHasChanged();
+        await Task.Yield();
+
+        foreach (var test in ClusterTests)
+        {
+            if (_entries.TryGetValue(test, out var entry) && entry != null)
+                entry.Run();
+        }
+    }
+
+    private async Task RunGroup(List<IClusterTest> tests)
+    {
+        if (tests.Count > 0)
+        {
+            _groupOpen[tests[0].Group] = true;
+
+            foreach (var test in tests.Where(t => !string.IsNullOrEmpty(t.Subgroup)))
+                _groupOpen[$"{test.Group}/{test.Subgroup}"] = true;
+
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        foreach (var test in tests)
+        {
+            if (_entries.TryGetValue(test, out var entry) && entry != null)
+                entry.Run();
+        }
+    }
+
+    private void CancelAll()
+    {
+        Runner.CancelAll();
+        RecalculateCounts();
+        StateHasChanged();
+    }
+
+    private void CancelGroup(List<IClusterTest> tests)
+    {
+        foreach (var test in tests)
+            Runner.Cancel(test.Title);
+
+        RecalculateCounts();
+        StateHasChanged();
+    }
+
+    private bool IsGroupRunning(List<IClusterTest> tests)
+    {
+        return tests.Any(t => Runner.IsRunning(t.Title));
+    }
+}

@@ -17,6 +17,7 @@
         <ProjectReference Include="..\..\Console\Console.csproj"/>
         <ProjectReference Include="..\..\Common\Common.csproj"/>
         <ProjectReference Include="..\..\Infrastructure\Infrastructure.csproj"/>
+        <ProjectReference Include="..\..\Tools\Benchmarks\Benchmarks.csproj"/>
     </ItemGroup>
 
 </Project>

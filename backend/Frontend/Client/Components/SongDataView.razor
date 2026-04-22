@@ -1,29 +1,66 @@
 @using Frontend.Client.Services
 
-<div class="song-title">@State.CurrentSong?.Name</div>
-<div class="song-author">@State.CurrentSong?.Author</div>
+@if (State.CurrentSong != null)
+{
+    <div class="song-data-overlay" aria-live="polite">
+        <div class="song-title" title="@State.CurrentSong.Name">@State.CurrentSong.Name</div>
+        <div class="song-author" title="@State.CurrentSong.Author">@State.CurrentSong.Author</div>
+    </div>
+}
 
 <style>
-    .song-title {
+    .song-data-overlay {
         position: fixed;
-        left: 20px;
-        bottom: 70px;
-        font-size: 3rem;
-        font-weight: 500;
+        left: clamp(1rem, 3vw, 3rem);
+        right: auto;
+        bottom: clamp(1rem, 4vh, 3rem);
+        width: min(58rem, calc(100vw - clamp(2rem, 6vw, 6rem)));
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.25rem, 0.8vh, 0.65rem);
         color: #fff;
-        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
         z-index: 10;
         pointer-events: none;
     }
+
+    .song-title,
     .song-author {
-        position: fixed;
-        left: 20px;
-        bottom: 20px;
-        font-size: 1.25rem;
+        max-width: 100%;
+        overflow: hidden;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+        overflow-wrap: anywhere;
+    }
+
+    .song-title {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        font-size: clamp(1.35rem, 2.6vw, 3rem);
+        line-height: 1.1;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+
+    .song-author {
+        width: fit-content;
+        max-width: 100%;
         color: #eee;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
-        z-index: 10;
-        pointer-events: none;
+        font-size: clamp(0.95rem, 1.35vw, 1.45rem);
+        line-height: 1.2;
+        font-weight: 500;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        opacity: 0.92;
+    }
+
+    @@media (max-width: 700px) {
+        .song-data-overlay {
+            width: calc(100vw - 2rem);
+        }
+
+        .song-title {
+            -webkit-line-clamp: 3;
+        }
     }
 </style>
 

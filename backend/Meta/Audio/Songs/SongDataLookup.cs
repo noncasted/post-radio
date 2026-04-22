@@ -4,6 +4,7 @@ using Common;
 using Common.Extensions;
 using Infrastructure;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Meta.Audio;
 
@@ -26,17 +27,19 @@ public class SongDataLookup : ISongDataLookup
     public SongDataLookup(
         IOrleans orleans,
         ISongsCollection songs,
+        IOptions<AudioOptions> options,
         ILogger<SongDataLookup> logger)
     {
         _orleans = orleans;
         _songs = songs;
+        _lookupFile = ResolveLookupFile(options.Value.SongLookupFile);
+        _metadataDirectory = Path.GetDirectoryName(_lookupFile) ?? AppContext.BaseDirectory;
         _logger = logger;
     }
 
-    private static readonly string MetadataDirectory =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "tools", "metadata"));
-
-    private static readonly string LookupFile = Path.Combine(MetadataDirectory, "songs.json");
+    private const string MetadataDirectoryName = "metadata";
+    private const string ToolsDirectoryName = "tools";
+    private const string LookupFileName = "songs.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -47,6 +50,8 @@ public class SongDataLookup : ISongDataLookup
     private readonly IOrleans _orleans;
     private readonly ISongsCollection _songs;
     private readonly ILogger<SongDataLookup> _logger;
+    private readonly string _lookupFile;
+    private readonly string _metadataDirectory;
 
     public async Task Save(IOperationProgress progress)
     {
@@ -63,30 +68,66 @@ public class SongDataLookup : ISongDataLookup
                 Name = kv.Value.Name
             });
 
-        Directory.CreateDirectory(MetadataDirectory);
+        Directory.CreateDirectory(_metadataDirectory);
 
-        progress.Log($"Writing {data.Count} entries to {LookupFile}");
+        progress.Log($"Writing {data.Count} entries to {_lookupFile}");
         var json = JsonSerializer.Serialize(data, JsonOptions);
-        await File.WriteAllTextAsync(LookupFile, json);
+        await File.WriteAllTextAsync(_lookupFile, json);
 
-        _logger.LogInformation("[Audio] [Lookup] Saved {Count} entries to {File}", data.Count, LookupFile);
+        _logger.LogInformation("[Audio] [Lookup] Saved {Count} entries to {File}", data.Count, _lookupFile);
         progress.Log($"Saved {data.Count} entries.");
         progress.SetStatus(OperationStatus.Success);
+    }
+
+    private static string ResolveLookupFile(string? configuredPath)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+            return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configuredPath));
+
+        var publishedPath = Path.Combine(AppContext.BaseDirectory, ToolsDirectoryName, MetadataDirectoryName, LookupFileName);
+
+        if (File.Exists(publishedPath))
+            return Path.GetFullPath(publishedPath);
+
+        var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
+
+        if (repositoryRoot != null)
+            return Path.Combine(repositoryRoot, ToolsDirectoryName, MetadataDirectoryName, LookupFileName);
+
+        return Path.GetFullPath(publishedPath);
+    }
+
+    private static string? FindRepositoryRoot(string startPath)
+    {
+        var directory = new DirectoryInfo(startPath);
+
+        while (directory != null)
+        {
+            var toolsMetadataPath = Path.Combine(directory.FullName, ToolsDirectoryName, MetadataDirectoryName);
+            var backendPath = Path.Combine(directory.FullName, "backend");
+
+            if (Directory.Exists(toolsMetadataPath) && Directory.Exists(backendPath))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        return null;
     }
 
     public async Task Load(IOperationProgress progress)
     {
         progress.SetStatus(OperationStatus.InProgress);
 
-        if (!File.Exists(LookupFile))
+        if (!File.Exists(_lookupFile))
         {
-            progress.Log($"Lookup file not found: {LookupFile}");
+            progress.Log($"Lookup file not found: {_lookupFile}");
             progress.SetStatus(OperationStatus.Failed);
             return;
         }
 
-        progress.Log($"Reading {LookupFile}");
-        var json = await File.ReadAllTextAsync(LookupFile);
+        progress.Log($"Reading {_lookupFile}");
+        var json = await File.ReadAllTextAsync(_lookupFile);
         var data = JsonSerializer.Deserialize<Dictionary<long, SongLookupInfo>>(json);
 
         if (data == null || data.Count == 0)

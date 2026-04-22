@@ -5,6 +5,7 @@
         <Project Path="Frontend/Server/Server.csproj" />
     </Folder>
     <Folder Name="/Tools/">
+        <Project Path="Tools/Benchmarks/Benchmarks.csproj" />
         <Project Path="Tools/DeploySetup/DeploySetup.csproj" />
         <Project Path="Tools/Generators/Generators.csproj" />
     </Folder>

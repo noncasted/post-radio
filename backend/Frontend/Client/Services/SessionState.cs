@@ -7,6 +7,8 @@ public class SessionState : IDisposable
     public SessionState(IRadioApi api)
     {
         _api = api;
+        SessionId = Guid.NewGuid().ToString("N");
+        _api.SetSessionId(SessionId);
     }
 
     private readonly IRadioApi _api;
@@ -18,6 +20,7 @@ public class SessionState : IDisposable
     private int _imageIndex = Random.Shared.Next();
 
     public CancellationToken Token => _cts.Token;
+    public string SessionId { get; }
 
     public PlaylistDto? Playlist { get; private set; }
     public SongDto? CurrentSong { get; private set; }
@@ -38,6 +41,8 @@ public class SessionState : IDisposable
     public event Action? CurrentSongChanged;
     public event Action? OptionsChanged;
 
+    private bool _isStarted;
+
     public async Task LoadOptions()
     {
         var options = await _api.GetFrontendOptions();
@@ -51,7 +56,16 @@ public class SessionState : IDisposable
         VolumeChanged?.Invoke();
     }
 
-    public void InvokeStart() => Started?.Invoke();
+    public void InvokeStart()
+    {
+        if (_isStarted)
+            return;
+
+        _isStarted = true;
+        TouchLoop();
+        Started?.Invoke();
+    }
+
     public void RequestSkip() => SkipRequested?.Invoke();
 
     public async Task SetPlaylist(PlaylistDto playlist)
@@ -103,5 +117,41 @@ public class SessionState : IDisposable
         }
     }
 
-    public void Dispose() => _cts.Cancel();
+    private void TouchLoop()
+    {
+        _ = RunTouchLoop();
+    }
+
+    private async Task RunTouchLoop()
+    {
+        while (!_cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await _api.TouchPresence();
+                await Task.Delay(TimeSpan.FromSeconds(60), _cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(60), _cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
 }
