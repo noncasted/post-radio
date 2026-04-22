@@ -203,9 +203,21 @@
         _componentStartUtc = DateTime.UtcNow;
         _componentCts = CancellationTokenSource.CreateLinkedTokenSource(State.Token);
 
-        _startedHandler = EnsureLoopStarted;
-        _skipRequestedHandler = () => _ = SetNext("skip-requested");
-        _playlistChangedHandler = () => _ = SetNext("playlist-changed");
+        _startedHandler = () =>
+        {
+            Logger.LogInformation("[AudioPlayer] Trigger source=Started loopRunning={LoopRunning}", _loopTask is { IsCompleted: false });
+            EnsureLoopStarted();
+        };
+        _skipRequestedHandler = () =>
+        {
+            Logger.LogInformation("[AudioPlayer] Trigger source=SkipRequested generation={Generation} currentSongId={SongId}", _generation, State.CurrentSong?.Id);
+            _ = SetNext("skip-requested");
+        };
+        _playlistChangedHandler = () =>
+        {
+            Logger.LogInformation("[AudioPlayer] Trigger source=PlaylistChanged generation={Generation} playlist={Playlist}", _generation, State.Playlist?.Name);
+            _ = SetNext("playlist-changed");
+        };
         _volumeChangedHandler = () => _ = OnVolumeChanged(State.Volume);
 
         State.Started += _startedHandler;
@@ -257,7 +269,7 @@
                     emptyUrlRetryCount++;
                     var delay = GetEmptyUrlDelay(emptyUrlRetryCount);
                     var isStartupWindow = DateTime.UtcNow - _componentStartUtc < StartupSilencePeriod;
-                    Logger.Log(isStartupWindow ? LogLevel.Debug : LogLevel.Information,
+                    Logger.LogInformation(
                         "[AudioPlayer] Empty url retry count={Count} delay={Delay} startupWindow={StartupWindow}",
                         emptyUrlRetryCount, delay, isStartupWindow);
                     await Task.Delay(delay, ComponentToken);
@@ -522,7 +534,24 @@
 
         if (!await _setNextLock.WaitAsync(0))
         {
-            Logger.LogInformation("[AudioPlayer] SetNext skipped reason={Reason} lock=busy generation={Generation}", reason, _generation);
+            Logger.LogInformation("[AudioPlayer] SetNext skipped reason={Reason} lock=busy generation={Generation} currentSongId={SongId}",
+                reason, _generation, State.CurrentSong?.Id);
+
+            _ = PushSkipToBackend(new
+            {
+                reason,
+                title = "SetNext skipped (lock busy)",
+                severity = "debug",
+                skipped = true,
+                lockBusy = true,
+                songId = State.CurrentSong?.Id,
+                songLabel = FormatSongLabel(State.CurrentSong),
+                timestampUtc = DateTime.UtcNow,
+                sessionId = State.SessionId,
+                generation = _generation,
+                recentSkipCount = State.RecentSkips.Count
+            });
+
             return SetNextResult.Busy;
         }
 
@@ -601,7 +630,7 @@
         }
     }
 
-    private bool IsReportSuppressed(string reason)
+    private bool IsUiSuppressed(string reason)
     {
         if (reason == "playlist-changed" || reason == "ended" || reason == "skip-requested")
             return true;
@@ -618,22 +647,28 @@
         IReadOnlyList<KeyValuePair<string, string?>> details,
         AudioStateSnapshot? snapshot)
     {
-        if (IsReportSuppressed(reason))
-            return;
-
         var (title, severity) = DescribeReason(reason);
         var songLabel = FormatSongLabel(previousSong);
         var timestamp = DateTime.UtcNow;
+        var uiSuppressed = IsUiSuppressed(reason);
 
-        var notification = new SkipNotification(
-            Reason: reason,
-            Title: title,
-            Severity: severity,
-            SongLabel: songLabel,
-            TimestampUtc: timestamp,
-            Details: details);
+        Logger.LogInformation(
+            "[AudioPlayer] ReportSkip reason={Reason} severity={Severity} songId={SongId} songLabel={SongLabel} uiSuppressed={UiSuppressed} details=[{Details}]",
+            reason, severity, previousSong?.Id, songLabel, uiSuppressed,
+            string.Join(", ", details.Select(kv => $"{kv.Key}={kv.Value ?? "-"}")));
 
-        State.ReportSkip(notification);
+        if (!uiSuppressed)
+        {
+            var notification = new SkipNotification(
+                Reason: reason,
+                Title: title,
+                Severity: severity,
+                SongLabel: songLabel,
+                TimestampUtc: timestamp,
+                Details: details);
+
+            State.ReportSkip(notification);
+        }
 
         var payload = new
         {
@@ -647,7 +682,8 @@
             generation = _generation,
             audioState = snapshot,
             details = details.Select(kv => new { key = kv.Key, value = kv.Value }).ToArray(),
-            recentSkipCount = State.RecentSkips.Count
+            recentSkipCount = State.RecentSkips.Count,
+            uiSuppressed
         };
 
         _ = PushSkipToBackend(payload);
