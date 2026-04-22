@@ -158,22 +158,37 @@
         await OnVolumeChanged(State.Volume);
 
         var emptyUrlRetryCount = 0;
+        var skippedMissingCount = 0;
 
         while (!ComponentToken.IsCancellationRequested)
         {
             try
             {
+                var setNextResult = SetNextResult.None;
                 if (string.IsNullOrWhiteSpace(_audioUrl))
-                    await SetNext("empty-url");
+                    setNextResult = await SetNext("empty-url");
 
                 if (string.IsNullOrWhiteSpace(_audioUrl))
                 {
+                    if (setNextResult == SetNextResult.SkippedMissing)
+                    {
+                        emptyUrlRetryCount = 0;
+                        skippedMissingCount++;
+
+                        if (skippedMissingCount >= 3)
+                            await Task.Delay(EmptyPlaylistDelay, ComponentToken);
+
+                        continue;
+                    }
+
+                    skippedMissingCount = 0;
                     emptyUrlRetryCount++;
                     await Task.Delay(GetEmptyUrlDelay(emptyUrlRetryCount), ComponentToken);
                     continue;
                 }
 
                 emptyUrlRetryCount = 0;
+                skippedMissingCount = 0;
                 var generation = _generation;
                 var url = _audioUrl;
                 MarkPlaybackStarted(generation, url);
@@ -345,15 +360,15 @@
         }
     }
 
-    private async Task SetNext(string reason)
+    private async Task<SetNextResult> SetNext(string reason)
     {
         if (_disposed)
-            return;
+            return SetNextResult.Cancelled;
 
         if (!await _setNextLock.WaitAsync(0))
         {
             Logger.LogDebug("[AudioPlayer] SetNext skipped reason={Reason} lock=busy generation={Generation}", reason, _generation);
-            return;
+            return SetNextResult.Busy;
         }
 
         try
@@ -372,7 +387,7 @@
                 State.SetCurrentSong(null);
                 _audioUrl = string.Empty;
                 await InvokeAsync(StateHasChanged);
-                return;
+                return SetNextResult.NoSong;
             }
 
             var stream = await Api.GetSongStreamUrl(song.Id, ComponentToken);
@@ -387,21 +402,34 @@
                 State.SetCurrentSong(null);
                 _audioUrl = string.Empty;
                 await InvokeAsync(StateHasChanged);
-                return;
+                return stream.IsNotFound ? SetNextResult.SkippedMissing : SetNextResult.TransientFailure;
             }
 
             State.CommitNextSong(song);
             State.SetCurrentSong(song);
             _audioUrl = stream.Url;
             await InvokeAsync(StateHasChanged);
+            return SetNextResult.Loaded;
         }
         catch (OperationCanceledException)
         {
+            return SetNextResult.Cancelled;
         }
         finally
         {
             _setNextLock.Release();
         }
+    }
+
+    private enum SetNextResult
+    {
+        None,
+        Loaded,
+        SkippedMissing,
+        TransientFailure,
+        NoSong,
+        Busy,
+        Cancelled
     }
 
     private void ResetPlaybackState()
