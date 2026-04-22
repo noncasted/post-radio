@@ -54,12 +54,24 @@
              "durationchange", "loadedmetadata", "loadeddata", "suspend",
              "abort", "emptied"]
                 .forEach(add);
+
+            const visibilityHandler = () => {
+                dotnetHelper.invokeMethodAsync(
+                    "OnVisibilityChange",
+                    document.hidden,
+                    document.visibilityState || "unknown")
+                    .catch((e) => console.debug("visibility callback failed:", e));
+            };
+            document.addEventListener("visibilitychange", visibilityHandler);
+            window.audioHelper.handlers.push(["__visibility__", visibilityHandler]);
         },
 
         detach: () => {
             const audio = document.getElementById("audio");
-            if (audio) {
-                for (const [eventName, handler] of window.audioHelper.handlers) {
+            for (const [eventName, handler] of window.audioHelper.handlers) {
+                if (eventName === "__visibility__") {
+                    document.removeEventListener("visibilitychange", handler);
+                } else if (audio) {
                     audio.removeEventListener(eventName, handler);
                 }
             }
@@ -135,8 +147,39 @@
                 errorCode: audio.error ? audio.error.code : null,
                 errorMessage: audio.error ? (audio.error.message || "") : null,
                 src: audio.currentSrc || audio.src || null,
-                buffered: bufferedRanges
+                buffered: bufferedRanges,
+                hidden: document.hidden,
+                visibilityState: document.visibilityState || "unknown",
+                userAgent: navigator.userAgent
             };
+        },
+
+        tryResumePlayback: async () => {
+            const audio = document.getElementById("audio");
+            if (!audio || !audio.getAttribute("src")) return { resumed: false, reason: "no-src" };
+
+            try {
+                const beforeTime = audio.currentTime;
+                await audio.play();
+                return {
+                    resumed: true,
+                    reason: "play-resolved",
+                    currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : null,
+                    beforeTime: Number.isFinite(beforeTime) ? beforeTime : null,
+                    readyState: audio.readyState,
+                    networkState: audio.networkState,
+                    paused: audio.paused
+                };
+            } catch (e) {
+                return {
+                    resumed: false,
+                    reason: e.name || "unknown",
+                    errorMessage: e.message || "",
+                    readyState: audio.readyState,
+                    networkState: audio.networkState,
+                    paused: audio.paused
+                };
+            }
         },
 
         stop: () => {
@@ -175,6 +218,10 @@
     private int _generation;
     private DateTime _componentStartUtc = DateTime.UtcNow;
     private DateTime? _loadAndPlayCompletedUtc;
+    private bool _isHidden;
+    private DateTime? _hiddenSinceUtc;
+    private int _progressTimeoutResumeAttempts;
+    private DateTime? _lastResumeAttemptUtc;
     private DateTime _lastProgressUtc = DateTime.MinValue;
     private DateTime? _bufferingStartedUtc;
     private bool _isBuffering;
@@ -317,10 +364,22 @@
 
                     if (TryGetWatchdogReason(out var reason))
                     {
-                        Logger.LogWarning("[AudioPlayer] Watchdog trip reason={Reason} generation={Generation} url={Url} hasProgress={HasProgress} isBuffering={IsBuffering} lastProgressAgoSec={LastProgressAgoSec} bufferingAgoSec={BufferingAgoSec} startedAgoSec={StartedAgoSec} readyState={ReadyState} networkState={NetworkState}",
-                            reason, generation, url, _hasReceivedProgress, _isBuffering,
+                        Logger.LogWarning("[AudioPlayer] Watchdog trip reason={Reason} generation={Generation} url={Url} hidden={Hidden} hasProgress={HasProgress} isBuffering={IsBuffering} lastProgressAgoSec={LastProgressAgoSec} bufferingAgoSec={BufferingAgoSec} startedAgoSec={StartedAgoSec} readyState={ReadyState} networkState={NetworkState}",
+                            reason, generation, url, _isHidden, _hasReceivedProgress, _isBuffering,
                             GetSecondsSince(_lastProgressUtc), GetSecondsSinceNullable(_bufferingStartedUtc), GetSecondsSinceNullable(_loadAndPlayCompletedUtc),
                             _lastReadyState, _lastNetworkState);
+
+                        if (_isHidden)
+                        {
+                            Logger.LogInformation("[AudioPlayer] Watchdog suppressed reason={Reason} hidden=true generation={Generation}", reason, generation);
+                            _lastProgressUtc = DateTime.UtcNow;
+                            _bufferingStartedUtc = _isBuffering ? DateTime.UtcNow : null;
+                            continue;
+                        }
+
+                        if (reason == "progress-timeout" && await TryResumeBeforeSkip(generation, url))
+                            continue;
+
                         await SetNext(reason);
                         break;
                     }
@@ -354,6 +413,8 @@
         _lastLoadAndPlayError = null;
         _lastCurrentTime = null;
         _lastDuration = null;
+        _progressTimeoutResumeAttempts = 0;
+        _lastResumeAttemptUtc = null;
     }
 
     private static TimeSpan GetEmptyUrlDelay(int retryCount)
@@ -436,6 +497,39 @@
     }
 
     [JSInvokable]
+    public Task OnVisibilityChange(bool hidden, string state)
+    {
+        if (_disposed)
+            return Task.CompletedTask;
+
+        var now = DateTime.UtcNow;
+        var previouslyHidden = _isHidden;
+        _isHidden = hidden;
+
+        if (hidden)
+        {
+            _hiddenSinceUtc ??= now;
+            Logger.LogInformation("[AudioPlayer] Visibility hidden state={State} generation={Generation}", state, _generation);
+        }
+        else
+        {
+            var hiddenFor = _hiddenSinceUtc.HasValue ? (now - _hiddenSinceUtc.Value).TotalSeconds : 0;
+            _hiddenSinceUtc = null;
+
+            if (previouslyHidden)
+            {
+                _lastProgressUtc = now;
+                _bufferingStartedUtc = _isBuffering ? now : null;
+                _progressTimeoutResumeAttempts = 0;
+            }
+
+            Logger.LogInformation("[AudioPlayer] Visibility visible state={State} generation={Generation} hiddenSec={HiddenSec:F1}", state, _generation, hiddenFor);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
     public async Task OnAudioEvent(
         string eventName,
         int generation,
@@ -496,6 +590,7 @@
                 _hasReceivedProgress = true;
                 _bufferingStartedUtc = null;
                 _isBuffering = false;
+                _progressTimeoutResumeAttempts = 0;
                 break;
             case "waiting":
             case "stalled":
@@ -751,6 +846,22 @@
         if (!string.IsNullOrWhiteSpace(_lastAudioErrorMessage))
             Add("lastAudioErrMsg", _lastAudioErrorMessage);
 
+        Add("hidden", _isHidden.ToString());
+        if (_hiddenSinceUtc.HasValue)
+            Add("hiddenAgoSec", GetSecondsSinceNullable(_hiddenSinceUtc).ToString("F1", CultureInfo.InvariantCulture));
+        if (_progressTimeoutResumeAttempts > 0)
+            Add("resumeAttempts", _progressTimeoutResumeAttempts.ToString(CultureInfo.InvariantCulture));
+
+        if (snapshot != null)
+        {
+            if (snapshot.Hidden.HasValue)
+                Add("domHidden", snapshot.Hidden.Value.ToString());
+            if (!string.IsNullOrWhiteSpace(snapshot.VisibilityState))
+                Add("visibilityState", snapshot.VisibilityState);
+            if (!string.IsNullOrWhiteSpace(snapshot.UserAgent))
+                Add("userAgent", snapshot.UserAgent);
+        }
+
         return list;
     }
 
@@ -867,6 +978,80 @@
         }
     }
 
+    private async Task<bool> TryResumeBeforeSkip(int generation, string url)
+    {
+        const int maxAttempts = 2;
+
+        if (_progressTimeoutResumeAttempts >= maxAttempts)
+        {
+            Logger.LogWarning("[AudioPlayer] Resume skipped attempts={Attempts} generation={Generation}", _progressTimeoutResumeAttempts, generation);
+            return false;
+        }
+
+        ResumeResult? result;
+        try
+        {
+            result = await Js.InvokeAsync<ResumeResult>("audioHelper.tryResumePlayback");
+        }
+        catch (JSDisconnectedException)
+        {
+            return false;
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning(e, "[AudioPlayer] Resume invoke failed");
+            return false;
+        }
+
+        _progressTimeoutResumeAttempts++;
+        _lastResumeAttemptUtc = DateTime.UtcNow;
+
+        Logger.LogWarning("[AudioPlayer] Resume attempt={Attempt} resumed={Resumed} reason={Reason} errorMessage={ErrorMessage} beforeTime={BeforeTime} currentTime={CurrentTime} readyState={ReadyState} networkState={NetworkState} paused={Paused}",
+            _progressTimeoutResumeAttempts, result?.Resumed, result?.Reason, result?.ErrorMessage,
+            result?.BeforeTime, result?.CurrentTime, result?.ReadyState, result?.NetworkState, result?.Paused);
+
+        var payload = new
+        {
+            reason = "resume-attempt",
+            title = "Resume before skip",
+            severity = "info",
+            attempt = _progressTimeoutResumeAttempts,
+            resumed = result?.Resumed ?? false,
+            detail = result?.Reason,
+            errorMessage = result?.ErrorMessage,
+            beforeTime = result?.BeforeTime,
+            currentTime = result?.CurrentTime,
+            readyState = result?.ReadyState,
+            networkState = result?.NetworkState,
+            paused = result?.Paused,
+            songId = State.CurrentSong?.Id,
+            songLabel = FormatSongLabel(State.CurrentSong),
+            timestampUtc = DateTime.UtcNow,
+            sessionId = State.SessionId,
+            generation,
+            hidden = _isHidden
+        };
+        _ = PushSkipToBackend(payload);
+
+        if (result?.Resumed != true || !IsCurrent(generation, url))
+            return false;
+
+        _lastProgressUtc = DateTime.UtcNow;
+        _bufferingStartedUtc = null;
+        _isBuffering = false;
+        return true;
+    }
+
+    private sealed record ResumeResult(
+        bool Resumed,
+        string? Reason,
+        string? ErrorMessage,
+        double? BeforeTime,
+        double? CurrentTime,
+        int? ReadyState,
+        int? NetworkState,
+        bool? Paused);
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -942,5 +1127,8 @@
         int? ErrorCode,
         string? ErrorMessage,
         string? Src,
-        IReadOnlyList<AudioBufferedRange> Buffered);
+        IReadOnlyList<AudioBufferedRange> Buffered,
+        bool? Hidden,
+        string? VisibilityState,
+        string? UserAgent);
 }
