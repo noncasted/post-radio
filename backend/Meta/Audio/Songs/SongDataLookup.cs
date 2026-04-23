@@ -21,6 +21,7 @@ public class SongLookupInfo
     public required string Url { get; init; }
     public required string Author { get; init; }
     public required string Name { get; init; }
+    public long? DurationMs { get; init; }
 }
 
 public class SongDataLookup : ISongDataLookup
@@ -153,7 +154,7 @@ public class SongDataLookup : ISongDataLookup
                 continue;
             }
 
-            if (state.Author == info.Author && state.Name == info.Name)
+            if (state.Author == info.Author && state.Name == info.Name && state.DurationMs == info.DurationMs)
             {
                 skipped++;
             }
@@ -168,7 +169,8 @@ public class SongDataLookup : ISongDataLookup
                     Url = state.Url,
                     Playlists = state.Playlists,
                     AddDate = state.AddDate,
-                    IsLoaded = state.IsLoaded
+                    IsLoaded = state.IsLoaded,
+                    DurationMs = info.DurationMs
                 });
                 applied++;
             }
@@ -193,7 +195,8 @@ public class SongDataLookup : ISongDataLookup
                 Id = kv.Key,
                 Url = kv.Value.Url,
                 Author = kv.Value.Author,
-                Name = kv.Value.Name
+                Name = kv.Value.Name,
+                DurationMs = kv.Value.DurationMs
             });
     }
 }

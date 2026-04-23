@@ -82,7 +82,8 @@ public static class RadioEndpoints
                    Name = kv.Value.Name,
                    Url = kv.Value.Url,
                    Playlists = kv.Value.Playlists,
-                   AddDate = kv.Value.AddDate
+                   AddDate = kv.Value.AddDate,
+                   DurationMs = kv.Value.DurationMs
                })
                .ToList();
     }
@@ -254,6 +255,7 @@ public class SongDto
     public required string Url { get; init; }
     public required IReadOnlyList<Guid> Playlists { get; init; }
     public required DateTime AddDate { get; init; }
+    public long? DurationMs { get; init; }
 }
 
 public class ImagesCountDto

@@ -14,7 +14,7 @@ public sealed record MediaImage(string Key, string FileName, long SizeBytes, Dat
 public interface IMediaStorage
 {
     Task EnsureStorage();
-    Task SaveAudio(long id, Stream stream);
+    Task SaveAudio(long id, Stream stream, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MediaImage>> GetImages();
     Task<IReadOnlyList<string>> GetImageKeys();
     Task<MediaImage> SaveImage(string fileName, Stream stream);
@@ -73,7 +73,7 @@ public class MediaStorage : IMediaStorage
         return Task.CompletedTask;
     }
 
-    public async Task SaveAudio(long id, Stream stream)
+    public async Task SaveAudio(long id, Stream stream, CancellationToken cancellationToken = default)
     {
         await EnsureStorage();
 
@@ -85,8 +85,8 @@ public class MediaStorage : IMediaStorage
             await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                 bufferSize: 1024 * 128, useAsync: true))
             {
-                await stream.CopyToAsync(file);
-                await file.FlushAsync();
+                await stream.CopyToAsync(file, cancellationToken);
+                await file.FlushAsync(cancellationToken);
             }
 
             File.Move(tempPath, path, overwrite: true);

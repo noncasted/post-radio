@@ -17,7 +17,7 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
             <BbButton Disabled="@_busy" @onclick="RunFetch">
                 @if (_busy && _currentOp == "fetch")
                 {
@@ -43,6 +43,11 @@
                 }
             </BbButton>
             <span class="text-xs text-muted-foreground">@_status</span>
+            <div class="flex-1"></div>
+            <span class="text-xs text-muted-foreground">Sort</span>
+            <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">Name</BbButton>
+            <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">Date</BbButton>
+            <BbButton Variant="@(_sortBy == SortBy.Duration ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Duration))">Duration</BbButton>
         </div>
 
         @if (!string.IsNullOrEmpty(_log))
@@ -66,12 +71,15 @@
     private string _name = "Playlist";
     private string _url = string.Empty;
     private List<KeyValuePair<long, SongState>> _songs = new();
+    private SortBy _sortBy = SortBy.AddDate;
     private int _loadedCount;
 
     private bool _busy;
     private string _currentOp = string.Empty;
     private string _status = string.Empty;
     private string _log = string.Empty;
+
+    private enum SortBy { Name, AddDate, Duration }
 
     protected override void OnInitialized()
     {
@@ -88,8 +96,27 @@
             _url = playlist.Url;
         }
 
-        _songs = SafeSnapshot(Songs, kv => kv.Value.Playlists.Contains(PlaylistId));
-        _loadedCount = _songs.Count(kv => kv.Value.IsLoaded);
+        var songs = SafeSnapshot(Songs, kv => kv.Value.Playlists.Contains(PlaylistId));
+        _loadedCount = songs.Count(kv => kv.Value.IsLoaded);
+        _songs = ApplySort(songs);
+    }
+
+
+    private List<KeyValuePair<long, SongState>> ApplySort(IEnumerable<KeyValuePair<long, SongState>> songs)
+    {
+        return (_sortBy switch
+        {
+            SortBy.Name => songs.OrderBy(kv => kv.Value.Name),
+            SortBy.Duration => songs.OrderByDescending(kv => kv.Value.DurationMs ?? -1),
+            SortBy.AddDate => songs.OrderByDescending(kv => kv.Value.AddDate),
+            _ => songs
+        }).ToList();
+    }
+
+    private void SetSort(SortBy sort)
+    {
+        _sortBy = sort;
+        Reload();
     }
 
     private Task RunFetch() => RunOp("fetch", (data, progress) => Loader.Fetch(data, progress));

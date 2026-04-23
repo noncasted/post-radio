@@ -34,6 +34,7 @@
         </BbButton>
         <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">Name</BbButton>
         <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">Date</BbButton>
+        <BbButton Variant="@(_sortBy == SortBy.Duration ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Duration))">Duration</BbButton>
         <BbButton Variant="@(_sortBy == SortBy.Invalid ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Invalid))">Invalid</BbButton>
     </div>
 
@@ -72,7 +73,7 @@
     private string _status = string.Empty;
     private string _log = string.Empty;
 
-    private enum SortBy { Name, AddDate, Invalid }
+    private enum SortBy { Name, AddDate, Duration, Invalid }
 
     private Task RunFetch() => RunOp("Fetching playlists", p => Loader.FetchAll(p));
     private Task RunSaveLookup() => RunOp("Saving", p => Lookup.Save(p));
@@ -151,6 +152,7 @@
                 {
                     SortBy.Name => Collection.OrderBy(kv => kv.Value.Name),
                     SortBy.AddDate => Collection.OrderByDescending(kv => kv.Value.AddDate),
+                    SortBy.Duration => Collection.OrderByDescending(kv => kv.Value.DurationMs ?? -1),
                     SortBy.Invalid => Collection.Where(kv => string.IsNullOrWhiteSpace(kv.Value.Author))
                                                 .OrderByDescending(kv => kv.Value.AddDate),
                     _ => Collection

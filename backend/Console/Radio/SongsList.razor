@@ -26,6 +26,18 @@
                             <div class="text-xs text-muted-foreground truncate">@state.Url</div>
                         }
                     </div>
+                    @if (state.DurationMs.HasValue)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-sky-500/15 text-sky-600 px-2 py-0.5 text-xs">
+                            <LucideIcon Name="timer" Size="12" /> @FormatDuration(state.DurationMs)
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-muted text-muted-foreground px-2 py-0.5 text-xs">
+                            <LucideIcon Name="timer-off" Size="12" /> unknown
+                        </span>
+                    }
                     @if (state.IsLoaded)
                     {
                         <span class="inline-flex items-center gap-1 rounded bg-emerald-500/15 text-emerald-600 px-2 py-0.5 text-xs">
@@ -193,6 +205,17 @@
         _pageSongs = _filtered.Skip(_page * _pageSize).Take(_pageSize).ToList();
     }
 
+    private static string FormatDuration(long? durationMs)
+    {
+        if (!durationMs.HasValue || durationMs.Value <= 0)
+            return "—";
+
+        var duration = TimeSpan.FromMilliseconds(durationMs.Value);
+        return duration.TotalHours >= 1
+            ? duration.ToString(@"h\:mm\:ss")
+            : duration.ToString(@"m\:ss");
+    }
+
     private void ToggleExpand(long id, SongState state)
     {
         if (_expandedId == id)
@@ -232,7 +255,8 @@
                 Url = state.Url,
                 Playlists = state.Playlists,
                 AddDate = state.AddDate,
-                IsLoaded = state.IsLoaded
+                IsLoaded = state.IsLoaded,
+                DurationMs = state.DurationMs
             });
 
             _expandedId = null;

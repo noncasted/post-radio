@@ -8,7 +8,10 @@ namespace Frontend.Client.Services;
 public sealed record SongStreamUrlResult(bool IsSuccess, string Url, bool IsNotFound, int? StatusCode)
 {
     public static SongStreamUrlResult Success(string url, int statusCode) => new(true, url, false, statusCode);
-    public static SongStreamUrlResult Failure(HttpStatusCode? statusCode = null) => new(false, string.Empty, false, statusCode.HasValue ? (int)statusCode.Value : null);
+
+    public static SongStreamUrlResult Failure(HttpStatusCode? statusCode = null) => new(false, string.Empty, false,
+        statusCode.HasValue ? (int)statusCode.Value : null);
+
     public static SongStreamUrlResult NotFound() => new(false, string.Empty, true, (int)HttpStatusCode.NotFound);
 }
 
@@ -72,6 +75,7 @@ public class RadioApi : IRadioApi
     public async Task<IReadOnlyList<SongDto>> GetSongs(Guid? playlistId = null)
     {
         var url = playlistId.HasValue ? $"/api/radio/songs?playlistId={playlistId}" : "/api/radio/songs";
+
         try
         {
             var result = await _http.GetFromJsonAsync<List<SongDto>>(WithSession(url));
@@ -88,17 +92,21 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            using var response = await _http.GetAsync(WithSession($"/api/radio/songs/{id}/stream"), HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await _http.GetAsync(WithSession($"/api/radio/songs/{id}/stream"),
+                HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return SongStreamUrlResult.NotFound();
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("[RadioApi] GetSongStreamUrl failed for {SongId}: {StatusCode}", id, response.StatusCode);
+                _logger.LogWarning("[RadioApi] GetSongStreamUrl failed for {SongId}: {StatusCode}", id,
+                    response.StatusCode);
                 return SongStreamUrlResult.Failure(response.StatusCode);
             }
 
             var url = await response.Content.ReadAsStringAsync(cancellationToken);
+
             if (string.IsNullOrWhiteSpace(url))
             {
                 _logger.LogWarning("[RadioApi] GetSongStreamUrl returned an empty url for {SongId}", id);
@@ -162,8 +170,7 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            using var response = await _http.PostAsJsonAsync(
-                WithSession("/api/radio/skip-report"),
+            using var response = await _http.PostAsJsonAsync(WithSession("/api/radio/skip-report"),
                 payload,
                 cancellationToken);
             response.EnsureSuccessStatusCode();

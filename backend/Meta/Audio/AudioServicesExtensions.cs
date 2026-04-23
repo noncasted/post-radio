@@ -33,6 +33,9 @@ public static class AudioServicesExtensions
         builder.Add<SongDataLookup>()
                .As<ISongDataLookup>();
 
+        builder.Add<TrackDurationRepairService>()
+               .As<ITrackDurationRepairService>();
+
         builder.Add<AudioServicesStartup>()
                .As<ICoordinatorSetupCompleted>();
 

@@ -11,6 +11,7 @@ public interface ISong : IGrainWithIntegerKey
     Task AddToPlaylist(Guid playlistId);
     Task RemoveFromPlaylist(Guid playlistId);
     Task SetLoaded(bool loaded);
+    Task SetAudioData(bool loaded, long? durationMs);
 }
 
 [GenerateSerializer]
@@ -23,6 +24,7 @@ public class SongData
     [Id(4)] public required string Name { get; init; }
     [Id(5)] public required DateTime AddDate { get; init; }
     [Id(6)] public required bool IsLoaded { get; init; }
+    [Id(7)] public long? DurationMs { get; init; }
 }
 
 [GenerateSerializer]
@@ -35,6 +37,7 @@ public class SongState : IStateValue
     [Id(3)] public string Name { get; set; } = string.Empty;
     [Id(4)] public DateTime AddDate { get; set; }
     [Id(5)] public bool IsLoaded { get; set; }
+    [Id(6)] public long? DurationMs { get; set; }
 
     public int Version => 0;
 }
@@ -60,6 +63,7 @@ public class Song : Grain, ISong
             s.Name = data.Name;
             s.Playlists = data.Playlists.ToList();
             s.AddDate = data.AddDate;
+            s.DurationMs = data.DurationMs;
         });
 
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
@@ -77,13 +81,23 @@ public class Song : Grain, ISong
             Name = state.Name,
             Playlists = state.Playlists,
             AddDate = state.AddDate,
-            IsLoaded = state.IsLoaded
+            IsLoaded = state.IsLoaded,
+            DurationMs = state.DurationMs
         };
     }
 
     public async Task SetLoaded(bool loaded)
     {
         var updated = await _state.Update(s => s.IsLoaded = loaded);
+        await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
+    }
+
+    public async Task SetAudioData(bool loaded, long? durationMs)
+    {
+        var updated = await _state.Update(s => {
+            s.IsLoaded = loaded;
+            s.DurationMs = durationMs;
+        });
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
     }
 

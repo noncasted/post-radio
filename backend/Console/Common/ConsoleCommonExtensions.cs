@@ -1,3 +1,5 @@
+using Common.Extensions;
+using Console.Actions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -8,6 +10,8 @@ public static class ConsoleCommonExtensions
     public static IHostApplicationBuilder AddCommonConsoleComponents(this IHostApplicationBuilder builder)
     {
         builder.Services.AddScoped<IConsoleNavigation, ConsoleNavigation>();
+        builder.Add<TrackDurationRepairConsoleAction>()
+               .As<IConsoleAction>();
 
         return builder;
     }

@@ -2,8 +2,8 @@ using Frontend.Shared;
 
 namespace Frontend.Client.Services;
 
-public sealed record SkipNotification(
-    string Reason,
+public sealed record SkipNotification
+(string Reason,
     string Title,
     string Severity,
     string? SongLabel,
@@ -96,6 +96,7 @@ public class SessionState : IDisposable
         lock (_recentSkips)
         {
             _recentSkips.AddFirst(notification);
+
             while (_recentSkips.Count > MaxRecentSkips)
                 _recentSkips.RemoveLast();
         }
@@ -137,6 +138,7 @@ public class SessionState : IDisposable
             return;
 
         var currentIndex = _songIndex % _playlistSongs.Count;
+
         if (_playlistSongs[currentIndex].Id == song.Id)
         {
             _songIndex++;
@@ -144,6 +146,7 @@ public class SessionState : IDisposable
         }
 
         var songIndex = _playlistSongs.FindIndex(candidate => candidate.Id == song.Id);
+
         if (songIndex >= 0)
             _songIndex = songIndex + 1;
     }

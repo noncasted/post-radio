@@ -1,0 +1,125 @@
+@page "/actions"
+@using global::Common.Extensions
+@using global::Common.Reactive
+@implements IDisposable
+
+<PageTitle>Actions</PageTitle>
+<PageHeader Title="Actions" />
+
+<div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-4">
+    <div class="text-sm text-muted-foreground">
+        Operational actions for radio maintenance.
+    </div>
+
+    <div class="grid grid-cols-1 gap-3">
+        @foreach (var action in _actions)
+        {
+            var state = GetState(action.Id);
+            var running = state.Progress.Status.Value is OperationStatus.Preparing or OperationStatus.InProgress;
+
+            <div class="rounded-lg border bg-card p-4 flex flex-col gap-3">
+                <div class="flex items-start gap-3">
+                    <span class="rounded-md bg-primary/10 p-2">
+                        <LucideIcon Name="play-circle" Size="16" class="text-primary" />
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold">@action.Name</div>
+                        <div class="text-xs text-muted-foreground">@action.Description</div>
+                    </div>
+                    <BbButton Disabled="@running" @onclick="@(() => RunAction(action))">
+                        @if (running)
+                        {
+                            <LucideIcon Name="loader" Size="14" class="mr-2 animate-spin" />
+                            <span>Running...</span>
+                        }
+                        else
+                        {
+                            <LucideIcon Name="play" Size="14" class="mr-2" />
+                            <span>Run</span>
+                        }
+                    </BbButton>
+                </div>
+
+                @if (state.Progress.Status.Value != OperationStatus.NotStarted)
+                {
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>@state.Progress.Status.Value</span>
+                            <span>@($"{state.Progress.Progress.Value * 100:F0}%")</span>
+                        </div>
+                        <div class="h-2 rounded bg-muted overflow-hidden">
+                            <div class="h-full rounded bg-primary transition-all"
+                                 style="width: @($"{state.Progress.Progress.Value * 100:F0}%")"></div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(state.Log))
+                        {
+                            <pre class="rounded bg-muted p-3 text-xs font-mono max-h-80 overflow-auto whitespace-pre-wrap">@state.Log</pre>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] public required IEnumerable<IConsoleAction> AvailableActions { get; init; }
+
+    private readonly ILifetime _lifetime = new Lifetime();
+    private readonly Dictionary<string, ActionState> _states = new();
+    private IReadOnlyList<IConsoleAction> _actions = Array.Empty<IConsoleAction>();
+
+    protected override void OnInitialized()
+    {
+        _actions = AvailableActions.OrderBy(action => action.Name).ToList();
+    }
+
+    private ActionState GetState(string actionId)
+    {
+        if (_states.TryGetValue(actionId, out var state))
+            return state;
+
+        state = new ActionState(new OperationProgress());
+        _states[actionId] = state;
+        return state;
+    }
+
+    private async Task RunAction(IConsoleAction action)
+    {
+        var state = new ActionState(new OperationProgress());
+        _states[action.Id] = state;
+
+        state.Progress.Message.Advise(_lifetime, (_, message) => {
+            state.Log += message + "\n";
+            InvokeAsync(StateHasChanged);
+        });
+        state.Progress.Progress.View(_lifetime, () => InvokeAsync(StateHasChanged));
+        state.Progress.Status.View(_lifetime, () => InvokeAsync(StateHasChanged));
+
+        try
+        {
+            await action.Execute(state.Progress);
+        }
+        catch (OperationCanceledException)
+        {
+            state.Progress.Log("Cancelled.");
+            state.Progress.SetStatus(OperationStatus.Cancelled);
+        }
+        catch (Exception e)
+        {
+            state.Progress.Log("ERROR: " + e.Message);
+            state.Progress.SetStatus(OperationStatus.Failed);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose() => _lifetime.Terminate();
+
+    private sealed record ActionState(OperationProgress Progress)
+    {
+        public string Log { get; set; } = string.Empty;
+    }
+}

@@ -15,6 +15,7 @@ public class SongDto
     public required string Url { get; init; }
     public required IReadOnlyList<Guid> Playlists { get; init; }
     public required DateTime AddDate { get; init; }
+    public long? DurationMs { get; init; }
 }
 
 public class ImagesCountDto

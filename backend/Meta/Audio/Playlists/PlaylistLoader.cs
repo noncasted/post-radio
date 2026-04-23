@@ -1,9 +1,11 @@
+using System.Text.Json;
 using Common;
 using Common.Extensions;
 using Infrastructure;
 using Microsoft.Extensions.Logging;
 using SoundCloudExplode;
 using SoundCloudExplode.Exceptions;
+using SoundCloudExplode.Tracks;
 
 namespace Meta.Audio;
 
@@ -13,7 +15,10 @@ public interface IPlaylistLoader
     Task FetchAll(IOperationProgress progress);
     Task Load(PlaylistData playlist, IOperationProgress progress);
     Task LoadAll(IOperationProgress progress);
+    Task<SongDownloadResult> DownloadSong(long id, SongState state, Track? track = null, CancellationToken cancellationToken = default);
 }
+
+public sealed record SongDownloadResult(long? SoundCloudDurationMs, TimeSpan? LocalDuration);
 
 public class PlaylistLoader : IPlaylistLoader
 {
@@ -42,6 +47,7 @@ public class PlaylistLoader : IPlaylistLoader
     private readonly IPlaylistsCollection _playlists;
     private readonly ISongsCollection _songs;
     private readonly SoundCloudClient _soundCloud;
+    private static readonly TimeSpan DurationTolerance = TimeSpan.FromSeconds(2);
 
     public async Task Fetch(PlaylistData playlist, IOperationProgress progress)
     {
@@ -149,13 +155,20 @@ public class PlaylistLoader : IPlaylistLoader
 
         var toCreate = new List<SongData>();
         var toAttach = new List<long>();
+        var toUpdateDuration = new List<(long Id, SongState State, long? DurationMs)>();
 
         foreach (var track in tracks)
         {
+            var localDurationMs = await ReadLocalDurationMs(track.Id);
+
             if (_songs.TryGetValue(track.Id, out var existing))
             {
                 if (!existing.Playlists.Contains(playlist.Id))
                     toAttach.Add(track.Id);
+
+                if (existing.DurationMs != localDurationMs)
+                    toUpdateDuration.Add((track.Id, existing, localDurationMs));
+
                 continue;
             }
 
@@ -172,7 +185,8 @@ public class PlaylistLoader : IPlaylistLoader
                 Author = author,
                 Name = name,
                 AddDate = DateTime.UtcNow,
-                IsLoaded = false
+                IsLoaded = false,
+                DurationMs = localDurationMs
             });
         }
 
@@ -201,7 +215,19 @@ public class PlaylistLoader : IPlaylistLoader
             progress.Log($"Attached {i + 1} / {toAttach.Count}");
         }
 
-        progress.Log($"Fetch complete: {toCreate.Count} new, {toAttach.Count} attached.");
+        progress.Log($"Updating duration for {toUpdateDuration.Count} existing songs...");
+        progress.SetProgress(0f);
+
+        for (var i = 0; i < toUpdateDuration.Count; i++)
+        {
+            var (id, state, durationMs) = toUpdateDuration[i];
+            await _orleans.GetGrain<ISong>(id).SetAudioData(state.IsLoaded, durationMs);
+
+            progress.SetProgress(i / (float)Math.Max(1, toUpdateDuration.Count));
+            progress.Log($"Updated duration {i + 1} / {toUpdateDuration.Count}: {state.Author} - {state.Name}");
+        }
+
+        progress.Log($"Fetch complete: {toCreate.Count} new, {toAttach.Count} attached, {toUpdateDuration.Count} duration updated.");
     }
 
     private async Task LoadPending(
@@ -220,8 +246,8 @@ public class PlaylistLoader : IPlaylistLoader
 
             try
             {
-                await Download(id, state);
-                await _orleans.GetGrain<ISong>(id).SetLoaded(true);
+                var result = await DownloadSong(id, state);
+                await _orleans.GetGrain<ISong>(id).SetAudioData(true, ToDurationMs(result.LocalDuration));
                 downloaded++;
                 progress.Log($"Loaded {i + 1} / {pending.Count}: {state.Author} - {state.Name}");
             }
@@ -245,20 +271,131 @@ public class PlaylistLoader : IPlaylistLoader
         progress.SetStatus(OperationStatus.Success);
     }
 
-    private async Task Download(long id, SongState state)
+    public async Task<SongDownloadResult> DownloadSong(
+        long id,
+        SongState state,
+        Track? track = null,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[Audio] Downloading {Author} {Name}", state.Author, state.Name);
 
-        var mediaUrl = await _soundCloud.Tracks.GetDownloadUrlAsync(state.Url);
+        track ??= await _soundCloud.Tracks.GetAsync(state.Url, cancellationToken)
+                  ?? throw new InvalidOperationException($"SoundCloud track not found: {state.Url}");
 
-        var request = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
-        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var mediaUrl = await GetDownloadUrlAsync(track, cancellationToken);
+        if (string.IsNullOrWhiteSpace(mediaUrl))
+            throw new InvalidOperationException($"SoundCloud download URL not found: {state.Url}");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException(
                 $"Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode}).");
 
-        await using var stream = await response.Content.ReadAsStreamAsync();
-        await _mediaStorage.SaveAudio(id, stream);
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await _mediaStorage.SaveAudio(id, stream, cancellationToken);
+
+        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
+        return new SongDownloadResult(GetTrackDurationMs(track), localDuration);
+    }
+
+    private async Task<long?> ReadLocalDurationMs(long id, CancellationToken cancellationToken = default)
+    {
+        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
+        return ToDurationMs(localDuration);
+    }
+
+    public static long? ToDurationMs(TimeSpan? duration)
+    {
+        return duration.HasValue
+            ? (long)Math.Round(duration.Value.TotalMilliseconds)
+            : null;
+    }
+
+    private async Task<string?> GetDownloadUrlAsync(Track track, CancellationToken cancellationToken)
+    {
+        var transcoding = SelectProgressiveTranscoding(track);
+        if (transcoding == null)
+            throw new TrackUnavailableException("No non-snipped progressive transcodings found");
+
+        if (transcoding.Url == null)
+            return null;
+
+        var uri = new UriBuilder(transcoding.Url)
+        {
+            Query = "client_id=" + Uri.EscapeDataString(_soundCloud.ClientId)
+        }.Uri;
+
+        using var response = await _http.GetAsync(uri, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode}).");
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(json);
+
+        if (!document.RootElement.TryGetProperty("url", out var urlElement))
+            return null;
+
+        var url = urlElement.GetString();
+        if (url?.Contains(".m3u8", StringComparison.OrdinalIgnoreCase) == true)
+            throw new TrackUnavailableException("Selected SoundCloud transcoding is HLS, not a direct audio file");
+
+        return url;
+    }
+
+    private static Transcoding? SelectProgressiveTranscoding(Track track)
+    {
+        var expectedDurationMs = GetTrackDurationMs(track);
+        var transcodings = track.Media?.Transcodings
+                           ?.Where(transcoding => IsUsableTranscoding(transcoding, expectedDurationMs))
+                           .ToList();
+
+        if (transcodings == null || transcodings.Count == 0)
+            return null;
+
+        return transcodings.FirstOrDefault(IsSqMp3Progressive)
+               ?? transcodings.FirstOrDefault(IsMp3Progressive)
+               ?? transcodings.FirstOrDefault(IsProgressive);
+    }
+
+    private static bool IsUsableTranscoding(Transcoding transcoding, long? expectedDurationMs)
+    {
+        if (transcoding.Snipped || transcoding.Url == null || !IsProgressive(transcoding))
+            return false;
+
+        return !expectedDurationMs.HasValue
+               || !transcoding.Duration.HasValue
+               || Math.Abs(transcoding.Duration.Value - expectedDurationMs.Value) <= DurationTolerance.TotalMilliseconds;
+    }
+
+    private static bool IsSqMp3Progressive(Transcoding transcoding)
+    {
+        return string.Equals(transcoding.Quality, "sq", StringComparison.OrdinalIgnoreCase)
+               && IsMp3Progressive(transcoding);
+    }
+
+    private static bool IsMp3Progressive(Transcoding transcoding)
+    {
+        return IsProgressive(transcoding)
+               && transcoding.Format?.MimeType?.Contains("audio/mpeg", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool IsProgressive(Transcoding transcoding)
+    {
+        return string.Equals(transcoding.Format?.Protocol, "progressive", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static long? GetTrackDurationMs(Track? track)
+    {
+        if (track == null)
+            return null;
+
+        return track.FullDuration is > 0
+            ? track.FullDuration
+            : track.Duration is > 0
+                ? track.Duration
+                : null;
     }
 }
