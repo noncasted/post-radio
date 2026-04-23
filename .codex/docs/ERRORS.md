@@ -8,6 +8,7 @@
 
 | Симптом | Причина | Как чинить |
 |---------|---------|------------|
+| `/songs Load data` стирает длительность или `Fetch` возвращает массовый Unknown | Song metadata import/fetch перетёр одно поле из одного источника поверх другого | Используй `MetaDataCache` + `SongMetadataMerge`, не обновляй `SongState` из lookup/fetch вслепую |
 | `ArgumentNullException` в `Advise`/`View`/`ListenQueue` | `null` вместо Lifetime | Передай реальный Lifetime — см. [COMMON_LIFETIMES.md](COMMON_LIFETIMES.md) |
 | Callback срабатывает после удаления элемента коллекции | Подписка привязана к родительскому lifetime, а не к `item.Lifetime` | Используй `item.Lifetime` или `parent.Child()` |
 | ViewableProperty View не даёт начального значения | Используется `Advise()` вместо `View()` | `View` = initial + future, `Advise` = future only |

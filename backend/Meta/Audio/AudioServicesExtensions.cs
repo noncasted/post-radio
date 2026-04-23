@@ -24,6 +24,10 @@ public static class AudioServicesExtensions
         builder.AddStateCollection<SongsCollection, long, SongState>()
                .As<ISongsCollection>();
 
+        builder.Add<MetaDataCache>()
+               .As<IMetaDataCache>()
+               .As<ICoordinatorSetupCompleted>();
+
         builder.Add<PlaylistFactory>()
                .As<IPlaylistFactory>();
 

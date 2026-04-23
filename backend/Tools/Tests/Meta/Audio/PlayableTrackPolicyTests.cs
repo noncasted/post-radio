@@ -3,7 +3,7 @@ using Frontend.Shared;
 using Meta.Audio;
 using Xunit;
 
-namespace AudioPlaybackValidation.Tests;
+namespace Tests.Meta.Audio;
 
 public class PlayableTrackPolicyTests
 {

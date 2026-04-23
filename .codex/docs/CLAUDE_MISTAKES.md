@@ -119,6 +119,33 @@ else
 
 ---
 
+## Lesson 6: Song metadata import/fetch должен merge-ить, а не перетирать поля
+
+### Ошибка
+```csharp
+// WRONG — lookup без DurationMs стирает уже загруженную длительность,
+// а fetch потом стирает curated author/name из metadata cache.
+await grain.UpdateData(new SongData
+{
+    Author = lookup.Author,
+    Name = lookup.Name,
+    DurationMs = lookup.DurationMs,
+    IsValid = lookup.IsValid
+});
+```
+
+### Правильно
+```csharp
+// CORRECT — curated metadata + уже известные поля трека merge-ятся.
+var merged = SongMetadataMerge.MergeLookup(id, existing, lookup);
+await grain.UpdateData(merged);
+```
+
+### Правило
+Для `SongState` не перетирай `IsLoaded`, `DurationMs`, `IsValid`, `Author` и `Name` из одного источника вслепую. `tools/metadata/songs.json` — curated cache для текста, а уже загруженный трек — источник runtime-аудиоданных. Любой import/fetch должен проходить через merge-логику и сохранять существующую длительность, если cache её не содержит.
+
+---
+
 ## Accumulation Log
 
 | # | Дата | Файл | Ошибка | Урок | Статус |
@@ -126,6 +153,7 @@ else
 | 1 | 2026-03 | Tests/* | `new Lifetime()` вместо `handle.Lifetime` | Lifetime в тестах | Fixed |
 | 2 | 2026-03 | Cluster/Coordination/RuntimePipe.cs | Non-reentrant observer-grain | `[Reentrant]` + discard | Fixed |
 | 3 | 2026-04 | Cluster/Coordination/* | Координатор ждёт свою же запись | Локальный `await` = подтверждение | Fixed |
+| 4 | 2026-04 | Meta/Audio/Songs/* | Song metadata import/fetch перетирал cache/runtime поля | Merge metadata sources | Fixed |
 
 ---
 

@@ -4,11 +4,9 @@
         <Project Path="Frontend/Client/Client.csproj" />
         <Project Path="Frontend/Server/Server.csproj" />
     </Folder>
-    <Folder Name="/Tests/">
-        <Project Path="Tests/AudioPlaybackValidation.Tests/AudioPlaybackValidation.Tests.csproj" />
-    </Folder>
     <Folder Name="/Tools/">
         <Project Path="Tools/Benchmarks/Benchmarks.csproj" />
+        <Project Path="Tools/Tests/Tests.csproj" />
         <Project Path="Tools/DeploySetup/DeploySetup.csproj" />
         <Project Path="Tools/Generators/Generators.csproj" />
     </Folder>

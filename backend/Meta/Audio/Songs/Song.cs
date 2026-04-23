@@ -66,6 +66,7 @@ public class Song : Grain, ISong
             s.Name = data.Name;
             s.Playlists = data.Playlists.ToList();
             s.AddDate = data.AddDate;
+            s.IsLoaded = data.IsLoaded;
             s.DurationMs = data.DurationMs;
             s.IsValid = data.IsValid;
         });

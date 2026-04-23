@@ -27,6 +27,7 @@ public class PlaylistLoader : IPlaylistLoader
         SoundCloudClient soundCloud,
         IPlaylistsCollection playlists,
         ISongsCollection songs,
+        IMetaDataCache metadataCache,
         IMediaStorage mediaStorage,
         HttpClient http,
         ILogger<PlaylistLoader> logger)
@@ -35,6 +36,7 @@ public class PlaylistLoader : IPlaylistLoader
         _soundCloud = soundCloud;
         _playlists = playlists;
         _songs = songs;
+        _metadataCache = metadataCache;
         _mediaStorage = mediaStorage;
         _http = http;
         _logger = logger;
@@ -45,6 +47,7 @@ public class PlaylistLoader : IPlaylistLoader
     private readonly HttpClient _http;
     private readonly ILogger<PlaylistLoader> _logger;
     private readonly IMediaStorage _mediaStorage;
+    private readonly IMetaDataCache _metadataCache;
     private readonly IOrleans _orleans;
     private readonly IPlaylistsCollection _playlists;
     private readonly ISongsCollection _songs;
@@ -171,55 +174,36 @@ public class PlaylistLoader : IPlaylistLoader
             var name = track.Title ?? string.Empty;
             var url = track.PermalinkUrl?.ToString() ?? string.Empty;
             var localDuration = await ReadLocalDuration(track.Id);
-            var localDurationMs = ToDurationMs(localDuration);
+            _metadataCache.TryGet(track.Id, out var cached);
 
             if (_songs.TryGetValue(track.Id, out var existing))
             {
-                var playlists = existing.Playlists.Contains(playlist.Id)
-                    ? existing.Playlists
-                    : existing.Playlists.Concat(new[] { playlist.Id }).ToList();
-                var addDate = existing.Playlists.Contains(playlist.Id)
-                    ? existing.AddDate
-                    : DateTime.UtcNow;
-                var isValid = GetFetchValidity(author, existing, localDuration);
+                var merged = SongMetadataMerge.MergeFetchedExisting(
+                    track.Id,
+                    existing,
+                    cached,
+                    playlist.Id,
+                    url,
+                    author,
+                    name,
+                    localDuration,
+                    DateTime.UtcNow);
 
-                if (existing.Url != url
-                    || existing.Author != author
-                    || existing.Name != name
-                    || !existing.Playlists.SequenceEqual(playlists)
-                    || existing.AddDate != addDate
-                    || existing.DurationMs != localDurationMs
-                    || existing.IsValid != isValid)
-                {
-                    toUpdate.Add(new SongData
-                    {
-                        Id = track.Id,
-                        Url = url,
-                        Playlists = playlists,
-                        Author = author,
-                        Name = name,
-                        AddDate = addDate,
-                        IsLoaded = existing.IsLoaded,
-                        DurationMs = localDurationMs,
-                        IsValid = isValid
-                    });
-                }
+                if (SongMetadataMerge.HasChanges(existing, merged))
+                    toUpdate.Add(merged);
 
                 continue;
             }
 
-            toCreate.Add(new SongData
-            {
-                Id = track.Id,
-                Url = url,
-                Playlists = new[] { playlist.Id },
-                Author = author,
-                Name = name,
-                AddDate = DateTime.UtcNow,
-                IsLoaded = false,
-                DurationMs = localDurationMs,
-                IsValid = IsValidAuthor(author)
-            });
+            toCreate.Add(SongMetadataMerge.MergeFetchedNew(
+                track.Id,
+                cached,
+                playlist.Id,
+                url,
+                author,
+                name,
+                localDuration,
+                DateTime.UtcNow));
         }
 
         progress.Log($"Creating {toCreate.Count} new song grains...");
@@ -407,22 +391,6 @@ public class PlaylistLoader : IPlaylistLoader
         return duration.HasValue
             ? (long)Math.Round(duration.Value.TotalMilliseconds)
             : null;
-    }
-
-    private static bool GetFetchValidity(string author, SongState state, TimeSpan? localDuration)
-    {
-        if (!IsValidAuthor(author))
-            return false;
-
-        if (localDuration.HasValue)
-            return AudioTrackValidation.IsValidLocalDuration(localDuration);
-
-        return !state.IsLoaded && state.IsValid;
-    }
-
-    private static bool IsValidAuthor(string author)
-    {
-        return !string.IsNullOrWhiteSpace(author);
     }
 
     private static string FormatLabel(long id, SongState state)
