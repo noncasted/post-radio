@@ -11,7 +11,8 @@ public interface ISong : IGrainWithIntegerKey
     Task AddToPlaylist(Guid playlistId);
     Task RemoveFromPlaylist(Guid playlistId);
     Task SetLoaded(bool loaded);
-    Task SetAudioData(bool loaded, long? durationMs);
+    Task SetAudioData(bool loaded, long? durationMs, bool isValid);
+    Task SetValid(bool isValid);
 }
 
 [GenerateSerializer]
@@ -25,6 +26,7 @@ public class SongData
     [Id(5)] public required DateTime AddDate { get; init; }
     [Id(6)] public required bool IsLoaded { get; init; }
     [Id(7)] public long? DurationMs { get; init; }
+    [Id(8)] public required bool IsValid { get; init; }
 }
 
 [GenerateSerializer]
@@ -38,6 +40,7 @@ public class SongState : IStateValue
     [Id(4)] public DateTime AddDate { get; set; }
     [Id(5)] public bool IsLoaded { get; set; }
     [Id(6)] public long? DurationMs { get; set; }
+    [Id(7)] public bool IsValid { get; set; } = true;
 
     public int Version => 0;
 }
@@ -64,6 +67,7 @@ public class Song : Grain, ISong
             s.Playlists = data.Playlists.ToList();
             s.AddDate = data.AddDate;
             s.DurationMs = data.DurationMs;
+            s.IsValid = data.IsValid;
         });
 
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
@@ -82,7 +86,8 @@ public class Song : Grain, ISong
             Playlists = state.Playlists,
             AddDate = state.AddDate,
             IsLoaded = state.IsLoaded,
-            DurationMs = state.DurationMs
+            DurationMs = state.DurationMs,
+            IsValid = state.IsValid
         };
     }
 
@@ -92,11 +97,20 @@ public class Song : Grain, ISong
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
     }
 
-    public async Task SetAudioData(bool loaded, long? durationMs)
+    public async Task SetAudioData(bool loaded, long? durationMs, bool isValid)
     {
         var updated = await _state.Update(s => {
             s.IsLoaded = loaded;
             s.DurationMs = durationMs;
+            s.IsValid = isValid;
+        });
+        await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
+    }
+
+    public async Task SetValid(bool isValid)
+    {
+        var updated = await _state.Update(s => {
+            s.IsValid = isValid;
         });
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
     }

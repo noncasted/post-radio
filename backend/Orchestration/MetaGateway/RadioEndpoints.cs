@@ -74,7 +74,11 @@ public static class RadioEndpoints
             : collection;
 
         return source
-               .Where(kv => kv.Value.IsLoaded && File.Exists(storage.GetAudioPath(kv.Key)))
+               .Where(kv => AudioTrackValidation.IsPlayableAudio(
+                                kv.Value.IsLoaded,
+                                kv.Value.IsValid,
+                                kv.Value.DurationMs)
+                            && File.Exists(storage.GetAudioPath(kv.Key)))
                .Select(kv => new SongDto
                {
                    Id = kv.Key,
@@ -83,17 +87,23 @@ public static class RadioEndpoints
                    Url = kv.Value.Url,
                    Playlists = kv.Value.Playlists,
                    AddDate = kv.Value.AddDate,
-                   DurationMs = kv.Value.DurationMs
+                   DurationMs = kv.Value.DurationMs,
+                   IsValid = kv.Value.IsValid
                })
                .ToList();
     }
 
     private static IResult GetSongStream(
         [FromServices] IMediaStorage storage,
+        [FromServices] ISongsCollection songs,
         [FromServices] IOnlineTracker onlineTracker,
         HttpContext context,
         long id)
     {
+        if (!songs.TryGetValue(id, out var song)
+            || !AudioTrackValidation.IsPlayableAudio(song.IsLoaded, song.IsValid, song.DurationMs))
+            return Results.NotFound();
+
         if (!File.Exists(storage.GetAudioPath(id)))
             return Results.NotFound();
 
@@ -103,10 +113,15 @@ public static class RadioEndpoints
 
     private static IResult GetAudioFile(
         [FromServices] IMediaStorage storage,
+        [FromServices] ISongsCollection songs,
         [FromServices] IOnlineTracker onlineTracker,
         HttpContext context,
         long id)
     {
+        if (!songs.TryGetValue(id, out var song)
+            || !AudioTrackValidation.IsPlayableAudio(song.IsLoaded, song.IsValid, song.DurationMs))
+            return Results.NotFound();
+
         var path = storage.GetAudioPath(id);
 
         if (!File.Exists(path))
@@ -256,6 +271,7 @@ public class SongDto
     public required IReadOnlyList<Guid> Playlists { get; init; }
     public required DateTime AddDate { get; init; }
     public long? DurationMs { get; init; }
+    public bool IsValid { get; init; } = true;
 }
 
 public class ImagesCountDto

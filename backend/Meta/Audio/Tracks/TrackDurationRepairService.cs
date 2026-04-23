@@ -72,7 +72,15 @@ public class TrackDurationRepairService : ITrackDurationRepairService
                 var localDuration = await AudioDurationReader.TryReadDuration(
                     _mediaStorage.GetAudioPath(id),
                     cancellationToken);
-                await UpdateStoredDuration(id, state, PlaylistLoader.ToDurationMs(localDuration));
+                var localDurationMs = PlaylistLoader.ToDurationMs(localDuration);
+                var localIsValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
+                await UpdateStoredAudioData(id, state, localDurationMs, localIsValid);
+
+                if (!localIsValid)
+                {
+                    progress.Log(
+                        $"ERROR: invalid local audio for {label}: local={FormatDuration(localDuration)}, minimum={FormatDuration(AudioTrackValidation.MinimumPlayableDuration)}.");
+                }
 
                 var track = await _soundCloud.Tracks.GetAsync(state.Url, cancellationToken);
                 var soundCloudDurationMs = PlaylistLoader.GetTrackDurationMs(track);
@@ -105,9 +113,10 @@ public class TrackDurationRepairService : ITrackDurationRepairService
 
                 var repairedLocalDuration = download.LocalDuration
                                             ?? await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
-                await _orleans.GetGrain<ISong>(id).SetAudioData(true, PlaylistLoader.ToDurationMs(repairedLocalDuration));
+                var repairedIsValid = AudioTrackValidation.IsValidLocalDuration(repairedLocalDuration);
+                await _orleans.GetGrain<ISong>(id).SetAudioData(true, PlaylistLoader.ToDurationMs(repairedLocalDuration), repairedIsValid);
 
-                if (IsDurationMatch(repairedLocalDuration, soundCloudDurationMs.Value))
+                if (repairedIsValid && IsDurationMatch(repairedLocalDuration, soundCloudDurationMs.Value))
                 {
                     repairedCount++;
                     checkedCount++;
@@ -120,10 +129,11 @@ public class TrackDurationRepairService : ITrackDurationRepairService
                         $"ERROR: redownload did not fix {label}: local={FormatDuration(repairedLocalDuration)}, soundcloud={FormatDuration(soundCloudDurationMs.Value)}.");
                 }
             }
-            catch (Exception e)
+            catch (Exception e) when (e is not OperationCanceledException)
             {
                 failedCount++;
                 _logger.LogError(e, "[Audio] [DurationAudit] Failed to check {SongId} {Author} - {Name}", id, state.Author, state.Name);
+                await _orleans.GetGrain<ISong>(id).SetValid(false);
                 progress.Log($"ERROR: failed to check {label}: {e.Message}");
             }
             finally
@@ -137,12 +147,12 @@ public class TrackDurationRepairService : ITrackDurationRepairService
         progress.SetStatus(failedCount > 0 ? OperationStatus.Failed : OperationStatus.Success);
     }
 
-    private async Task UpdateStoredDuration(long id, SongState state, long? durationMs)
+    private async Task UpdateStoredAudioData(long id, SongState state, long? durationMs, bool isValid)
     {
-        if (state.DurationMs == durationMs)
+        if (state.DurationMs == durationMs && state.IsValid == isValid)
             return;
 
-        await _orleans.GetGrain<ISong>(id).SetAudioData(state.IsLoaded, durationMs);
+        await _orleans.GetGrain<ISong>(id).SetAudioData(state.IsLoaded, durationMs, isValid);
     }
 
     private static bool IsDurationMatch(TimeSpan? localDuration, long soundCloudDurationMs)

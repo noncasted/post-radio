@@ -79,7 +79,9 @@ public class RadioApi : IRadioApi
         try
         {
             var result = await _http.GetFromJsonAsync<List<SongDto>>(WithSession(url));
-            return result ?? new List<SongDto>();
+            return (result ?? new List<SongDto>())
+                   .Where(PlayableTrackPolicy.IsPlayable)
+                   .ToList();
         }
         catch (Exception e)
         {

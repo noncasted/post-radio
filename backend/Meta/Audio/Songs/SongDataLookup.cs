@@ -22,6 +22,7 @@ public class SongLookupInfo
     public required string Author { get; init; }
     public required string Name { get; init; }
     public long? DurationMs { get; init; }
+    public bool IsValid { get; init; } = true;
 }
 
 public class SongDataLookup : ISongDataLookup
@@ -154,7 +155,10 @@ public class SongDataLookup : ISongDataLookup
                 continue;
             }
 
-            if (state.Author == info.Author && state.Name == info.Name && state.DurationMs == info.DurationMs)
+            if (state.Author == info.Author
+                && state.Name == info.Name
+                && state.DurationMs == info.DurationMs
+                && state.IsValid == info.IsValid)
             {
                 skipped++;
             }
@@ -170,7 +174,8 @@ public class SongDataLookup : ISongDataLookup
                     Playlists = state.Playlists,
                     AddDate = state.AddDate,
                     IsLoaded = state.IsLoaded,
-                    DurationMs = info.DurationMs
+                    DurationMs = info.DurationMs,
+                    IsValid = info.IsValid
                 });
                 applied++;
             }
@@ -196,7 +201,8 @@ public class SongDataLookup : ISongDataLookup
                 Url = kv.Value.Url,
                 Author = kv.Value.Author,
                 Name = kv.Value.Name,
-                DurationMs = kv.Value.DurationMs
+                DurationMs = kv.Value.DurationMs,
+                IsValid = kv.Value.IsValid
             });
     }
 }

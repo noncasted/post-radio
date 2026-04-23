@@ -44,10 +44,28 @@
             </BbButton>
             <span class="text-xs text-muted-foreground">@_status</span>
             <div class="flex-1"></div>
-            <span class="text-xs text-muted-foreground">Sort</span>
-            <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">Name</BbButton>
-            <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">Date</BbButton>
-            <BbButton Variant="@(_sortBy == SortBy.Duration ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Duration))">Duration</BbButton>
+            <span class="text-xs text-muted-foreground">Sort: @CurrentSortDescription</span>
+            <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">
+                Name
+                @if (_sortBy == SortBy.Name)
+                {
+                    <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                }
+            </BbButton>
+            <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">
+                Date
+                @if (_sortBy == SortBy.AddDate)
+                {
+                    <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                }
+            </BbButton>
+            <BbButton Variant="@(_sortBy == SortBy.Duration ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Duration))">
+                Duration
+                @if (_sortBy == SortBy.Duration)
+                {
+                    <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                }
+            </BbButton>
         </div>
 
         @if (!string.IsNullOrEmpty(_log))
@@ -72,6 +90,7 @@
     private string _url = string.Empty;
     private List<KeyValuePair<long, SongState>> _songs = new();
     private SortBy _sortBy = SortBy.AddDate;
+    private bool _sortAscending;
     private int _loadedCount;
 
     private bool _busy;
@@ -80,6 +99,16 @@
     private string _log = string.Empty;
 
     private enum SortBy { Name, AddDate, Duration }
+
+    private string SortDirectionIcon => _sortAscending ? "arrow-up" : "arrow-down";
+
+    private string CurrentSortDescription => _sortBy switch
+    {
+        SortBy.Name => _sortAscending ? "name A-Z" : "name Z-A",
+        SortBy.AddDate => _sortAscending ? "oldest first" : "newest first",
+        SortBy.Duration => _sortAscending ? "shortest first" : "longest first",
+        _ => "default"
+    };
 
     protected override void OnInitialized()
     {
@@ -106,17 +135,36 @@
     {
         return (_sortBy switch
         {
-            SortBy.Name => songs.OrderBy(kv => kv.Value.Name),
-            SortBy.Duration => songs.OrderByDescending(kv => kv.Value.DurationMs ?? -1),
-            SortBy.AddDate => songs.OrderByDescending(kv => kv.Value.AddDate),
+            SortBy.Name => _sortAscending
+                ? songs.OrderBy(kv => kv.Value.Name)
+                : songs.OrderByDescending(kv => kv.Value.Name),
+            SortBy.Duration => _sortAscending
+                ? songs.OrderBy(kv => kv.Value.DurationMs ?? long.MaxValue)
+                : songs.OrderByDescending(kv => kv.Value.DurationMs ?? -1),
+            SortBy.AddDate => _sortAscending
+                ? songs.OrderBy(kv => kv.Value.AddDate)
+                : songs.OrderByDescending(kv => kv.Value.AddDate),
             _ => songs
         }).ToList();
     }
 
     private void SetSort(SortBy sort)
     {
+        if (_sortBy == sort)
+        {
+            _sortAscending = !_sortAscending;
+            Reload();
+            return;
+        }
+
         _sortBy = sort;
+        _sortAscending = DefaultSortAscending(sort);
         Reload();
+    }
+
+    private static bool DefaultSortAscending(SortBy sort)
+    {
+        return sort == SortBy.Name;
     }
 
     private Task RunFetch() => RunOp("fetch", (data, progress) => Loader.Fetch(data, progress));

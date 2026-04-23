@@ -112,7 +112,9 @@ public class SessionState : IDisposable
             ? (Guid?)null
             : playlist.Id;
 
-        _playlistSongs = (await _api.GetSongs(playlistId)).ToList();
+        _playlistSongs = (await _api.GetSongs(playlistId))
+                         .Where(PlayableTrackPolicy.IsPlayable)
+                         .ToList();
         Shuffle(_playlistSongs);
         _songIndex = 0;
         PlaylistChanged?.Invoke();

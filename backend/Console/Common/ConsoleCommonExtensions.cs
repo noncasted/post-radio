@@ -10,6 +10,8 @@ public static class ConsoleCommonExtensions
     public static IHostApplicationBuilder AddCommonConsoleComponents(this IHostApplicationBuilder builder)
     {
         builder.Services.AddScoped<IConsoleNavigation, ConsoleNavigation>();
+        builder.Add<InvalidTracksRedownloadConsoleAction>()
+               .As<IConsoleAction>();
         builder.Add<TrackDurationRepairConsoleAction>()
                .As<IConsoleAction>();
 

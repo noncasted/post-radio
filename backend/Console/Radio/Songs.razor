@@ -9,33 +9,87 @@
 <PageHeader Title="Songs" />
 
 <div class="container mx-auto max-w-5xl px-4 py-4 flex flex-col gap-4">
-    <div class="flex gap-2 items-center flex-wrap">
-        <span class="text-sm text-muted-foreground">@Collection.Count song(s)</span>
-        <div class="flex-1"></div>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunFetch">
-            <LucideIcon Name="list-plus" Size="14" class="mr-1" />
-            <span>Fetch</span>
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadAudio">
-            <LucideIcon Name="cloud-download" Size="14" class="mr-1" />
-            <span>Load audio</span>
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunDownloadLookup">
-            <LucideIcon Name="file-down" Size="14" class="mr-1" />
-            <span>Download songs.json</span>
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadLookup">
-            <LucideIcon Name="download" Size="14" class="mr-1" />
-            <span>Load data from lookup</span>
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunSaveLookup">
-            <LucideIcon Name="save" Size="14" class="mr-1" />
-            <span>Save data to lookup</span>
-        </BbButton>
-        <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">Name</BbButton>
-        <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">Date</BbButton>
-        <BbButton Variant="@(_sortBy == SortBy.Duration ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Duration))">Duration</BbButton>
-        <BbButton Variant="@(_sortBy == SortBy.Invalid ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Invalid))">Invalid</BbButton>
+    <div class="rounded-lg border bg-card p-3 flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-muted-foreground">@Collection.Count song(s)</span>
+            <div class="flex-1"></div>
+            <span class="text-xs text-muted-foreground">Sort: @CurrentSortDescription</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-3 items-start">
+            <div class="rounded-md border bg-muted/20 p-2 flex flex-col gap-2">
+                <div class="text-[10px] uppercase tracking-wide text-muted-foreground">Sync</div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunFetch">
+                        <LucideIcon Name="list-plus" Size="14" class="mr-1" />
+                        <span>Fetch</span>
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadAudio">
+                        <LucideIcon Name="cloud-download" Size="14" class="mr-1" />
+                        <span>Load audio</span>
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="rounded-md border bg-muted/20 p-2 flex flex-col gap-2">
+                <div class="text-[10px] uppercase tracking-wide text-muted-foreground">Lookup</div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunDownloadLookup">
+                        <LucideIcon Name="file-down" Size="14" class="mr-1" />
+                        <span>Download songs.json</span>
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunLoadLookup">
+                        <LucideIcon Name="download" Size="14" class="mr-1" />
+                        <span>Load data</span>
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@_busy" @onclick="RunSaveLookup">
+                        <LucideIcon Name="save" Size="14" class="mr-1" />
+                        <span>Save data</span>
+                    </BbButton>
+                </div>
+            </div>
+
+            <div class="rounded-md border bg-muted/20 p-2 flex flex-col gap-2">
+                <div class="text-[10px] uppercase tracking-wide text-muted-foreground">Sort & filters</div>
+                <div class="flex flex-wrap gap-2">
+                    <BbButton Variant="@(_sortBy == SortBy.Name ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Name))">
+                        Name
+                        @if (_sortBy == SortBy.Name)
+                        {
+                            <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                        }
+                    </BbButton>
+                    <BbButton Variant="@(_sortBy == SortBy.AddDate ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.AddDate))">
+                        Date
+                        @if (_sortBy == SortBy.AddDate)
+                        {
+                            <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                        }
+                    </BbButton>
+                    <BbButton Variant="@(_sortBy == SortBy.Duration ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.Duration))">
+                        Duration
+                        @if (_sortBy == SortBy.Duration)
+                        {
+                            <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                        }
+                    </BbButton>
+                    <BbButton Variant="@(_sortBy == SortBy.InvalidAuthor ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.InvalidAuthor))">
+                        Invalid author
+                        @if (_sortBy == SortBy.InvalidAuthor)
+                        {
+                            <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                        }
+                    </BbButton>
+                    <BbButton Variant="@(_sortBy == SortBy.InvalidTime ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" @onclick="@(() => SetSort(SortBy.InvalidTime))">
+                        Invalid time
+                        @if (_sortBy == SortBy.InvalidTime)
+                        {
+                            <LucideIcon Name="@SortDirectionIcon" Size="12" class="ml-1" />
+                        }
+                    </BbButton>
+                </div>
+            </div>
+        </div>
     </div>
 
     @if (_busy || !string.IsNullOrEmpty(_log))
@@ -67,13 +121,26 @@
     private readonly ILifetime _lifetime = new Lifetime();
 
     private SortBy _sortBy = SortBy.AddDate;
+    private bool _sortAscending;
     private List<KeyValuePair<long, SongState>> _sorted = new();
 
     private bool _busy;
     private string _status = string.Empty;
     private string _log = string.Empty;
 
-    private enum SortBy { Name, AddDate, Duration, Invalid }
+    private enum SortBy { Name, AddDate, Duration, InvalidAuthor, InvalidTime }
+
+    private string SortDirectionIcon => _sortAscending ? "arrow-up" : "arrow-down";
+
+    private string CurrentSortDescription => _sortBy switch
+    {
+        SortBy.Name => _sortAscending ? "name A-Z" : "name Z-A",
+        SortBy.AddDate => _sortAscending ? "oldest first" : "newest first",
+        SortBy.Duration => _sortAscending ? "shortest first" : "longest first",
+        SortBy.InvalidAuthor => _sortAscending ? "invalid author oldest first" : "invalid author newest first",
+        SortBy.InvalidTime => _sortAscending ? "invalid time shortest first" : "invalid time longest first",
+        _ => "default"
+    };
 
     private Task RunFetch() => RunOp("Fetching playlists", p => Loader.FetchAll(p));
     private Task RunSaveLookup() => RunOp("Saving", p => Lookup.Save(p));
@@ -150,11 +217,25 @@
             {
                 IEnumerable<KeyValuePair<long, SongState>> query = _sortBy switch
                 {
-                    SortBy.Name => Collection.OrderBy(kv => kv.Value.Name),
-                    SortBy.AddDate => Collection.OrderByDescending(kv => kv.Value.AddDate),
-                    SortBy.Duration => Collection.OrderByDescending(kv => kv.Value.DurationMs ?? -1),
-                    SortBy.Invalid => Collection.Where(kv => string.IsNullOrWhiteSpace(kv.Value.Author))
-                                                .OrderByDescending(kv => kv.Value.AddDate),
+                    SortBy.Name => _sortAscending
+                        ? Collection.OrderBy(kv => kv.Value.Name)
+                        : Collection.OrderByDescending(kv => kv.Value.Name),
+                    SortBy.AddDate => _sortAscending
+                        ? Collection.OrderBy(kv => kv.Value.AddDate)
+                        : Collection.OrderByDescending(kv => kv.Value.AddDate),
+                    SortBy.Duration => _sortAscending
+                        ? Collection.OrderBy(kv => kv.Value.DurationMs ?? long.MaxValue)
+                        : Collection.OrderByDescending(kv => kv.Value.DurationMs ?? -1),
+                    SortBy.InvalidAuthor => _sortAscending
+                        ? Collection.Where(IsInvalidAuthor)
+                                    .OrderBy(kv => kv.Value.AddDate)
+                        : Collection.Where(IsInvalidAuthor)
+                                    .OrderByDescending(kv => kv.Value.AddDate),
+                    SortBy.InvalidTime => _sortAscending
+                        ? Collection.Where(IsInvalidTime)
+                                    .OrderBy(kv => kv.Value.DurationMs ?? long.MaxValue)
+                        : Collection.Where(IsInvalidTime)
+                                    .OrderByDescending(kv => kv.Value.DurationMs ?? -1),
                     _ => Collection
                 };
 
@@ -171,8 +252,31 @@
 
     private void SetSort(SortBy sort)
     {
+        if (_sortBy == sort)
+        {
+            _sortAscending = !_sortAscending;
+            Reload();
+            return;
+        }
+
         _sortBy = sort;
+        _sortAscending = DefaultSortAscending(sort);
         Reload();
+    }
+
+    private static bool DefaultSortAscending(SortBy sort)
+    {
+        return sort is SortBy.Name or SortBy.InvalidTime;
+    }
+
+    private static bool IsInvalidAuthor(KeyValuePair<long, SongState> song)
+    {
+        return !song.Value.IsValid || string.IsNullOrWhiteSpace(song.Value.Author);
+    }
+
+    private static bool IsInvalidTime(KeyValuePair<long, SongState> song)
+    {
+        return !song.Value.IsValid || !AudioTrackValidation.IsValidLocalDurationMs(song.Value.DurationMs);
     }
 
     public void Dispose() => _lifetime.Terminate();

@@ -46,15 +46,49 @@ public static class AudioServicesExtensions
                .ConfigurePrimaryHttpMessageHandler(CreateSoundCloudHandler);
 
         builder.Services.AddHttpClient<PlaylistLoader>()
+               .ConfigureHttpClient(ConfigureSoundCloudHttpClient)
                .ConfigurePrimaryHttpMessageHandler(CreateSoundCloudHandler);
 
         builder.Services.AddSingleton(serviceProvider =>
         {
             var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-            return new SoundCloudClient(httpClientFactory.CreateClient(SoundCloudHttpClientName));
+            var options = serviceProvider.GetRequiredService<IOptions<AudioOptions>>().Value;
+            var httpClient = httpClientFactory.CreateClient(SoundCloudHttpClientName);
+
+            return CreateSoundCloudClient(httpClient, options);
         });
 
         return builder;
+    }
+
+    private static SoundCloudClient CreateSoundCloudClient(HttpClient http, AudioOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.SoundCloudClientId))
+        {
+            ConfigureSoundCloudAuthorization(http, options);
+            return new SoundCloudClient(http);
+        }
+
+        if (string.IsNullOrWhiteSpace(options.SoundCloudAuthorization))
+            return new SoundCloudClient(options.SoundCloudClientId, http);
+
+        return new SoundCloudClient(options.SoundCloudClientId, http, options.SoundCloudAuthorization);
+    }
+
+    private static void ConfigureSoundCloudHttpClient(IServiceProvider serviceProvider, HttpClient http)
+    {
+        var options = serviceProvider.GetRequiredService<IOptions<AudioOptions>>().Value;
+
+        ConfigureSoundCloudAuthorization(http, options);
+    }
+
+    private static void ConfigureSoundCloudAuthorization(HttpClient http, AudioOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.SoundCloudAuthorization))
+            return;
+
+        http.DefaultRequestHeaders.Remove("Authorization");
+        http.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", options.SoundCloudAuthorization);
     }
 
     private static HttpMessageHandler CreateSoundCloudHandler(IServiceProvider serviceProvider)

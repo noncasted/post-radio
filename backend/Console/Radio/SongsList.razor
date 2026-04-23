@@ -12,7 +12,7 @@
             var draft = _drafts.TryGetValue(id, out var d) ? d : null;
 
             <div class="flex flex-col">
-                <div class="p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30"
+                <div class="@GetRowClass(state)"
                      @onclick="@(() => ToggleExpand(id, state))">
                     <span class="rounded-md bg-primary/10 p-2">
                         <LucideIcon Name="music" Size="14" class="text-primary" />
@@ -48,6 +48,12 @@
                     {
                         <span class="inline-flex items-center gap-1 rounded bg-amber-500/15 text-amber-600 px-2 py-0.5 text-xs">
                             <LucideIcon Name="clock" Size="12" /> pending
+                        </span>
+                    }
+                    @if (!state.IsValid)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-red-500/15 text-red-600 px-2 py-0.5 text-xs">
+                            <LucideIcon Name="ban" Size="12" /> invalid
                         </span>
                     }
                     @if (ShowDate)
@@ -216,6 +222,15 @@
             : duration.ToString(@"m\:ss");
     }
 
+    private static string GetRowClass(SongState state)
+    {
+        var dangerClass = state.IsValid
+            ? "hover:bg-muted/30"
+            : "bg-red-500/10 hover:bg-red-500/15";
+
+        return $"p-3 flex items-center gap-3 cursor-pointer {dangerClass}";
+    }
+
     private void ToggleExpand(long id, SongState state)
     {
         if (_expandedId == id)
@@ -256,7 +271,8 @@
                 Playlists = state.Playlists,
                 AddDate = state.AddDate,
                 IsLoaded = state.IsLoaded,
-                DurationMs = state.DurationMs
+                DurationMs = state.DurationMs,
+                IsValid = state.IsValid
             });
 
             _expandedId = null;

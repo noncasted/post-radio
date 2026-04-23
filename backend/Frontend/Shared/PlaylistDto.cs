@@ -16,6 +16,22 @@ public class SongDto
     public required IReadOnlyList<Guid> Playlists { get; init; }
     public required DateTime AddDate { get; init; }
     public long? DurationMs { get; init; }
+    public bool IsValid { get; init; } = true;
+}
+
+public static class PlayableTrackPolicy
+{
+    public const long MinimumPlayableDurationMs = 31_000;
+
+    public static bool IsPlayable(SongDto song)
+    {
+        return song.IsValid && IsValidDurationMs(song.DurationMs);
+    }
+
+    public static bool IsValidDurationMs(long? durationMs)
+    {
+        return durationMs is >= MinimumPlayableDurationMs;
+    }
 }
 
 public class ImagesCountDto

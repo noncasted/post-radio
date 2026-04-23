@@ -40,6 +40,8 @@ public class PlaylistLoader : IPlaylistLoader
         _logger = logger;
     }
 
+    private static readonly TimeSpan DurationTolerance = TimeSpan.FromSeconds(2);
+
     private readonly HttpClient _http;
     private readonly ILogger<PlaylistLoader> _logger;
     private readonly IMediaStorage _mediaStorage;
@@ -47,7 +49,6 @@ public class PlaylistLoader : IPlaylistLoader
     private readonly IPlaylistsCollection _playlists;
     private readonly ISongsCollection _songs;
     private readonly SoundCloudClient _soundCloud;
-    private static readonly TimeSpan DurationTolerance = TimeSpan.FromSeconds(2);
 
     public async Task Fetch(PlaylistData playlist, IOperationProgress progress)
     {
@@ -113,7 +114,7 @@ public class PlaylistLoader : IPlaylistLoader
         progress.Log("Scanning playlist for unloaded songs...");
 
         var pending = _songs
-                      .Where(kv => kv.Value.Playlists.Contains(playlist.Id) && !kv.Value.IsLoaded)
+                      .Where(kv => kv.Value.Playlists.Contains(playlist.Id) && !kv.Value.IsLoaded && kv.Value.IsValid)
                       .Select(kv => (Id: kv.Key, State: kv.Value))
                       .ToList();
 
@@ -131,7 +132,7 @@ public class PlaylistLoader : IPlaylistLoader
         progress.Log("Scanning all songs for unloaded audio...");
 
         var pending = _songs
-                      .Where(kv => !kv.Value.IsLoaded)
+                      .Where(kv => !kv.Value.IsLoaded && kv.Value.IsValid)
                       .Select(kv => (Id: kv.Key, State: kv.Value))
                       .ToList();
 
@@ -155,19 +156,21 @@ public class PlaylistLoader : IPlaylistLoader
 
         var toCreate = new List<SongData>();
         var toAttach = new List<long>();
-        var toUpdateDuration = new List<(long Id, SongState State, long? DurationMs)>();
+        var toUpdateAudio = new List<(long Id, SongState State, long? DurationMs, bool IsValid)>();
 
         foreach (var track in tracks)
         {
-            var localDurationMs = await ReadLocalDurationMs(track.Id);
+            var localDuration = await ReadLocalDuration(track.Id);
+            var localDurationMs = ToDurationMs(localDuration);
 
             if (_songs.TryGetValue(track.Id, out var existing))
             {
                 if (!existing.Playlists.Contains(playlist.Id))
                     toAttach.Add(track.Id);
 
-                if (existing.DurationMs != localDurationMs)
-                    toUpdateDuration.Add((track.Id, existing, localDurationMs));
+                var isValid = GetFetchValidity(existing, localDuration);
+                if (existing.DurationMs != localDurationMs || existing.IsValid != isValid)
+                    toUpdateAudio.Add((track.Id, existing, localDurationMs, isValid));
 
                 continue;
             }
@@ -186,7 +189,8 @@ public class PlaylistLoader : IPlaylistLoader
                 Name = name,
                 AddDate = DateTime.UtcNow,
                 IsLoaded = false,
-                DurationMs = localDurationMs
+                DurationMs = localDurationMs,
+                IsValid = true
             });
         }
 
@@ -215,19 +219,19 @@ public class PlaylistLoader : IPlaylistLoader
             progress.Log($"Attached {i + 1} / {toAttach.Count}");
         }
 
-        progress.Log($"Updating duration for {toUpdateDuration.Count} existing songs...");
+        progress.Log($"Updating local audio data for {toUpdateAudio.Count} existing songs...");
         progress.SetProgress(0f);
 
-        for (var i = 0; i < toUpdateDuration.Count; i++)
+        for (var i = 0; i < toUpdateAudio.Count; i++)
         {
-            var (id, state, durationMs) = toUpdateDuration[i];
-            await _orleans.GetGrain<ISong>(id).SetAudioData(state.IsLoaded, durationMs);
+            var (id, state, durationMs, isValid) = toUpdateAudio[i];
+            await _orleans.GetGrain<ISong>(id).SetAudioData(state.IsLoaded, durationMs, isValid);
 
-            progress.SetProgress(i / (float)Math.Max(1, toUpdateDuration.Count));
-            progress.Log($"Updated duration {i + 1} / {toUpdateDuration.Count}: {state.Author} - {state.Name}");
+            progress.SetProgress(i / (float)Math.Max(1, toUpdateAudio.Count));
+            progress.Log($"Updated local audio {i + 1} / {toUpdateAudio.Count}: {state.Author} - {state.Name}");
         }
 
-        progress.Log($"Fetch complete: {toCreate.Count} new, {toAttach.Count} attached, {toUpdateDuration.Count} duration updated.");
+        progress.Log($"Fetch complete: {toCreate.Count} new, {toAttach.Count} attached, {toUpdateAudio.Count} local audio updated.");
     }
 
     private async Task LoadPending(
@@ -238,6 +242,7 @@ public class PlaylistLoader : IPlaylistLoader
         progress.SetProgress(0f);
 
         var downloaded = 0;
+        var invalid = 0;
         var failed = 0;
 
         for (var i = 0; i < pending.Count; i++)
@@ -247,27 +252,38 @@ public class PlaylistLoader : IPlaylistLoader
             try
             {
                 var result = await DownloadSong(id, state);
-                await _orleans.GetGrain<ISong>(id).SetAudioData(true, ToDurationMs(result.LocalDuration));
-                downloaded++;
-                progress.Log($"Loaded {i + 1} / {pending.Count}: {state.Author} - {state.Name}");
+                var isValid = AudioTrackValidation.IsValidLocalDuration(result.LocalDuration);
+                await _orleans.GetGrain<ISong>(id).SetAudioData(true, ToDurationMs(result.LocalDuration), isValid);
+                if (!isValid)
+                {
+                    invalid++;
+                    progress.Log($"Invalid short audio {i + 1} / {pending.Count}: {state.Author} - {state.Name} ({FormatDuration(result.LocalDuration)}). Marked invalid.");
+                }
+                else
+                {
+                    downloaded++;
+                    progress.Log($"Loaded {i + 1} / {pending.Count}: {state.Author} - {state.Name}");
+                }
             }
             catch (TrackUnavailableException)
             {
                 failed++;
-                progress.Log($"Unavailable {i + 1} / {pending.Count}: {state.Author} - {state.Name}");
+                await _orleans.GetGrain<ISong>(id).SetValid(false);
+                progress.Log($"Unavailable {i + 1} / {pending.Count}: {state.Author} - {state.Name}. Marked invalid.");
             }
             catch (Exception e)
             {
                 failed++;
 
                 logError(state, e);
-                progress.Log($"Failed {i + 1} / {pending.Count}: {e.Message}");
+                await _orleans.GetGrain<ISong>(id).SetValid(false);
+                progress.Log($"Failed {i + 1} / {pending.Count}: {e.Message}. Marked invalid.");
             }
 
             progress.SetProgress((i + 1) / (float)Math.Max(1, pending.Count));
         }
 
-        progress.Log($"Load complete: {downloaded} downloaded, {failed} failed.");
+        progress.Log($"Load complete: {downloaded} downloaded, {invalid} invalid, {failed} failed.");
         progress.SetStatus(OperationStatus.Success);
     }
 
@@ -300,10 +316,9 @@ public class PlaylistLoader : IPlaylistLoader
         return new SongDownloadResult(GetTrackDurationMs(track), localDuration);
     }
 
-    private async Task<long?> ReadLocalDurationMs(long id, CancellationToken cancellationToken = default)
+    private async Task<TimeSpan?> ReadLocalDuration(long id, CancellationToken cancellationToken = default)
     {
-        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
-        return ToDurationMs(localDuration);
+        return await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
     }
 
     public static long? ToDurationMs(TimeSpan? duration)
@@ -311,6 +326,24 @@ public class PlaylistLoader : IPlaylistLoader
         return duration.HasValue
             ? (long)Math.Round(duration.Value.TotalMilliseconds)
             : null;
+    }
+
+    private static bool GetFetchValidity(SongState state, TimeSpan? localDuration)
+    {
+        if (localDuration.HasValue)
+            return AudioTrackValidation.IsValidLocalDuration(localDuration);
+
+        return !state.IsLoaded && state.IsValid;
+    }
+
+    private static string FormatDuration(TimeSpan? duration)
+    {
+        if (!duration.HasValue)
+            return "missing";
+
+        return duration.Value.TotalHours >= 1
+            ? duration.Value.ToString(@"h\:mm\:ss")
+            : duration.Value.ToString(@"m\:ss");
     }
 
     private async Task<string?> GetDownloadUrlAsync(Track track, CancellationToken cancellationToken)
