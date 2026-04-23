@@ -9,6 +9,11 @@ public static class AudioTrackValidation
         return isLoaded && isValid && IsValidLocalDurationMs(durationMs);
     }
 
+    public static bool IsInvalidPlaybackCandidate(bool isLoaded, bool isValid, long? durationMs)
+    {
+        return !isValid || (isLoaded && !IsValidLocalDurationMs(durationMs));
+    }
+
     public static bool IsValidLocalDuration(TimeSpan? duration)
     {
         return duration.HasValue && duration.Value >= MinimumPlayableDuration;

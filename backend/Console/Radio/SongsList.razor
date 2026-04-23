@@ -224,11 +224,19 @@
 
     private static string GetRowClass(SongState state)
     {
-        var dangerClass = state.IsValid
-            ? "hover:bg-muted/30"
-            : "bg-red-500/10 hover:bg-red-500/15";
+        var dangerClass = IsVisuallyInvalid(state)
+            ? "bg-red-500/10 hover:bg-red-500/15"
+            : "hover:bg-muted/30";
 
         return $"p-3 flex items-center gap-3 cursor-pointer {dangerClass}";
+    }
+
+    private static bool IsVisuallyInvalid(SongState state)
+    {
+        return AudioTrackValidation.IsInvalidPlaybackCandidate(
+            state.IsLoaded,
+            state.IsValid,
+            state.DurationMs);
     }
 
     private void ToggleExpand(long id, SongState state)

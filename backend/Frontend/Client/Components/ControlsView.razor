@@ -5,7 +5,7 @@
         <div class="volume-wrap">
             <input type="range" min="0" max="100" step="1" value="@State.Volume"
                    class="volume-slider"
-                   @oninput="@(e => OnVolumeChanged(e.Value?.ToString() ?? "0"))" />
+                   @oninput="OnVolumeInput" />
         </div>
 
         <button class="skip-btn" @onclick="@(() => State.RequestSkip())" title="Skip">
@@ -19,7 +19,7 @@
     <div class="playlist-selection">
         @foreach (var playlist in _playlists)
         {
-            <label class="playlist-option @(playlist.Id == _selectedId ? "selected" : "")">
+            <label class="@GetPlaylistClass(playlist)">
                 <input type="radio" name="playlist" value="@playlist.Id"
                        checked="@(playlist.Id == _selectedId)"
                        @onchange="@(_ => OnPlaylistChanged(playlist))" />
@@ -135,9 +135,21 @@
         await State.SetPlaylist(playlist);
     }
 
+    private void OnVolumeInput(ChangeEventArgs e)
+    {
+        OnVolumeChanged(e.Value?.ToString() ?? "0");
+    }
+
     private void OnVolumeChanged(string value)
     {
         if (double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var v))
             State.SetVolume(v);
+    }
+
+    private string GetPlaylistClass(PlaylistDto playlist)
+    {
+        return playlist.Id == _selectedId
+            ? "playlist-option selected"
+            : "playlist-option";
     }
 }

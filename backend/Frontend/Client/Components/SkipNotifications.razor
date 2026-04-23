@@ -4,28 +4,9 @@
 <div class="skip-notifications">
     @foreach (var item in _visible)
     {
-        <div class="skip-toast @item.Notification.Severity" @key="item.Id">
-            <div class="skip-toast-head">
-                <span class="skip-toast-title">@item.Notification.Title</span>
-                <button class="skip-toast-close" @onclick="@(() => Dismiss(item))" title="Dismiss">x</button>
-            </div>
-            @if (!string.IsNullOrWhiteSpace(item.Notification.SongLabel))
-            {
-                <div class="skip-toast-song">@item.Notification.SongLabel</div>
-            }
-            <div class="skip-toast-reason">reason=@item.Notification.Reason @item.Notification.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</div>
-            @if (item.Notification.Details.Count > 0)
-            {
-                <details class="skip-toast-details" open="@item.ExpandedByDefault">
-                    <summary>state</summary>
-                    <ul>
-                        @foreach (var kv in item.Notification.Details)
-                        {
-                            <li><span class="k">@kv.Key:</span> <span class="v">@(kv.Value ?? "-")</span></li>
-                        }
-                    </ul>
-                </details>
-            }
+        <div class="skip-toast @item.Notification.Severity" @key="item.Id" title="@BuildTooltip(item.Notification)">
+            <span class="skip-toast-text">@FormatMessage(item.Notification.Reason)</span>
+            <button class="skip-toast-close" @onclick="@(() => Dismiss(item))" title="Dismiss">x</button>
         </div>
     }
 </div>
@@ -37,68 +18,46 @@
         bottom: 16px;
         display: flex;
         flex-direction: column-reverse;
-        gap: 8px;
+        gap: 4px;
         z-index: 40;
-        max-width: 380px;
+        max-width: min(240px, calc(100vw - 32px));
         pointer-events: auto;
     }
     .skip-toast {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         background: rgba(18, 18, 26, 0.94);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-left-width: 3px;
         border-radius: 4px;
-        padding: 8px 10px;
+        padding: 5px 7px;
         color: #f2f2f2;
         font-family: system-ui, -apple-system, sans-serif;
-        font-size: 12px;
-        line-height: 1.4;
+        font-size: 11px;
+        line-height: 1.1;
         animation: skip-toast-in 0.18s ease;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
     }
     .skip-toast.info { border-left-color: #5aa9e6; }
     .skip-toast.warning { border-left-color: #f5a623; }
     .skip-toast.error { border-left-color: #e05555; }
-    .skip-toast-head {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
+    .skip-toast-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
-    .skip-toast-title { font-weight: 600; }
     .skip-toast-close {
         background: none;
         border: none;
         color: rgba(255, 255, 255, 0.45);
         cursor: pointer;
-        font-size: 12px;
+        font-size: 11px;
         padding: 0 2px;
         line-height: 1;
     }
     .skip-toast-close:hover { color: #fff; }
-    .skip-toast-song { opacity: 0.9; margin-top: 1px; }
-    .skip-toast-reason {
-        opacity: 0.55;
-        margin-top: 3px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 10.5px;
-    }
-    .skip-toast-details { margin-top: 6px; opacity: 0.85; }
-    .skip-toast-details summary {
-        cursor: pointer;
-        font-size: 10.5px;
-        opacity: 0.75;
-        user-select: none;
-    }
-    .skip-toast-details ul {
-        margin: 4px 0 0 0;
-        padding-left: 0;
-        list-style: none;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 10.5px;
-    }
-    .skip-toast-details li { margin: 1px 0; }
-    .skip-toast-details .k { opacity: 0.6; }
-    .skip-toast-details .v { opacity: 0.95; }
     @@keyframes skip-toast-in {
         from { opacity: 0; transform: translateX(-10px); }
         to { opacity: 1; transform: translateX(0); }
@@ -123,7 +82,7 @@
     {
         _ = InvokeAsync(async () =>
         {
-            var item = new VisibleItem(Guid.NewGuid(), notification, notification.Severity != "info");
+            var item = new VisibleItem(Guid.NewGuid(), notification);
             _visible.Add(item);
             while (_visible.Count > 5)
                 _visible.RemoveAt(0);
@@ -156,5 +115,19 @@
             State.SkipReported -= _handler;
     }
 
-    private sealed record VisibleItem(Guid Id, SkipNotification Notification, bool ExpandedByDefault);
+    private static string FormatMessage(string reason)
+    {
+        return string.IsNullOrWhiteSpace(reason)
+            ? "Skipped"
+            : $"Skipped ({reason})";
+    }
+
+    private static string BuildTooltip(SkipNotification notification)
+    {
+        return string.IsNullOrWhiteSpace(notification.Title)
+            ? FormatMessage(notification.Reason)
+            : $"{FormatMessage(notification.Reason)} — {notification.Title}";
+    }
+
+    private sealed record VisibleItem(Guid Id, SkipNotification Notification);
 }

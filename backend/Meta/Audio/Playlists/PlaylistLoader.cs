@@ -155,42 +155,64 @@ public class PlaylistLoader : IPlaylistLoader
         progress.Log($"Received {tracks.Count} tracks from playlist.");
 
         var toCreate = new List<SongData>();
-        var toAttach = new List<long>();
-        var toUpdateAudio = new List<(long Id, SongState State, long? DurationMs, bool IsValid)>();
+        var toUpdate = new List<SongData>();
 
         foreach (var track in tracks)
         {
+            var author = track.PublisherMetadata is { Artist: not null }
+                ? track.PublisherMetadata.Artist
+                : string.Empty;
+            var name = track.Title ?? string.Empty;
+            var url = track.PermalinkUrl?.ToString() ?? string.Empty;
             var localDuration = await ReadLocalDuration(track.Id);
             var localDurationMs = ToDurationMs(localDuration);
 
             if (_songs.TryGetValue(track.Id, out var existing))
             {
-                if (!existing.Playlists.Contains(playlist.Id))
-                    toAttach.Add(track.Id);
+                var playlists = existing.Playlists.Contains(playlist.Id)
+                    ? existing.Playlists
+                    : existing.Playlists.Concat(new[] { playlist.Id }).ToList();
+                var addDate = existing.Playlists.Contains(playlist.Id)
+                    ? existing.AddDate
+                    : DateTime.UtcNow;
+                var isValid = GetFetchValidity(author, existing, localDuration);
 
-                var isValid = GetFetchValidity(existing, localDuration);
-                if (existing.DurationMs != localDurationMs || existing.IsValid != isValid)
-                    toUpdateAudio.Add((track.Id, existing, localDurationMs, isValid));
+                if (existing.Url != url
+                    || existing.Author != author
+                    || existing.Name != name
+                    || !existing.Playlists.SequenceEqual(playlists)
+                    || existing.AddDate != addDate
+                    || existing.DurationMs != localDurationMs
+                    || existing.IsValid != isValid)
+                {
+                    toUpdate.Add(new SongData
+                    {
+                        Id = track.Id,
+                        Url = url,
+                        Playlists = playlists,
+                        Author = author,
+                        Name = name,
+                        AddDate = addDate,
+                        IsLoaded = existing.IsLoaded,
+                        DurationMs = localDurationMs,
+                        IsValid = isValid
+                    });
+                }
 
                 continue;
             }
 
-            var author = track.PublisherMetadata is { Artist: not null }
-                ? track.PublisherMetadata.Artist
-                : string.Empty;
-            var name = track.Title ?? string.Empty;
-
             toCreate.Add(new SongData
             {
                 Id = track.Id,
-                Url = track.PermalinkUrl!.ToString(),
+                Url = url,
                 Playlists = new[] { playlist.Id },
                 Author = author,
                 Name = name,
                 AddDate = DateTime.UtcNow,
                 IsLoaded = false,
                 DurationMs = localDurationMs,
-                IsValid = true
+                IsValid = IsValidAuthor(author)
             });
         }
 
@@ -207,31 +229,20 @@ public class PlaylistLoader : IPlaylistLoader
             progress.Log($"Created {i + 1} / {toCreate.Count}: {data.Author} - {data.Name}");
         }
 
-        progress.Log($"Attaching playlist to {toAttach.Count} existing songs...");
+        progress.Log($"Updating {toUpdate.Count} existing song grains...");
         progress.SetProgress(0f);
 
-        for (var i = 0; i < toAttach.Count; i++)
+        for (var i = 0; i < toUpdate.Count; i++)
         {
-            var grain = _orleans.GetGrain<ISong>(toAttach[i]);
-            await grain.AddToPlaylist(playlist.Id);
+            var data = toUpdate[i];
+            var grain = _orleans.GetGrain<ISong>(data.Id);
+            await grain.UpdateData(data);
 
-            progress.SetProgress(i / (float)Math.Max(1, toAttach.Count));
-            progress.Log($"Attached {i + 1} / {toAttach.Count}");
+            progress.SetProgress(i / (float)Math.Max(1, toUpdate.Count));
+            progress.Log($"Updated {i + 1} / {toUpdate.Count}: {data.Author} - {data.Name} (valid={data.IsValid})");
         }
 
-        progress.Log($"Updating local audio data for {toUpdateAudio.Count} existing songs...");
-        progress.SetProgress(0f);
-
-        for (var i = 0; i < toUpdateAudio.Count; i++)
-        {
-            var (id, state, durationMs, isValid) = toUpdateAudio[i];
-            await _orleans.GetGrain<ISong>(id).SetAudioData(state.IsLoaded, durationMs, isValid);
-
-            progress.SetProgress(i / (float)Math.Max(1, toUpdateAudio.Count));
-            progress.Log($"Updated local audio {i + 1} / {toUpdateAudio.Count}: {state.Author} - {state.Name}");
-        }
-
-        progress.Log($"Fetch complete: {toCreate.Count} new, {toAttach.Count} attached, {toUpdateAudio.Count} local audio updated.");
+        progress.Log($"Fetch complete: {toCreate.Count} new, {toUpdate.Count} updated.");
     }
 
     private async Task LoadPending(
@@ -328,12 +339,20 @@ public class PlaylistLoader : IPlaylistLoader
             : null;
     }
 
-    private static bool GetFetchValidity(SongState state, TimeSpan? localDuration)
+    private static bool GetFetchValidity(string author, SongState state, TimeSpan? localDuration)
     {
+        if (!IsValidAuthor(author))
+            return false;
+
         if (localDuration.HasValue)
             return AudioTrackValidation.IsValidLocalDuration(localDuration);
 
         return !state.IsLoaded && state.IsValid;
+    }
+
+    private static bool IsValidAuthor(string author)
+    {
+        return !string.IsNullOrWhiteSpace(author);
     }
 
     private static string FormatDuration(TimeSpan? duration)

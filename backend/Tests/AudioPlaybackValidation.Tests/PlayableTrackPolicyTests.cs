@@ -27,6 +27,24 @@ public class PlayableTrackPolicyTests
     }
 
     [Theory]
+    [InlineData(true, true, 41_000L, false)]
+    [InlineData(true, true, 31_000L, false)]
+    [InlineData(true, false, 41_000L, true)]
+    [InlineData(false, true, 41_000L, false)]
+    [InlineData(true, true, 30_000L, true)]
+    [InlineData(true, true, null, true)]
+    [InlineData(false, false, null, true)]
+    [InlineData(false, true, null, false)]
+    public void InvalidPlaybackCandidateIncludesLoadedShortTracks(
+        bool isLoaded,
+        bool isValid,
+        long? durationMs,
+        bool expected)
+    {
+        AudioTrackValidation.IsInvalidPlaybackCandidate(isLoaded, isValid, durationMs).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(true, 41_000L, true)]
     [InlineData(true, 31_000L, true)]
     [InlineData(false, 41_000L, false)]

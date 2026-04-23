@@ -187,10 +187,15 @@ public static class RadioEndpoints
         var userAgent = context.Request.Headers.UserAgent.ToString();
         var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "-";
         var reason = TryGetString(report, "reason") ?? "-";
+        var sourceReason = TryGetString(report, "sourceReason") ?? "-";
         var severity = TryGetString(report, "severity") ?? "-";
         var title = TryGetString(report, "title") ?? "-";
         var songId = TryGetString(report, "songId") ?? "-";
         var songLabel = TryGetString(report, "songLabel") ?? "-";
+        var candidateSongId = TryGetString(report, "candidateSongId") ?? "-";
+        var candidateSongLabel = TryGetString(report, "candidateSongLabel") ?? "-";
+        var streamStatusCode = TryGetString(report, "streamStatusCode") ?? "-";
+        var streamIsNotFound = TryGetString(report, "streamIsNotFound") ?? "-";
         var rawJson = report.GetRawText();
 
         var level = severity switch
@@ -202,8 +207,9 @@ public static class RadioEndpoints
 
         logger.Log(
             level,
-            "[RadioSkip] session={SessionId} remote={RemoteIp} severity={Severity} reason={Reason} title={Title} songId={SongId} song={SongLabel} userAgent={UserAgent} payload={Payload}",
-            sessionId, remoteIp, severity, reason, title, songId, songLabel, userAgent, rawJson);
+            "[RadioSkip] session={SessionId} remote={RemoteIp} severity={Severity} reason={Reason} sourceReason={SourceReason} title={Title} songId={SongId} song={SongLabel} candidateSongId={CandidateSongId} candidateSong={CandidateSongLabel} streamStatus={StreamStatusCode} streamNotFound={StreamIsNotFound} userAgent={UserAgent} payload={Payload}",
+            sessionId, remoteIp, severity, reason, sourceReason, title, songId, songLabel, candidateSongId,
+            candidateSongLabel, streamStatusCode, streamIsNotFound, userAgent, rawJson);
 
         return Results.NoContent();
     }

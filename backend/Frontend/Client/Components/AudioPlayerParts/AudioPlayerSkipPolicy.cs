@@ -2,9 +2,15 @@ namespace Frontend.Client.Components;
 
 internal static class AudioPlayerSkipPolicy
 {
+    public const string MissingStreamReason = "missing-stream";
+    public const string StreamUrlFailedReason = "stream-url-failed";
+
     public static bool IsUiSuppressed(string reason, DateTime componentStartUtc)
     {
         if (reason == "playlist-changed" || reason == "ended" || reason == "skip-requested")
+            return true;
+
+        if (reason == MissingStreamReason)
             return true;
 
         if (reason == "empty-url" && AudioPlayerTiming.IsStartupWindow(componentStartUtc))
@@ -27,6 +33,8 @@ internal static class AudioPlayerSkipPolicy
             "skip-requested" => ("Пропущено пользователем", "info"),
             "playlist-changed" => ("Смена плейлиста", "info"),
             "empty-url" => ("Нет URL для трека", "warning"),
+            MissingStreamReason => ("Трек недоступен, пропускаем", "info"),
+            StreamUrlFailedReason => ("Не удалось получить URL трека", "warning"),
             AudioPlayerTiming.ProgressTimeoutReason => ("Watchdog: нет прогресса 30 сек", "warning"),
             "buffering-timeout" => ("Watchdog: буферизация > 90 сек", "warning"),
             "startup-timeout" => ("Watchdog: трек не стартовал за 20 сек", "warning"),

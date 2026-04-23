@@ -276,7 +276,10 @@
 
     private static bool IsInvalidTime(KeyValuePair<long, SongState> song)
     {
-        return !song.Value.IsValid || !AudioTrackValidation.IsValidLocalDurationMs(song.Value.DurationMs);
+        return AudioTrackValidation.IsInvalidPlaybackCandidate(
+            song.Value.IsLoaded,
+            song.Value.IsValid,
+            song.Value.DurationMs);
     }
 
     public void Dispose() => _lifetime.Terminate();

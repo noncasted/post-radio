@@ -32,16 +32,21 @@ public partial class AudioPlayer
         string reason,
         SongDto? previousSong,
         IReadOnlyList<KeyValuePair<string, string?>> details,
-        AudioStateSnapshot? snapshot)
+        AudioStateSnapshot? snapshot,
+        SongDto? candidateSong = null,
+        SongStreamUrlResult? streamResult = null,
+        string? sourceReason = null)
     {
         var (title, severity) = AudioPlayerSkipPolicy.DescribeReason(reason);
         var songLabel = AudioPlayerFormatters.FormatSongLabel(previousSong);
+        var candidateSongLabel = AudioPlayerFormatters.FormatSongLabel(candidateSong);
         var timestamp = DateTime.UtcNow;
         var uiSuppressed = IsUiSuppressed(reason);
 
         Logger.LogInformation(
-            "[AudioPlayer] ReportSkip reason={Reason} severity={Severity} songId={SongId} songLabel={SongLabel} uiSuppressed={UiSuppressed} details=[{Details}]",
-            reason, severity, previousSong?.Id, songLabel, uiSuppressed,
+            "[AudioPlayer] ReportSkip reason={Reason} sourceReason={SourceReason} severity={Severity} songId={SongId} songLabel={SongLabel} candidateSongId={CandidateSongId} candidateSongLabel={CandidateSongLabel} streamStatus={StreamStatusCode} streamNotFound={StreamIsNotFound} uiSuppressed={UiSuppressed} details=[{Details}]",
+            reason, sourceReason, severity, previousSong?.Id, songLabel, candidateSong?.Id, candidateSongLabel,
+            streamResult?.StatusCode, streamResult?.IsNotFound, uiSuppressed,
             string.Join(", ", details.Select(kv => $"{kv.Key}={kv.Value ?? "-"}")));
 
         if (!uiSuppressed)
@@ -64,6 +69,11 @@ public partial class AudioPlayer
             severity,
             songId = previousSong?.Id,
             songLabel,
+            candidateSongId = candidateSong?.Id,
+            candidateSongLabel,
+            sourceReason,
+            streamStatusCode = streamResult?.StatusCode,
+            streamIsNotFound = streamResult?.IsNotFound,
             timestampUtc = timestamp,
             sessionId = State.SessionId,
             generation = _generation,
@@ -74,6 +84,41 @@ public partial class AudioPlayer
         };
 
         _ = PushSkipToBackend(payload);
+    }
+
+    private async Task ReportStreamFailure(string sourceReason, SongDto candidateSong, SongStreamUrlResult streamResult)
+    {
+        var reason = streamResult.IsNotFound
+            ? AudioPlayerSkipPolicy.MissingStreamReason
+            : AudioPlayerSkipPolicy.StreamUrlFailedReason;
+        var snapshot = await TryCaptureSnapshot();
+        var details = BuildDetails(snapshot, State.CurrentSong)
+                      .Concat(BuildStreamFailureDetails(sourceReason, candidateSong, streamResult))
+                      .ToArray();
+
+        ReportSkip(
+            reason,
+            State.CurrentSong,
+            details,
+            snapshot,
+            candidateSong,
+            streamResult,
+            sourceReason);
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string?>> BuildStreamFailureDetails(
+        string sourceReason,
+        SongDto candidateSong,
+        SongStreamUrlResult streamResult)
+    {
+        return new[]
+        {
+            new KeyValuePair<string, string?>("sourceReason", sourceReason),
+            new KeyValuePair<string, string?>("candidateSongId", candidateSong.Id.ToString()),
+            new KeyValuePair<string, string?>("candidateSong", AudioPlayerFormatters.FormatSongLabel(candidateSong)),
+            new KeyValuePair<string, string?>("streamStatus", streamResult.StatusCode?.ToString()),
+            new KeyValuePair<string, string?>("streamNotFound", streamResult.IsNotFound.ToString())
+        };
     }
 
     private async Task PushSkipToBackend(object payload)

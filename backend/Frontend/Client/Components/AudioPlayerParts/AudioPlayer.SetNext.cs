@@ -18,7 +18,9 @@ public partial class AudioPlayer
             var snapshot = await TryCaptureSnapshot();
             var previousSong = State.CurrentSong;
             var details = BuildDetails(snapshot, previousSong);
-            ReportSkip(reason, previousSong, details, snapshot);
+
+            if (ShouldReportTransitionSkip(reason, previousSong))
+                ReportSkip(reason, previousSong, details, snapshot);
 
             var song = State.PeekNextSong();
             var generation = Interlocked.Increment(ref _generation);
@@ -86,6 +88,8 @@ public partial class AudioPlayer
             Logger.LogWarning("[AudioPlayer] Stream url failed reason={Reason} generation={Generation} songId={SongId} statusCode={StatusCode} notFound={IsNotFound}",
                 reason, generation, song.Id, stream.StatusCode, stream.IsNotFound);
 
+            await ReportStreamFailure(reason, song, stream);
+
             if (stream.IsNotFound)
                 State.CommitNextSong(song);
 
@@ -100,6 +104,11 @@ public partial class AudioPlayer
         _audioUrl = stream.Url;
         await InvokeAsync(StateHasChanged);
         return SetNextResult.Loaded;
+    }
+
+    private static bool ShouldReportTransitionSkip(string reason, SongDto? previousSong)
+    {
+        return reason != "empty-url" || previousSong != null;
     }
 
     private IReadOnlyList<KeyValuePair<string, string?>> BuildDetails(AudioStateSnapshot? snapshot, SongDto? song)
