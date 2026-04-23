@@ -12,7 +12,9 @@
             var draft = _drafts.TryGetValue(id, out var d) ? d : null;
 
             <div class="flex flex-col">
-                <div class="@GetRowClass(state)"
+                <div class="@GetRowClass()"
+                     style="@GetRowStyle(state)"
+                     title="@GetRowTitle(state)"
                      @onclick="@(() => ToggleExpand(id, state))">
                     <span class="rounded-md bg-primary/10 p-2">
                         <LucideIcon Name="music" Size="14" class="text-primary" />
@@ -28,7 +30,7 @@
                     </div>
                     @if (state.DurationMs.HasValue)
                     {
-                        <span class="@GetDurationBadgeClass(state)">
+                        <span style="@GetDurationBadgeStyle(state)">
                             <LucideIcon Name="timer" Size="12" /> @FormatDuration(state.DurationMs)
                         </span>
                     }
@@ -52,13 +54,13 @@
                     }
                     @if (!state.IsValid)
                     {
-                        <span class="song-invalid-badge">
+                        <span style="@InvalidBadgeStyle">
                             <LucideIcon Name="ban" Size="12" /> invalid
                         </span>
                     }
                     @if (IsShortLoadedTrack(state))
                     {
-                        <span class="song-invalid-badge">
+                        <span style="@InvalidBadgeStyle">
                             <LucideIcon Name="timer-off" Size="12" /> short &lt;31s
                         </span>
                     }
@@ -137,61 +139,6 @@
     </div>
 </div>
 
-<style>
-    .song-row-invalid {
-        background: rgba(239, 68, 68, 0.18);
-        box-shadow: inset 4px 0 0 rgba(248, 113, 113, 0.95);
-    }
-
-    .song-row-invalid:hover {
-        background: rgba(239, 68, 68, 0.25);
-    }
-
-    .song-row-normal:hover {
-        background: rgba(255, 255, 255, 0.04);
-    }
-
-    .song-duration-invalid {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        border-radius: 0.25rem;
-        border: 1px solid rgba(248, 113, 113, 0.45);
-        background: rgba(239, 68, 68, 0.18);
-        color: rgb(252, 165, 165);
-        padding: 0.125rem 0.5rem;
-        font-size: 0.75rem;
-        line-height: 1rem;
-        font-weight: 600;
-    }
-
-    .song-duration-valid {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        border-radius: 0.25rem;
-        background: rgba(14, 165, 233, 0.15);
-        color: rgb(56, 189, 248);
-        padding: 0.125rem 0.5rem;
-        font-size: 0.75rem;
-        line-height: 1rem;
-    }
-
-    .song-invalid-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        border-radius: 0.25rem;
-        border: 1px solid rgba(248, 113, 113, 0.45);
-        background: rgba(239, 68, 68, 0.18);
-        color: rgb(252, 165, 165);
-        padding: 0.125rem 0.5rem;
-        font-size: 0.75rem;
-        line-height: 1rem;
-        font-weight: 600;
-    }
-</style>
-
 @code {
     [Parameter] public IReadOnlyList<KeyValuePair<long, SongState>> Source { get; set; } = Array.Empty<KeyValuePair<long, SongState>>();
     [Parameter] public bool ShowUrl { get; set; } = true;
@@ -213,6 +160,17 @@
     private readonly Dictionary<long, Draft> _drafts = new();
     private bool _saving;
     private long _savingId;
+
+    private const string BaseBadgeStyle =
+        "display:inline-flex;align-items:center;gap:0.25rem;border-radius:0.25rem;padding:0.125rem 0.5rem;font-size:0.75rem;line-height:1rem;";
+
+    private const string InvalidBadgeStyle =
+        BaseBadgeStyle +
+        "border:1px solid rgba(248,113,113,0.7);background:rgba(239,68,68,0.28);color:rgb(254,202,202);font-weight:700;";
+
+    private const string ValidDurationBadgeStyle =
+        BaseBadgeStyle +
+        "background:rgba(14,165,233,0.15);color:rgb(56,189,248);";
 
     protected override void OnParametersSet()
     {
@@ -277,26 +235,47 @@
         if (!durationMs.HasValue || durationMs.Value <= 0)
             return "—";
 
-        var duration = TimeSpan.FromMilliseconds(durationMs.Value);
+        return FormatDuration(TimeSpan.FromMilliseconds(durationMs.Value));
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
         return duration.TotalHours >= 1
             ? duration.ToString(@"h\:mm\:ss")
             : duration.ToString(@"m\:ss");
     }
 
-    private static string GetRowClass(SongState state)
+    private static string GetRowClass()
     {
-        var dangerClass = IsVisuallyInvalid(state)
-            ? "song-row-invalid"
-            : "song-row-normal";
-
-        return $"p-3 flex items-center gap-3 cursor-pointer {dangerClass}";
+        return "p-3 flex items-center gap-3 cursor-pointer";
     }
 
-    private static string GetDurationBadgeClass(SongState state)
+    private static string GetRowStyle(SongState state)
+    {
+        return IsVisuallyInvalid(state)
+            ? "background:rgba(239,68,68,0.24);box-shadow:inset 5px 0 0 rgba(248,113,113,1);"
+            : string.Empty;
+    }
+
+    private static string GetRowTitle(SongState state)
+    {
+        if (!IsVisuallyInvalid(state))
+            return string.Empty;
+
+        if (!state.IsValid)
+            return "Invalid track";
+
+        if (IsShortLoadedTrack(state))
+            return $"Invalid time: loaded audio is shorter than {FormatDuration(AudioTrackValidation.MinimumPlayableDuration)}";
+
+        return "Invalid time";
+    }
+
+    private static string GetDurationBadgeStyle(SongState state)
     {
         return IsShortLoadedTrack(state)
-            ? "song-duration-invalid"
-            : "song-duration-valid";
+            ? InvalidBadgeStyle
+            : ValidDurationBadgeStyle;
     }
 
     private static bool IsVisuallyInvalid(SongState state)

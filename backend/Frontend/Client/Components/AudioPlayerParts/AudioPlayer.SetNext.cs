@@ -108,9 +108,6 @@ public partial class AudioPlayer
 
     private static bool ShouldReportTransitionSkip(string reason, SongDto? previousSong)
     {
-        if (reason == "empty-url")
-            return false;
-
         return previousSong != null;
     }
 

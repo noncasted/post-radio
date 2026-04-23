@@ -13,9 +13,6 @@ internal static class AudioPlayerSkipPolicy
         if (reason == MissingStreamReason)
             return true;
 
-        if (reason == "empty-url")
-            return true;
-
         return false;
     }
 

@@ -54,6 +54,10 @@ public class PlaylistLoader : IPlaylistLoader
     {
         progress.SetStatus(OperationStatus.InProgress);
 
+        await MarkInvalidShortTracks(
+            progress,
+            state => state.Playlists.Contains(playlist.Id));
+
         await FetchPlaylist(playlist, progress);
 
         progress.SetStatus(OperationStatus.Success);
@@ -62,6 +66,8 @@ public class PlaylistLoader : IPlaylistLoader
     public async Task FetchAll(IOperationProgress progress)
     {
         progress.SetStatus(OperationStatus.InProgress);
+        await MarkInvalidShortTracks(progress, _ => true);
+
         progress.Log("Scanning all playlists for tracks...");
 
         var playlists = _playlists
@@ -298,6 +304,63 @@ public class PlaylistLoader : IPlaylistLoader
         progress.SetStatus(OperationStatus.Success);
     }
 
+    private async Task MarkInvalidShortTracks(
+        IOperationProgress progress,
+        Func<SongState, bool> filter)
+    {
+        var candidates = _songs
+                         .Where(kv => kv.Value.IsValid && filter(kv.Value))
+                         .Select(kv => (Id: kv.Key, State: kv.Value))
+                         .ToList();
+
+        if (candidates.Count == 0)
+            return;
+
+        progress.Log($"Checking {candidates.Count} currently valid track(s) for short audio...");
+
+        var markedInvalid = 0;
+        var refreshed = 0;
+
+        foreach (var (id, state) in candidates)
+        {
+            if (!state.IsLoaded)
+            {
+                if (AudioTrackValidation.IsValidLocalDurationMs(state.DurationMs))
+                    continue;
+
+                if (!state.DurationMs.HasValue)
+                    continue;
+
+                await _orleans.GetGrain<ISong>(id).SetValid(false);
+                markedInvalid++;
+                progress.Log($"Marked invalid short metadata: {FormatLabel(id, state)} ({FormatDuration(state.DurationMs)} < {FormatDuration(AudioTrackValidation.MinimumPlayableDuration)}).");
+                continue;
+            }
+
+            var localDuration = await ReadLocalDuration(id);
+            var durationMs = ToDurationMs(localDuration);
+            var isValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
+
+            if (isValid)
+            {
+                if (state.DurationMs != durationMs)
+                {
+                    await _orleans.GetGrain<ISong>(id).SetAudioData(true, durationMs, true);
+                    refreshed++;
+                }
+
+                continue;
+            }
+
+            await _orleans.GetGrain<ISong>(id).SetAudioData(true, durationMs, false);
+            markedInvalid++;
+            progress.Log($"Marked invalid loaded audio: {FormatLabel(id, state)} ({FormatDuration(localDuration)} < {FormatDuration(AudioTrackValidation.MinimumPlayableDuration)}).");
+        }
+
+        if (markedInvalid > 0 || refreshed > 0)
+            progress.Log($"Short audio validation complete: {markedInvalid} invalid, {refreshed} duration(s) refreshed.");
+    }
+
     public async Task<SongDownloadResult> DownloadSong(
         long id,
         SongState state,
@@ -361,6 +424,22 @@ public class PlaylistLoader : IPlaylistLoader
     {
         return !string.IsNullOrWhiteSpace(author);
     }
+
+    private static string FormatLabel(long id, SongState state)
+    {
+        var author = string.IsNullOrWhiteSpace(state.Author) ? "Unknown" : state.Author;
+        var name = string.IsNullOrWhiteSpace(state.Name) ? "Untitled" : state.Name;
+        return $"{author} - {name} #{id}";
+    }
+
+    private static string FormatDuration(long? durationMs)
+    {
+        return durationMs.HasValue
+            ? FormatDuration(TimeSpan.FromMilliseconds(durationMs.Value))
+            : FormatDuration((TimeSpan?)null);
+    }
+
+    private static string FormatDuration(TimeSpan duration) => FormatDuration((TimeSpan?)duration);
 
     private static string FormatDuration(TimeSpan? duration)
     {
@@ -492,13 +571,6 @@ public class PlaylistLoader : IPlaylistLoader
     private static bool IsHls(Transcoding transcoding)
     {
         return string.Equals(transcoding.Format?.Protocol, "hls", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string FormatDuration(long? durationMs)
-    {
-        return durationMs.HasValue
-            ? FormatDuration(TimeSpan.FromMilliseconds(durationMs.Value))
-            : FormatDuration((TimeSpan?)null);
     }
 
     public static long? GetTrackDurationMs(Track? track)
