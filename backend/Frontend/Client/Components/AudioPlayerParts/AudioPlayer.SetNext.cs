@@ -108,7 +108,10 @@ public partial class AudioPlayer
 
     private static bool ShouldReportTransitionSkip(string reason, SongDto? previousSong)
     {
-        return reason != "empty-url" || previousSong != null;
+        if (reason == "empty-url")
+            return false;
+
+        return previousSong != null;
     }
 
     private IReadOnlyList<KeyValuePair<string, string?>> BuildDetails(AudioStateSnapshot? snapshot, SongDto? song)

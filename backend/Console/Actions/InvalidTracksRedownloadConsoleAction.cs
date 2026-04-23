@@ -48,11 +48,19 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                       .ToList();
 
         progress.Log($"Scanning {songs.Count} song(s) on SoundCloud.");
+        progress.Log(
+            "Retry policy: candidates are stored invalid tracks, loaded local files below 0:31, SoundCloud tracks below 0:31, or local/SoundCloud duration mismatches.");
+        progress.Log(
+            $"Restore policy: a redownload counts as restored only after SoundCloud returns a non-snipped progressive stream and the saved local duration matches SoundCloud within {FormatDuration(DurationTolerance)}.");
         progress.SetProgress(0f);
 
         var ok = 0;
+        var candidates = 0;
+        var markedInvalid = 0;
+        var redownloadAttempts = 0;
         var restored = new List<string>();
         var failed = new List<string>();
+        var failureReasons = new Dictionary<string, int>(StringComparer.Ordinal);
 
         for (var i = 0; i < songs.Count; i++)
         {
@@ -89,7 +97,11 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                 var reason = FormatReason(state, localDuration, soundCloudDurationMs, hasDurationMismatch);
                 progress.Log($"Invalid candidate {label}: {reason}. Marking invalid and redownloading...");
 
+                candidates++;
                 await MarkInvalid(id, state, localDurationMs);
+                markedInvalid++;
+                redownloadAttempts++;
+                progress.Log($"Redownload attempt {redownloadAttempts} for {label}: requesting SoundCloud progressive stream...");
 
                 var result = await _loader.DownloadSong(id, state, track, cancellationToken);
                 var repairedLocalDuration = result.LocalDuration
@@ -112,15 +124,17 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                 {
                     var failedReason = $"redownloaded local={FormatDuration(repairedLocalDuration)}, soundcloud={FormatDuration(soundCloudDurationMs)}";
                     failed.Add($"{label} — {failedReason}");
+                    CountFailureReason(failureReasons, "Redownloaded but duration still invalid/mismatched");
                     progress.Log($"Failed {label}: {failedReason}. Kept invalid.");
                 }
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
                 failed.Add($"{label} — {e.Message}");
+                CountFailureReason(failureReasons, NormalizeFailureReason(e.Message));
                 _logger.LogError(e, "[Audio] [InvalidRetry] Failed to scan/redownload {SongId} {Author} - {Name}", id, state.Author, state.Name);
                 await _orleans.GetGrain<ISong>(id).SetValid(false);
-                progress.Log($"Failed {label}: {e.Message}. Marked invalid.");
+                progress.Log($"Redownload failed for {label}: {e.Message}. Marked invalid.");
             }
             finally
             {
@@ -129,8 +143,14 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
         }
 
         LogResults(progress, "Restored", restored);
+        LogFailureReasons(progress, failureReasons);
         LogResults(progress, "Failed", failed);
-        progress.Log($"Complete: scanned={songs.Count}, ok={ok}, restored={restored.Count}, failed={failed.Count}.");
+        progress.Log(
+            $"Complete: scanned={songs.Count}, ok={ok}, candidates={candidates}, markedInvalid={markedInvalid}, redownloadAttempts={redownloadAttempts}, restored={restored.Count}, failed={failed.Count}.");
+
+        if (candidates > 0 && redownloadAttempts > 0 && restored.Count == 0 && failed.Count == candidates)
+            progress.Log("Result: action executed and attempted redownloads, but no invalid candidate was restored. Check Failure reasons above for the blocker.");
+
         progress.SetStatus(failed.Count > 0 ? OperationStatus.Failed : OperationStatus.Success);
     }
 
@@ -162,6 +182,33 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
 
         foreach (var item in items)
             progress.Log($"- {item}");
+    }
+
+    private static void LogFailureReasons(IOperationProgress progress, IReadOnlyDictionary<string, int> failureReasons)
+    {
+        progress.Log($"Failure reasons ({failureReasons.Count}):");
+
+        foreach (var (reason, count) in failureReasons.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key))
+            progress.Log($"- {reason} — {count}");
+    }
+
+    private static void CountFailureReason(IDictionary<string, int> failureReasons, string reason)
+    {
+        if (failureReasons.TryGetValue(reason, out var count))
+        {
+            failureReasons[reason] = count + 1;
+            return;
+        }
+
+        failureReasons[reason] = 1;
+    }
+
+    private static string NormalizeFailureReason(string message)
+    {
+        var diagnosticStart = message.IndexOf(" (trackDuration=", StringComparison.Ordinal);
+        return diagnosticStart > 0
+            ? message[..diagnosticStart]
+            : message;
     }
 
     private static bool IsInvalidDuration(long? durationMs)

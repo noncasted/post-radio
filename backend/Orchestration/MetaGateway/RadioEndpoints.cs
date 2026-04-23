@@ -15,6 +15,11 @@ internal sealed class RadioSkipLog;
 public static class RadioEndpoints
 {
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
+    private static readonly TimeSpan DuplicateEmptyUrlSkipLogWindow = TimeSpan.FromSeconds(30);
+    private static readonly Dictionary<string, SkipLogRateLimitEntry> EmptyUrlSkipLogRateLimits = new();
+    private static readonly object EmptyUrlSkipLogRateLimitLock = new();
+    private const int MaxEmptyUrlSkipLogRateLimitEntries = 1024;
+
     public static IEndpointRouteBuilder AddRadioEndpoints(this IEndpointRouteBuilder builder)
     {
         var group = builder.MapGroup("/api/radio");
@@ -197,6 +202,26 @@ public static class RadioEndpoints
         var streamStatusCode = TryGetString(report, "streamStatusCode") ?? "-";
         var streamIsNotFound = TryGetString(report, "streamIsNotFound") ?? "-";
         var rawJson = report.GetRawText();
+        var now = DateTime.UtcNow;
+        var suppressedCount = GetSuppressedEmptyUrlSkipLogCount(
+            sessionId,
+            remoteIp,
+            severity,
+            reason,
+            sourceReason,
+            title,
+            songId,
+            songLabel,
+            candidateSongId,
+            candidateSongLabel,
+            streamStatusCode,
+            streamIsNotFound,
+            userAgent,
+            now,
+            out var shouldLog);
+
+        if (!shouldLog)
+            return Results.NoContent();
 
         var level = severity switch
         {
@@ -207,11 +232,90 @@ public static class RadioEndpoints
 
         logger.Log(
             level,
-            "[RadioSkip] session={SessionId} remote={RemoteIp} severity={Severity} reason={Reason} sourceReason={SourceReason} title={Title} songId={SongId} song={SongLabel} candidateSongId={CandidateSongId} candidateSong={CandidateSongLabel} streamStatus={StreamStatusCode} streamNotFound={StreamIsNotFound} userAgent={UserAgent} payload={Payload}",
+            "[RadioSkip] session={SessionId} remote={RemoteIp} severity={Severity} reason={Reason} sourceReason={SourceReason} title={Title} songId={SongId} song={SongLabel} candidateSongId={CandidateSongId} candidateSong={CandidateSongLabel} streamStatus={StreamStatusCode} streamNotFound={StreamIsNotFound} userAgent={UserAgent} suppressedDuplicates={SuppressedDuplicates} payload={Payload}",
             sessionId, remoteIp, severity, reason, sourceReason, title, songId, songLabel, candidateSongId,
-            candidateSongLabel, streamStatusCode, streamIsNotFound, userAgent, rawJson);
+            candidateSongLabel, streamStatusCode, streamIsNotFound, userAgent, suppressedCount, rawJson);
 
         return Results.NoContent();
+    }
+
+    private static int GetSuppressedEmptyUrlSkipLogCount(
+        string? sessionId,
+        string remoteIp,
+        string severity,
+        string reason,
+        string sourceReason,
+        string title,
+        string songId,
+        string songLabel,
+        string candidateSongId,
+        string candidateSongLabel,
+        string streamStatusCode,
+        string streamIsNotFound,
+        string userAgent,
+        DateTime now,
+        out bool shouldLog)
+    {
+        shouldLog = true;
+
+        if (reason != "empty-url")
+            return 0;
+
+        var key = string.Join('\u001f',
+            sessionId ?? "-",
+            remoteIp,
+            severity,
+            reason,
+            sourceReason,
+            title,
+            songId,
+            songLabel,
+            candidateSongId,
+            candidateSongLabel,
+            streamStatusCode,
+            streamIsNotFound,
+            userAgent);
+
+        lock (EmptyUrlSkipLogRateLimitLock)
+        {
+            PruneEmptyUrlSkipLogRateLimits(now);
+
+            if (EmptyUrlSkipLogRateLimits.TryGetValue(key, out var entry))
+            {
+                if (now - entry.LastLoggedUtc < DuplicateEmptyUrlSkipLogWindow)
+                {
+                    entry.SuppressedCount++;
+                    shouldLog = false;
+                    return entry.SuppressedCount;
+                }
+
+                var suppressedCount = entry.SuppressedCount;
+                entry.LastLoggedUtc = now;
+                entry.SuppressedCount = 0;
+                return suppressedCount;
+            }
+
+            EmptyUrlSkipLogRateLimits[key] = new SkipLogRateLimitEntry(now);
+            return 0;
+        }
+    }
+
+    private static void PruneEmptyUrlSkipLogRateLimits(DateTime now)
+    {
+        if (EmptyUrlSkipLogRateLimits.Count <= MaxEmptyUrlSkipLogRateLimitEntries)
+            return;
+
+        foreach (var (key, entry) in EmptyUrlSkipLogRateLimits.ToArray())
+        {
+            if (now - entry.LastLoggedUtc >= DuplicateEmptyUrlSkipLogWindow)
+                EmptyUrlSkipLogRateLimits.Remove(key);
+        }
+    }
+
+    private sealed class SkipLogRateLimitEntry(DateTime lastLoggedUtc)
+    {
+        public DateTime LastLoggedUtc { get; set; } = lastLoggedUtc;
+        public int SuppressedCount { get; set; }
     }
 
     private static string? TryGetString(JsonElement root, string name)

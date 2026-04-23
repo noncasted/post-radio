@@ -309,6 +309,13 @@ public class PlaylistLoader : IPlaylistLoader
         track ??= await _soundCloud.Tracks.GetAsync(state.Url, cancellationToken)
                   ?? throw new InvalidOperationException($"SoundCloud track not found: {state.Url}");
 
+        _logger.LogInformation(
+            "[Audio] Download source for {SongId} {Author} - {Name}: {TranscodingAvailability}",
+            id,
+            state.Author,
+            state.Name,
+            FormatTranscodingAvailability(track));
+
         var mediaUrl = await GetDownloadUrlAsync(track, cancellationToken);
         if (string.IsNullOrWhiteSpace(mediaUrl))
             throw new InvalidOperationException($"SoundCloud download URL not found: {state.Url}");
@@ -369,7 +376,8 @@ public class PlaylistLoader : IPlaylistLoader
     {
         var transcoding = SelectProgressiveTranscoding(track);
         if (transcoding == null)
-            throw new TrackUnavailableException("No non-snipped progressive transcodings found");
+            throw new TrackUnavailableException(
+                $"No non-snipped progressive transcodings found ({FormatTranscodingAvailability(track)})");
 
         if (transcoding.Url == null)
             return null;
@@ -422,6 +430,48 @@ public class PlaylistLoader : IPlaylistLoader
                || Math.Abs(transcoding.Duration.Value - expectedDurationMs.Value) <= DurationTolerance.TotalMilliseconds;
     }
 
+    private static string FormatTranscodingAvailability(Track track)
+    {
+        var expectedDurationMs = GetTrackDurationMs(track);
+        var transcodings = track.Media?.Transcodings?.ToList() ?? [];
+
+        if (transcodings.Count == 0)
+            return $"trackDuration={FormatDuration(expectedDurationMs)}, total=0";
+
+        var progressive = transcodings.Count(IsProgressive);
+        var hls = transcodings.Count(IsHls);
+        var snipped = transcodings.Count(transcoding => transcoding.Snipped);
+        var missingUrl = transcodings.Count(transcoding => transcoding.Url == null);
+        var durationMismatch = transcodings.Count(transcoding => HasTranscodingDurationMismatch(transcoding, expectedDurationMs));
+        var usable = transcodings.Count(transcoding => IsUsableTranscoding(transcoding, expectedDurationMs));
+        var sample = string.Join(", ", transcodings.Take(5).Select(FormatTranscoding));
+
+        return $"trackDuration={FormatDuration(expectedDurationMs)}, total={transcodings.Count}, progressive={progressive}, hls={hls}, snipped={snipped}, missingUrl={missingUrl}, durationMismatch={durationMismatch}, usable={usable}, sample=[{sample}]";
+    }
+
+    private static bool HasTranscodingDurationMismatch(Transcoding transcoding, long? expectedDurationMs)
+    {
+        return expectedDurationMs.HasValue
+               && transcoding.Duration.HasValue
+               && Math.Abs(transcoding.Duration.Value - expectedDurationMs.Value) > DurationTolerance.TotalMilliseconds;
+    }
+
+    private static string FormatTranscoding(Transcoding transcoding)
+    {
+        var protocol = string.IsNullOrWhiteSpace(transcoding.Format?.Protocol)
+            ? "unknown"
+            : transcoding.Format.Protocol;
+        var mime = string.IsNullOrWhiteSpace(transcoding.Format?.MimeType)
+            ? "unknown"
+            : transcoding.Format.MimeType;
+        var quality = string.IsNullOrWhiteSpace(transcoding.Quality)
+            ? "unknown"
+            : transcoding.Quality;
+        var url = transcoding.Url == null ? "missing-url" : "has-url";
+
+        return $"{protocol}/{mime}/{quality}/duration={FormatDuration(transcoding.Duration)}/snipped={transcoding.Snipped}/{url}";
+    }
+
     private static bool IsSqMp3Progressive(Transcoding transcoding)
     {
         return string.Equals(transcoding.Quality, "sq", StringComparison.OrdinalIgnoreCase)
@@ -437,6 +487,18 @@ public class PlaylistLoader : IPlaylistLoader
     private static bool IsProgressive(Transcoding transcoding)
     {
         return string.Equals(transcoding.Format?.Protocol, "progressive", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsHls(Transcoding transcoding)
+    {
+        return string.Equals(transcoding.Format?.Protocol, "hls", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatDuration(long? durationMs)
+    {
+        return durationMs.HasValue
+            ? FormatDuration(TimeSpan.FromMilliseconds(durationMs.Value))
+            : FormatDuration((TimeSpan?)null);
     }
 
     public static long? GetTrackDurationMs(Track? track)
