@@ -1,5 +1,7 @@
 @using Frontend.Client.Services
+@using Microsoft.JSInterop
 @inject IRadioApi Api
+@inject IJSRuntime JS
 @implements IDisposable
 
 <div class="image-container">
@@ -97,14 +99,24 @@
                     continue;
                 }
 
-                current.Hide();
-                current = current == _first ? _second : _first;
                 var index = State.IncImageIndex(_totalImages);
                 var url = await Api.GetImageUrl(index);
 
                 if (_disposed || token.IsCancellationRequested)
                     return;
 
+                try
+                {
+                    await JS.InvokeAsync<bool>("imagePreloader.load", token, url);
+                }
+                catch (JSDisconnectedException) { return; }
+                catch (TaskCanceledException) { return; }
+
+                if (_disposed || token.IsCancellationRequested)
+                    return;
+
+                current.Hide();
+                current = current == _first ? _second : _first;
                 current.Url = url;
                 current.Show();
 
