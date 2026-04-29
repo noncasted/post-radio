@@ -270,8 +270,8 @@ services:
   # reading Docker state through a read-only socket mount.
   resource-service:
     build:
-      context: https://github.com/noncasted/Aspire.ResourceServer.Standalone.git#ba56b364bfb7d56262e984c476071a811af07c5a
-    image: post-radio/resource-service:ba56b36
+      context: https://github.com/noncasted/Aspire.ResourceServer.Standalone.git#6d9cba465a25bd16bc941163da2283590e5f8581
+    image: post-radio/resource-service:6d9cba4
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:80
       ResourceProvider: docker
