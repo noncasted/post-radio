@@ -124,7 +124,7 @@
         var playlists = await Api.GetPlaylists();
         _playlists = playlists.Prepend(AllPlaylist).ToList();
 
-        var first = _playlists[0];
+        var first = _playlists.Last();
         _selectedId = first.Id;
         await State.SetPlaylist(first);
     }
