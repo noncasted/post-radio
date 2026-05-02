@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /commit, commit, комит, коммит, делай комит, закоммить, сделай коммит
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Commit Skill
 
 When the user runs `/commit`, follow these rules for generating commit messages:

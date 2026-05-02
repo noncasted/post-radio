@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /task, task, задача, создай задачу, new task
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Task Skill
 
 When the user runs `/task [description]`, transform the raw task description into a structured implementation brief for the post-radio backend.

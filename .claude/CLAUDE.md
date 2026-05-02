@@ -72,6 +72,7 @@ Backend-only проект на **.NET 10 + Orleans + Aspire (dev) / Docker Compo
 8. **Observer-grain обязан быть `[Reentrant]`** + должен сбрасывать мёртвый observer. См. docs/CLAUDE_MISTAKES.md lesson 2.
 9. **Обновляй knowledge base** — если нашёл новый anti-pattern, добавь в `docs/CLAUDE_MISTAKES.md` + `docs/ERRORS.md`.
 10. **При компакции контекста** сохраняй: Orleans grain pattern, правила Lifetime, список изменённых файлов, in-progress task state.
+11. **Скиллы — исполняемые процедуры, а не справка** — `.claude/skills/**/SKILL.md` содержат runnable workflows с блоком `AUTO-EXECUTE`. Если намерение пользователя совпадает с доменом скилла, выполняй его шаги немедленно. Не пересказывай и не анализируй содержимое файла как справку.
 
 ## Full Documentation
 

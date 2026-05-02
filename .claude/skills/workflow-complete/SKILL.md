@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /workflow-complete, workflow complete, заверши задачу, complete workflow
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Workflow Complete Skill
 
 When the user runs `/workflow-complete [task_name]`, finalize the task, create a condensed summary in `docs/tasks/complete/`, and clean up the working folder from `docs/tasks/current/`.

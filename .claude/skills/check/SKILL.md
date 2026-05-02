@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /check, check, проверь, проверь код, audit code
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Check Skill
 
 When the user runs `/check`, launch validation agents in parallel to audit post-radio backend code for correctness.

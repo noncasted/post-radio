@@ -2,6 +2,10 @@
 name: write-test
 description: Write integration tests for post-radio backend features using the Orleans cluster test framework. Use this skill whenever the user asks to write, create, or add tests for any backend feature — grains, state, transactions, messaging, meta services, deploy-epoch, infrastructure. Also trigger on "cover this with tests", "add test coverage", or mentions of testing backend code.
 ---
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /write-test, write test, напиши интеграционные тесты, write integration tests
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 
 # Write Integration Tests
 

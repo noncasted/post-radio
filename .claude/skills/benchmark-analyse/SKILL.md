@@ -2,6 +2,10 @@
 name: benchmark-analyse
 description: Run post-radio backend benchmarks via API and analyse results — trends, regressions, anomalies. Use when user asks to run benchmarks, check performance, compare benchmark results, or analyse benchmark history. Also trigger on "run benchmarks", "check performance", "benchmark results", "performance regression".
 ---
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /benchmark-analyse, benchmark analyse, analyze benchmarks, проанализируй бенчмарки
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 
 # Benchmark Analyse
 

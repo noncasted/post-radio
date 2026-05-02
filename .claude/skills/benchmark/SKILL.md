@@ -2,6 +2,10 @@
 name: benchmark
 description: Write new benchmarks for post-radio backend features using the cluster benchmark framework. Use whenever the user asks to benchmark, performance-test, or measure throughput of any backend feature — grains, state, transactions, messaging, task scheduling, meta services, infrastructure. Also trigger on "benchmark this", "add benchmark coverage", "measure performance of".
 ---
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /benchmark, benchmark, бенчмарк, замерь производительность, measure performance
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 
 # Write Benchmarks
 

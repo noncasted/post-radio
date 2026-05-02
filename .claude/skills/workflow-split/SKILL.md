@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /workflow-split, workflow split, разбей задачу, split workflow
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Workflow Split Skill
 
 When the user runs `/workflow-split [task_name]`, save all current session context into the task's `_info.md` and `_progress.md` files so that the next Claude Code session can seamlessly continue.

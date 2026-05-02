@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /validate, validate, валидируй, проверь правила, validate rules
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Validate Skill
 
 When the user runs `/validate`, check all modified `.cs` files against post-radio backend rules and report every violation. In-place checker (без делегации агентам — для коротких быстрых проверок).

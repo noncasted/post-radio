@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /branch-commit, branch-commit, создай ветку и коммит, в новую ветку, move changes to branch
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Branch Commit Skill
 
 Create a new branch from the current branch, move uncommitted changes there, and commit them — all in one step.

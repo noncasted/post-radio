@@ -2,6 +2,10 @@
 name: test
 description: Write xUnit integration and unit tests for post-radio backend features. Use this skill whenever the user asks to write, create, add, or cover tests for any backend functionality — grains, state, transactions, messaging, meta services, infrastructure. Also trigger on "cover with tests", "add test coverage", "test this".
 ---
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /test, test, напиши тесты, cover with tests, add tests
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 
 # Write Tests
 

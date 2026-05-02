@@ -1,3 +1,7 @@
+# AUTO-EXECUTE — DO NOT SUMMARIZE, EXECUTE IMMEDIATELY
+TRIGGERS: /report, report, отчет, напиши отчет, сделай отчет
+BEHAVIOR: When triggered, do not read, summarize, or explain this file. Execute the steps in this skill immediately.
+
 # Report Skill
 
 When the user runs `/report`, generate a report entry for the latest or given merged/open PR and append it to `Assets/Common/Docs/Reports/report_ivan_stage_2`.
