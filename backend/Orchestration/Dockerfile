@@ -10,11 +10,17 @@
 #   - runtime stages just copy their service's publish output, selected via ASSEMBLY_NAME.
 
 ARG DOTNET_VERSION=10.0
-# SDK 10.0.202 in the latest tag was producing publish output without
-# wwwroot/_framework/blazor.web.js for Web SDK projects after the first one
-# in publish-all (Blazor console got 404 on its own framework JS).
-# Pin a known-good tag until the regression is bisected.
-ARG DOTNET_SDK_TAG=10.0.201
+# Must ship a Roslyn at least as new as the Microsoft.CodeAnalysis.* version the
+# source generator in backend/Tools/Generators is built against (see
+# backend/Directory.Packages.props). An older compiler silently drops the generator
+# (CS9057) and every [State] registration it emits vanishes with it, so
+# Extensions.csproj fails on CS0103: GeneratedStatesRegistration.
+#   10.0.201 -> Roslyn 5.3.0   (too old for the 5.9.0 analyzer packages)
+#   10.0.400 -> Roslyn 5.9.0
+# The earlier reason for pinning 10.0.201 - publish output missing
+# wwwroot/_framework/blazor.web.js for every Web SDK project after the first one -
+# is handled by the staticwebassets cache wipe in the publish loop below.
+ARG DOTNET_SDK_TAG=10.0.400
 
 # Stage 1: restore. Cache key = project/graph metadata only.
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_SDK_TAG} AS restore
