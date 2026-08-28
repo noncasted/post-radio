@@ -68,6 +68,13 @@ Set these in Coolify; mark secrets as secret values.
 | `CONSOLE_TOKEN` | Admin login token for `/login?token=...` |
 | `ASPIRE_TOKEN` | Browser token for Aspire Dashboard |
 | `OTEL_API_KEY` | OTLP API key shared by services and dashboard |
+| `SOUNDCLOUD_PROXY` | Optional SOCKS5 proxy for SoundCloud traffic. Set it when tracks download as 30s previews: SoundCloud resolves streaming rights by request region and reports `policy=SNIP` for tracks not licensed where the deploy runs. |
+| `SOUNDCLOUD_AUTH` | Optional full `Authorization` header, e.g. `OAuth <token>`. Authenticates the session but does not lift regional restrictions. Mark as secret. |
+
+Both SoundCloud variables default to blank, which means anonymous and direct. The
+first line of every playlist load or redownload run prints the resolved session
+(`proxy=`, `geo=`, `probedTrackPolicy=`), so a deploy can be checked against what
+SoundCloud actually sees.
 
 The compose passes both `postgres` and `ConnectionStrings__postgres`; keep both because the migrator and application helpers read different key shapes.
 

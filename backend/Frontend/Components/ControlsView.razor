@@ -1,5 +1,6 @@
 @using Frontend.Services
 @using Frontend.Shared
+@implements IDisposable
 <div class="controls-overlay">
     <div class="volume-skip">
         <div class="volume-wrap">
@@ -109,6 +110,8 @@
 
     [Inject] public IRadioApi Api { get; set; } = null!;
 
+    [Inject] private PersistentComponentState PersistentState { get; set; } = null!;
+
     private static readonly PlaylistDto AllPlaylist = new()
     {
         Id = SessionState.AllPlaylistId,
@@ -116,25 +119,45 @@
         Url = string.Empty
     };
 
+    private const string PlaylistsKey = "controls.playlists";
+
     private IReadOnlyList<PlaylistDto> _playlists = Array.Empty<PlaylistDto>();
+    private List<PlaylistDto> _fetchedPlaylists = new();
+    private PersistingComponentStateSubscription _persistSubscription;
     private Guid _selectedId;
 
     protected override async Task OnInitializedAsync()
     {
-        // Runs twice under prerendering. Playlist names are cheap and belong in the
-        // crawlable markup; loading their songs is playback work, so it waits for the
-        // interactive pass instead of being paid for on every crawl.
-        var playlists = await Api.GetPlaylists();
-        _playlists = playlists.Prepend(AllPlaylist).ToList();
+        // OnInitializedAsync runs twice under prerendering. Playlist names belong in the
+        // crawlable markup, so the prerender pass does fetch them - but it hands the result
+        // to the interactive pass through PersistentComponentState instead of letting it
+        // hit meta a second time.
+        _persistSubscription = PersistentState.RegisterOnPersisting(PersistPlaylists);
+
+        if (!PersistentState.TryTakeFromJson<List<PlaylistDto>>(PlaylistsKey, out var fetched) || fetched is null)
+            fetched = (await Api.GetPlaylists()).ToList();
+
+        _fetchedPlaylists = fetched;
+        _playlists = fetched.Prepend(AllPlaylist).ToList();
 
         var first = _playlists.Last();
         _selectedId = first.Id;
 
+        // Loading a playlist's songs is playback work: pointless on a crawl, and the
+        // prerendered frame is replaced the moment the circuit comes up.
         if (!RendererInfo.IsInteractive)
             return;
 
         await State.SetPlaylist(first);
     }
+
+    private Task PersistPlaylists()
+    {
+        PersistentState.PersistAsJson(PlaylistsKey, _fetchedPlaylists);
+        return Task.CompletedTask;
+    }
+
+    public void Dispose() => _persistSubscription.Dispose();
 
     private async Task OnPlaylistChanged(PlaylistDto playlist)
     {

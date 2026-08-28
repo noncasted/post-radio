@@ -27,3 +27,13 @@
 @media (min-width: 1024px) { .container { max-width: 1024px; } }
 @media (min-width: 1280px) { .container { max-width: 1280px; } }
 @media (min-width: 1536px) { .container { max-width: 1536px; } }
+
+/* Default border colour for bare `border` utilities.
+ * blazorblueprint.css sets `* { border-color: var(--border) }` in @layer base, but
+ * Tailwind's own preflight here (`border: 0 solid`) is in the same layer and loads
+ * later, resetting it to currentColor. Re-apply it at the end of our base layer. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+}

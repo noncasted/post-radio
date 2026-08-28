@@ -56,6 +56,15 @@ var frontend = builder.AddProject<Frontend>("frontend")
 foreach (var project in new[] { silo, coordinator, meta, console })
     project.WithEnvironment("MediaStorage__RootPath", mediaRoot);
 
+// SoundCloud streaming rights depend on the session the request runs under, so the
+// optional authorization/proxy settings are forwarded from the AppHost environment
+// instead of being committed to appsettings. Blank means "anonymous, direct".
+foreach (var (key, value) in ReadSoundCloudSettings())
+{
+    foreach (var project in new[] { silo, coordinator, meta, console })
+        project.WithEnvironment(key, value);
+}
+
 SetupDB();
 
 coordinator.WaitFor(silo);
@@ -68,6 +77,22 @@ builder.Eventing.Subscribe<AfterResourcesCreatedEvent>((_, _) => PostResourcesSe
 builder.Build().Run();
 
 return;
+
+Dictionary<string, string> ReadSoundCloudSettings()
+{
+    var settings = new Dictionary<string, string>();
+
+    foreach (var name in new[] { "SoundCloudAuthorization", "SoundCloudClientId", "Socks5Proxy" })
+    {
+        var value = configuration[$"Audio:{name}"]
+                    ?? Environment.GetEnvironmentVariable($"Audio__{name}");
+
+        if (!string.IsNullOrWhiteSpace(value))
+            settings[$"Audio__{name}"] = value;
+    }
+
+    return settings;
+}
 
 void SetupDB()
 {

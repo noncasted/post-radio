@@ -23,6 +23,14 @@
     protected override async Task OnInitializedAsync()
     {
         _state = new SessionState(Api);
+
+        // OnInitializedAsync runs twice under prerendering. Options only feed the volume
+        // slider and the JS player config, and neither is observable in the prerendered
+        // frame, so fetching them there would just double the load on meta for nothing.
+        // SessionState ships usable defaults until the interactive pass arrives.
+        if (!RendererInfo.IsInteractive)
+            return;
+
         await _state.LoadOptions();
     }
 

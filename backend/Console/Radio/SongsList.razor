@@ -58,6 +58,13 @@
                             <LucideIcon Name="ban" Size="12" /> invalid
                         </span>
                     }
+                    @if (state.IsSnipped)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-sky-500/15 text-sky-600 px-2 py-0.5 text-xs"
+                              title="SoundCloud served a 30s preview only for the session that downloaded this track. Not permanently broken - retry under an authorized session.">
+                            <LucideIcon Name="scissors" Size="12" /> preview only
+                        </span>
+                    }
                     @if (IsShortLoadedTrack(state))
                     {
                         <span style="@InvalidBadgeStyle">
@@ -333,7 +340,8 @@
                 AddDate = state.AddDate,
                 IsLoaded = state.IsLoaded,
                 DurationMs = state.DurationMs,
-                IsValid = state.IsValid
+                IsValid = state.IsValid,
+                IsSnipped = state.IsSnipped
             });
 
             _expandedId = null;

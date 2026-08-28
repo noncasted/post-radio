@@ -13,6 +13,7 @@ public interface ISong : IGrainWithIntegerKey
     Task SetLoaded(bool loaded);
     Task SetAudioData(bool loaded, long? durationMs, bool isValid);
     Task SetValid(bool isValid);
+    Task SetSnipped(bool isSnipped);
 }
 
 [GenerateSerializer]
@@ -27,6 +28,12 @@ public class SongData
     [Id(6)] public required bool IsLoaded { get; init; }
     [Id(7)] public long? DurationMs { get; init; }
     [Id(8)] public required bool IsValid { get; init; }
+
+    // True when SoundCloud served only a snipped preview (policy SNIP) to the
+    // current session. Unlike IsValid this is not a permanent verdict: the same
+    // track becomes downloadable once the request runs under a session that is
+    // allowed to stream it, so snipped tracks stay worth retrying.
+    [Id(9)] public bool IsSnipped { get; init; }
 }
 
 [GenerateSerializer]
@@ -41,6 +48,7 @@ public class SongState : IStateValue
     [Id(5)] public bool IsLoaded { get; set; }
     [Id(6)] public long? DurationMs { get; set; }
     [Id(7)] public bool IsValid { get; set; } = true;
+    [Id(8)] public bool IsSnipped { get; set; }
 
     public int Version => 0;
 }
@@ -69,6 +77,7 @@ public class Song : Grain, ISong
             s.IsLoaded = data.IsLoaded;
             s.DurationMs = data.DurationMs;
             s.IsValid = data.IsValid;
+            s.IsSnipped = data.IsSnipped;
         });
 
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
@@ -88,7 +97,8 @@ public class Song : Grain, ISong
             AddDate = state.AddDate,
             IsLoaded = state.IsLoaded,
             DurationMs = state.DurationMs,
-            IsValid = state.IsValid
+            IsValid = state.IsValid,
+            IsSnipped = state.IsSnipped
         };
     }
 
@@ -112,6 +122,14 @@ public class Song : Grain, ISong
     {
         var updated = await _state.Update(s => {
             s.IsValid = isValid;
+        });
+        await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
+    }
+
+    public async Task SetSnipped(bool isSnipped)
+    {
+        var updated = await _state.Update(s => {
+            s.IsSnipped = isSnipped;
         });
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
     }

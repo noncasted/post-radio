@@ -40,6 +40,9 @@ public static class AudioServicesExtensions
         builder.Add<TrackDurationRepairService>()
                .As<ITrackDurationRepairService>();
 
+        builder.Add<SoundCloudSessionProbe>()
+               .As<ISoundCloudSessionProbe>();
+
         builder.Add<AudioServicesStartup>()
                .As<ICoordinatorSetupCompleted>();
 
@@ -50,6 +53,10 @@ public static class AudioServicesExtensions
                .ConfigurePrimaryHttpMessageHandler(CreateSoundCloudHandler);
 
         builder.Services.AddHttpClient<PlaylistLoader>()
+               .ConfigureHttpClient(ConfigureSoundCloudHttpClient)
+               .ConfigurePrimaryHttpMessageHandler(CreateSoundCloudHandler);
+
+        builder.Services.AddHttpClient<SoundCloudSessionProbe>()
                .ConfigureHttpClient(ConfigureSoundCloudHttpClient)
                .ConfigurePrimaryHttpMessageHandler(CreateSoundCloudHandler);
 

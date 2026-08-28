@@ -6,38 +6,28 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Post Radio - онлайн-радио с непрерывным потоком музыки</title>
+    <title>Post Radio - пост-панк радио: от русского андеграунда до классики</title>
     <base href="/" />
     <link rel="canonical" href="@Site.Url("/")" />
-    <meta name="description" content="Post Radio - онлайн-радио: непрерывный музыкальный поток, плейлисты и обложки треков. Слушайте прямо в браузере, без регистрации и установки." />
+    <meta name="description" content="Непрерывный поток пост-панка с меняющимся визуальным рядом: русский андеграунд, зарубежная классика жанра и редкие записи. Играет в браузере, без регистрации." />
     <meta name="theme-color" content="#0a0a0f" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Post Radio" />
     <meta property="og:locale" content="ru_RU" />
     <meta property="og:url" content="@Site.Url("/")" />
-    <meta property="og:title" content="Post Radio - онлайн-радио с непрерывным потоком музыки" />
-    <meta property="og:description" content="Непрерывный музыкальный поток, плейлисты и обложки треков. Слушайте прямо в браузере, без регистрации и установки." />
+    <meta property="og:title" content="Post Radio - пост-панк радио: от русского андеграунда до классики" />
+    <meta property="og:description" content="Пост-панк нон-стоп с меняющимся визуальным рядом - от русского андеграунда до классики жанра. Играет в браузере, без регистрации." />
     <meta property="og:image" content="@Site.Url("favicon.png")" />
 
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Post Radio - онлайн-радио с непрерывным потоком музыки" />
-    <meta name="twitter:description" content="Непрерывный музыкальный поток, плейлисты и обложки треков. Слушайте прямо в браузере, без регистрации и установки." />
+    <meta name="twitter:title" content="Post Radio - пост-панк радио: от русского андеграунда до классики" />
+    <meta name="twitter:description" content="Пост-панк нон-стоп с меняющимся визуальным рядом - от русского андеграунда до классики жанра. Играет в браузере, без регистрации." />
     <meta name="twitter:image" content="@Site.Url("favicon.png")" />
 
     <link rel="icon" type="image/png" href="favicon.png" />
 
-    <script type="application/ld+json">
-        {
-            "@@context": "https://schema.org",
-            "@@type": "RadioStation",
-            "name": "Post Radio",
-            "url": "@Site.Url("/")",
-            "inLanguage": "ru",
-            "description": "Онлайн-радио с непрерывным музыкальным потоком, плейлистами и обложками треков.",
-            "logo": "@Site.Url("favicon.png")"
-        }
-    </script>
+    @(StructuredData)
     <style>
         html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0f; color: #e8e8ef; font-family: system-ui, -apple-system, sans-serif; }
         #app { min-height: 100%; }
@@ -133,11 +123,20 @@
         <div class="ring"></div>
         <div class="title">Post Radio</div>
         <div class="seo">
-            <h1>Post Radio - онлайн-радио</h1>
+            <h1>Post Radio - пост-панк радио онлайн</h1>
             <p>
-                Post Radio - это непрерывный музыкальный поток, который играет прямо в браузере.
-                Переключайте плейлисты, смотрите обложки и данные текущего трека, пропускайте песни -
-                без регистрации, установки и рекламы.
+                Post Radio - это круглосуточный поток пост-панка, который играет прямо в браузере.
+                От русского андеграунда - полузабытых кассетных записей и самиздата - до классики
+                жанра: новой волны, колд-вейва и готик-рока.
+            </p>
+            <p>
+                Каждый трек идёт со своим визуальным рядом: обложки и кадры меняются вместе с музыкой.
+                Можно переключать плейлисты, смотреть данные текущей песни и пропускать то, что не зашло.
+                Без регистрации, установки и рекламы.
+            </p>
+            <p>
+                Что нового в эфире - в Telegram-канале
+                <a href="https://t.me/posttradio">@@posttradio</a>.
             </p>
             <p>Если плеер не загрузился, включите JavaScript и обновите страницу.</p>
         </div>
@@ -181,4 +180,24 @@
         so prerendering costs nothing on the interop side.
     */
     private static readonly InteractiveServerRenderMode RenderMode = new(prerender: true);
+
+    /*
+        Emitted as raw markup rather than written inline: Razor html-encodes attribute
+        values, which turns the "+" of application/ld+json into "&#x2B;". Parsers decode
+        that back, but crawlers have no reason to be handed a mangled mime type.
+    */
+    private MarkupString StructuredData => (MarkupString)$$"""
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "RadioStation",
+            "name": "Post Radio",
+            "url": "{{Site.Url("/")}}",
+            "logo": "{{Site.Url("favicon.png")}}",
+            "description": "Пост-панк радио: непрерывный поток от русского андеграунда до классики жанра, с меняющимся визуальным рядом.",
+            "sameAs": "https://t.me/posttradio",
+            "knowsAbout": ["пост-панк", "post-punk", "русский андеграунд", "новая волна", "готик-рок", "колд-вейв"]
+        }
+        </script>
+        """;
 }

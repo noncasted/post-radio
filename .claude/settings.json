@@ -2,8 +2,6 @@
   "permissions": {
     "allow": [
       "Edit(.claude/**)",
-      "Write(.claude/**)",
-      "MultiEdit(.claude/**)",
       "Bash",
       "Read",
       "Write",

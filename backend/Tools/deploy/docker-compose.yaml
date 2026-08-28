@@ -34,6 +34,10 @@ x-service-env: &service-env
   ConnectionStrings__postgres: "Host=pgbouncer;Port=6432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
   postgres: "Host=pgbouncer;Port=6432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
   MediaStorage__RootPath: /app/media
+  # Optional SoundCloud session settings. Blank means anonymous + direct, which is
+  # what makes SoundCloud serve 30s previews (policy SNIP) for restricted tracks.
+  Audio__SoundCloudAuthorization: "${SOUNDCLOUD_AUTH:-}"
+  Audio__Socks5Proxy: "${SOUNDCLOUD_PROXY:-}"
 
 x-traefik-network-labels: &traefik-network-labels
   - "traefik.docker.network=post-radio-production"

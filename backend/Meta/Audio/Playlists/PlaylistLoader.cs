@@ -29,6 +29,7 @@ public class PlaylistLoader : IPlaylistLoader
         ISongsCollection songs,
         IMetaDataCache metadataCache,
         IMediaStorage mediaStorage,
+        ISoundCloudSessionProbe sessionProbe,
         HttpClient http,
         ILogger<PlaylistLoader> logger)
     {
@@ -38,6 +39,7 @@ public class PlaylistLoader : IPlaylistLoader
         _songs = songs;
         _metadataCache = metadataCache;
         _mediaStorage = mediaStorage;
+        _sessionProbe = sessionProbe;
         _http = http;
         _logger = logger;
     }
@@ -51,6 +53,7 @@ public class PlaylistLoader : IPlaylistLoader
     private readonly IOrleans _orleans;
     private readonly IPlaylistsCollection _playlists;
     private readonly ISongsCollection _songs;
+    private readonly ISoundCloudSessionProbe _sessionProbe;
     private readonly SoundCloudClient _soundCloud;
 
     public async Task Fetch(PlaylistData playlist, IOperationProgress progress)
@@ -242,9 +245,13 @@ public class PlaylistLoader : IPlaylistLoader
     {
         progress.SetProgress(0f);
 
+        if (pending.Count > 0)
+            await LogSessionInfo(pending[0].Id, progress);
+
         var downloaded = 0;
         var invalid = 0;
         var failed = 0;
+        var snipped = 0;
 
         for (var i = 0; i < pending.Count; i++)
         {
@@ -255,6 +262,10 @@ public class PlaylistLoader : IPlaylistLoader
                 var result = await DownloadSong(id, state);
                 var isValid = AudioTrackValidation.IsValidLocalDuration(result.LocalDuration);
                 await _orleans.GetGrain<ISong>(id).SetAudioData(true, ToDurationMs(result.LocalDuration), isValid);
+
+                if (state.IsSnipped)
+                    await _orleans.GetGrain<ISong>(id).SetSnipped(false);
+
                 if (!isValid)
                 {
                     invalid++;
@@ -265,6 +276,17 @@ public class PlaylistLoader : IPlaylistLoader
                     downloaded++;
                     progress.Log($"Loaded {i + 1} / {pending.Count}: {state.Author} - {state.Name}");
                 }
+            }
+            catch (SoundCloudSnippedTrackException e)
+            {
+                snipped++;
+
+                await _orleans.GetGrain<ISong>(id).SetValid(false);
+                await _orleans.GetGrain<ISong>(id).SetSnipped(true);
+                _logger.LogWarning(
+                    "[Audio] [Songs] SoundCloud served a preview only for {Author} - {Name}: {Policy}; {Diagnostics}",
+                    state.Author, state.Name, e.Policy, e.Diagnostics);
+                progress.Log($"Snipped {i + 1} / {pending.Count}: {state.Author} - {state.Name} ({e.Policy}). Preview only for this session; kept as retry candidate.");
             }
             catch (TrackUnavailableException)
             {
@@ -278,13 +300,17 @@ public class PlaylistLoader : IPlaylistLoader
 
                 logError(state, e);
                 await _orleans.GetGrain<ISong>(id).SetValid(false);
-                progress.Log($"Failed {i + 1} / {pending.Count}: {e.Message}. Marked invalid.");
+                progress.Log($"Failed {i + 1} / {pending.Count}: {state.Author} - {state.Name}: {e.Message}. Marked invalid.");
             }
 
             progress.SetProgress((i + 1) / (float)Math.Max(1, pending.Count));
         }
 
-        progress.Log($"Load complete: {downloaded} downloaded, {invalid} invalid, {failed} failed.");
+        progress.Log($"Load complete: {downloaded} downloaded, {invalid} invalid, {snipped} snipped, {failed} failed.");
+
+        if (snipped > 0)
+            progress.Log($"{snipped} track(s) returned a preview only. SoundCloud restricts them for the current session, not permanently: set Audio:SoundCloudAuthorization (an \"OAuth <token>\" header from an account allowed to stream them) and/or Audio:Socks5Proxy, then retry.");
+
         progress.SetStatus(OperationStatus.Success);
     }
 
@@ -381,6 +407,17 @@ public class PlaylistLoader : IPlaylistLoader
         return new SongDownloadResult(GetTrackDurationMs(track), localDuration);
     }
 
+    // Logged once per run so a scan result can be read against the session it
+    // ran under: the same track downloads or comes back as a preview depending
+    // on whether SoundCloud sees an authorized session.
+    private async Task LogSessionInfo(long probeTrackId, IOperationProgress progress)
+    {
+        var session = await _sessionProbe.Describe(probeTrackId);
+
+        _logger.LogInformation("[Audio] [Session] SoundCloud session: {Session}", session);
+        progress.Log($"SoundCloud session: {session}");
+    }
+
     private async Task<TimeSpan?> ReadLocalDuration(long id, CancellationToken cancellationToken = default)
     {
         return await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
@@ -423,8 +460,17 @@ public class PlaylistLoader : IPlaylistLoader
     {
         var transcoding = SelectProgressiveTranscoding(track);
         if (transcoding == null)
+        {
+            // A snipped track is restricted for this session rather than broken,
+            // so it is reported separately and stays a retry candidate.
+            if (SoundCloudTrackPolicy.IsSnippedTrack(track))
+                throw new SoundCloudSnippedTrackException(
+                    SoundCloudTrackPolicy.Describe(track),
+                    FormatTranscodingAvailability(track));
+
             throw new TrackUnavailableException(
                 $"No non-snipped progressive transcodings found ({FormatTranscodingAvailability(track)})");
+        }
 
         if (transcoding.Url == null)
             return null;

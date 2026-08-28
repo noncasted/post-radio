@@ -15,6 +15,7 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
         IPlaylistLoader loader,
         IMediaStorage mediaStorage,
         SoundCloudClient soundCloud,
+        ISoundCloudSessionProbe sessionProbe,
         IOrleans orleans,
         ILogger<InvalidTracksRedownloadConsoleAction> logger)
     {
@@ -22,6 +23,7 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
         _loader = loader;
         _mediaStorage = mediaStorage;
         _soundCloud = soundCloud;
+        _sessionProbe = sessionProbe;
         _orleans = orleans;
         _logger = logger;
     }
@@ -33,6 +35,7 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
     private readonly ILogger<InvalidTracksRedownloadConsoleAction> _logger;
     private readonly IMediaStorage _mediaStorage;
     private readonly IOrleans _orleans;
+    private readonly ISoundCloudSessionProbe _sessionProbe;
     private readonly SoundCloudClient _soundCloud;
     private readonly ISongsCollection _songs;
 
@@ -50,16 +53,23 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                       .ToList();
 
         progress.Log($"Scanning {songs.Count} SoundCloud song record(s).");
-        progress.Log("Outcome legend: OK=already valid, CANDIDATE=redownload will be attempted, RESTORED=redownload fixed the track, FAILED=redownload/error kept it invalid, SKIP-WARN=not actionable and skipped.");
+        progress.Log("Outcome legend: OK=already valid, CANDIDATE=redownload will be attempted, RESTORED=redownload fixed the track, SNIPPED=SoundCloud served a preview only for this session, FAILED=redownload/error kept it invalid, SKIP-WARN=not actionable and skipped.");
         progress.Log("Retry policy: candidates are stored invalid tracks, loaded local files below 0:31, SoundCloud tracks below 0:31, or local/SoundCloud duration mismatches.");
         progress.Log($"Restore policy: redownload is RESTORED only when the saved local file is playable and matches SoundCloud within {FormatDuration(DurationTolerance)}.");
         progress.SetProgress(0f);
+
+        if (songs.Count > 0)
+        {
+            var session = await _sessionProbe.Describe(songs[0].Key, cancellationToken);
+            progress.Log($"SoundCloud session: {session}");
+        }
 
         var ok = 0;
         var candidates = 0;
         var markedInvalid = 0;
         var redownloadAttempts = 0;
         var restored = new List<string>();
+        var snipped = new List<string>();
         var failed = new List<string>();
         var skipped = new List<string>();
         var scanErrors = new List<string>();
@@ -148,6 +158,9 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
 
                 await _orleans.GetGrain<ISong>(id).SetAudioData(true, repairedDurationMs, isValid);
 
+                if (state.IsSnipped)
+                    await _orleans.GetGrain<ISong>(id).SetSnipped(false);
+
                 if (isValid)
                 {
                     restored.Add($"{label} — local={FormatDuration(repairedLocalDuration)}, soundcloud={FormatDuration(soundCloudDurationMs)}");
@@ -160,6 +173,18 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                     CountReason(failureReasons, "Redownloaded but duration still invalid/mismatched");
                     progress.Log($"FAILED {failed.Count}: {label}; {failedReason}; kept invalid.");
                 }
+            }
+            catch (SoundCloudSnippedTrackException e)
+            {
+                CountReason(failureReasons, "SoundCloud served a preview only for this session");
+                _logger.LogWarning(
+                    "[Audio] [InvalidRetry] SoundCloud served a preview only for {SongId} {Label}: {Policy}; {Diagnostics}",
+                    id, label, e.Policy, e.Diagnostics);
+                await _orleans.GetGrain<ISong>(id).SetValid(false);
+                await _orleans.GetGrain<ISong>(id).SetSnipped(true);
+
+                snipped.Add($"{label} — {e.Policy}");
+                progress.Log($"SNIPPED {snipped.Count}: {label}; SoundCloud served a preview only ({e.Policy}). Kept as retry candidate.");
             }
             catch (TrackUnavailableException e)
             {
@@ -207,11 +232,15 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
         LogReasons(progress, "Skip warnings", skipReasons);
         LogReasons(progress, "Failure reasons", failureReasons);
         LogResults(progress, "RESTORED redownloads", restored);
+        LogResults(progress, "SNIPPED preview-only tracks", snipped);
         LogResults(progress, "FAILED redownloads", failed);
         LogResults(progress, "FAILED scans", scanErrors);
         LogResults(progress, "SKIP-WARN skipped without redownload", skipped);
         progress.Log(
-            $"Complete: scanned={songs.Count}, ok={ok}, candidates={candidates}, markedInvalid={markedInvalid}, redownloadAttempts={redownloadAttempts}, restored={restored.Count}, failedRedownloads={failed.Count}, scanErrors={scanErrors.Count}, skippedWarnings={skipped.Count}.");
+            $"Complete: scanned={songs.Count}, ok={ok}, candidates={candidates}, markedInvalid={markedInvalid}, redownloadAttempts={redownloadAttempts}, restored={restored.Count}, snipped={snipped.Count}, failedRedownloads={failed.Count}, scanErrors={scanErrors.Count}, skippedWarnings={skipped.Count}.");
+
+        if (snipped.Count > 0)
+            progress.Log($"Result: {snipped.Count} track(s) are restricted for the current session, not permanently broken. Check the SoundCloud session line above, then set Audio:SoundCloudAuthorization and/or Audio:Socks5Proxy and rerun.");
 
         if (redownloadAttempts == 0)
             progress.Log("Result: no redownload was attempted. Check SKIP-WARN / FAILED-SCAN sections for blockers such as empty-url or SoundCloud metadata errors.");
