@@ -14,6 +14,7 @@ public interface ISong : IGrainWithIntegerKey
     Task SetAudioData(bool loaded, long? durationMs, bool isValid);
     Task SetValid(bool isValid);
     Task SetSnipped(bool isSnipped);
+    Task SetAudioSource(SongAudioSource source, string? youTubeUrl);
 }
 
 [GenerateSerializer]
@@ -34,6 +35,8 @@ public class SongData
     // track becomes downloadable once the request runs under a session that is
     // allowed to stream it, so snipped tracks stay worth retrying.
     [Id(9)] public bool IsSnipped { get; init; }
+    [Id(10)] public SongAudioSource AudioSource { get; init; }
+    [Id(11)] public string YouTubeUrl { get; init; } = string.Empty;
 }
 
 [GenerateSerializer]
@@ -49,6 +52,8 @@ public class SongState : IStateValue
     [Id(6)] public long? DurationMs { get; set; }
     [Id(7)] public bool IsValid { get; set; } = true;
     [Id(8)] public bool IsSnipped { get; set; }
+    [Id(9)] public SongAudioSource AudioSource { get; set; }
+    [Id(10)] public string YouTubeUrl { get; set; } = string.Empty;
 
     public int Version => 0;
 }
@@ -78,6 +83,8 @@ public class Song : Grain, ISong
             s.DurationMs = data.DurationMs;
             s.IsValid = data.IsValid;
             s.IsSnipped = data.IsSnipped;
+            s.AudioSource = data.AudioSource;
+            s.YouTubeUrl = data.YouTubeUrl ?? string.Empty;
         });
 
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
@@ -98,7 +105,9 @@ public class Song : Grain, ISong
             IsLoaded = state.IsLoaded,
             DurationMs = state.DurationMs,
             IsValid = state.IsValid,
-            IsSnipped = state.IsSnipped
+            IsSnipped = state.IsSnipped,
+            AudioSource = state.AudioSource,
+            YouTubeUrl = state.YouTubeUrl
         };
     }
 
@@ -130,6 +139,19 @@ public class Song : Grain, ISong
     {
         var updated = await _state.Update(s => {
             s.IsSnipped = isSnipped;
+        });
+        await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
+    }
+
+    public async Task SetAudioSource(SongAudioSource source, string? youTubeUrl)
+    {
+        var normalizedUrl = source == SongAudioSource.YouTube
+            ? SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)
+            : string.Empty;
+
+        var updated = await _state.Update(s => {
+            s.AudioSource = source;
+            s.YouTubeUrl = normalizedUrl;
         });
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
     }

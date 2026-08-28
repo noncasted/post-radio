@@ -34,6 +34,35 @@ public class SongMetadataMergeTests
         merged.DurationMs.Should().Be(180_000);
         merged.IsLoaded.Should().BeTrue();
         merged.IsValid.Should().BeTrue();
+        merged.AudioSource.Should().Be(SongAudioSource.Unknown);
+    }
+
+    [Fact]
+    public void LookupMergePreservesImportedYouTubeSource()
+    {
+        var existing = new SongState
+        {
+            Url = "https://soundcloud.example/original",
+            Author = "Author",
+            Name = "Title",
+            IsLoaded = true,
+            DurationMs = 180_000,
+            IsValid = true,
+            AudioSource = SongAudioSource.YouTube,
+            YouTubeUrl = "https://www.youtube.com/watch?v=ufF61Fw6X7E"
+        };
+        var lookup = new SongLookupInfo
+        {
+            Id = 1,
+            Url = "https://soundcloud.example/cached",
+            Author = "Author",
+            Name = "Title"
+        };
+
+        var merged = SongMetadataMerge.MergeLookup(1, existing, lookup);
+
+        merged.AudioSource.Should().Be(SongAudioSource.YouTube);
+        merged.YouTubeUrl.Should().Be("https://www.youtube.com/watch?v=ufF61Fw6X7E");
     }
 
     [Fact]

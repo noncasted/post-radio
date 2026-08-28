@@ -16,12 +16,24 @@ public interface IPlaylistLoader
     Task Load(PlaylistData playlist, IOperationProgress progress);
     Task LoadAll(IOperationProgress progress);
     Task<SongDownloadResult> DownloadSong(long id, SongState state, Track? track = null, CancellationToken cancellationToken = default);
-    Task<SongImportResult> ImportAudio(long id, Stream stream, CancellationToken cancellationToken = default);
+    Task<SongImportResult> ImportAudio(
+        long id,
+        Stream stream,
+        SongAudioSource source = SongAudioSource.Unknown,
+        string? youTubeUrl = null,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record SongDownloadResult(long? SoundCloudDurationMs, TimeSpan? LocalDuration);
 
-public sealed record SongImportResult(long Id, string Author, string Name, long? DurationMs, bool IsValid);
+public sealed record SongImportResult(
+    long Id,
+    string Author,
+    string Name,
+    long? DurationMs,
+    bool IsValid,
+    SongAudioSource AudioSource,
+    string YouTubeUrl);
 
 public class PlaylistLoader : IPlaylistLoader
 {
@@ -265,6 +277,7 @@ public class PlaylistLoader : IPlaylistLoader
                 var result = await DownloadSong(id, state);
                 var isValid = AudioTrackValidation.IsValidLocalDuration(result.LocalDuration);
                 await _orleans.GetGrain<ISong>(id).SetAudioData(true, ToDurationMs(result.LocalDuration), isValid);
+                await _orleans.GetGrain<ISong>(id).SetAudioSource(SongAudioSource.SoundCloud, null);
 
                 if (state.IsSnipped)
                     await _orleans.GetGrain<ISong>(id).SetSnipped(false);
@@ -413,31 +426,51 @@ public class PlaylistLoader : IPlaylistLoader
     public async Task<SongImportResult> ImportAudio(
         long id,
         Stream stream,
+        SongAudioSource source = SongAudioSource.Unknown,
+        string? youTubeUrl = null,
         CancellationToken cancellationToken = default)
     {
         if (!_songs.TryGetValue(id, out var state))
             throw new InvalidOperationException($"Song {id} is not in the collection");
+
+        if (source == SongAudioSource.YouTube
+            && string.IsNullOrWhiteSpace(SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)))
+        {
+            throw new InvalidOperationException("YouTube import requires a youtube video url.");
+        }
 
         await _mediaStorage.SaveAudio(id, stream, cancellationToken);
 
         var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
         var durationMs = ToDurationMs(localDuration);
         var isValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
+        var grain = _orleans.GetGrain<ISong>(id);
 
-        await _orleans.GetGrain<ISong>(id).SetAudioData(true, durationMs, isValid);
+        await grain.SetAudioData(true, durationMs, isValid);
+        await grain.SetAudioSource(source, youTubeUrl);
 
         if (isValid && state.IsSnipped)
-            await _orleans.GetGrain<ISong>(id).SetSnipped(false);
+            await grain.SetSnipped(false);
 
         _logger.LogInformation(
-            "[Audio] Imported {SongId} {Author} - {Name}: duration={Duration}, valid={IsValid}",
+            "[Audio] Imported {SongId} {Author} - {Name}: duration={Duration}, valid={IsValid}, source={Source}",
             id,
             state.Author,
             state.Name,
             FormatDuration(localDuration),
-            isValid);
+            isValid,
+            source);
 
-        return new SongImportResult(id, state.Author, state.Name, durationMs, isValid);
+        return new SongImportResult(
+            id,
+            state.Author,
+            state.Name,
+            durationMs,
+            isValid,
+            source,
+            source == SongAudioSource.YouTube
+                ? SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)
+                : string.Empty);
     }
 
     // Logged once per run so a scan result can be read against the session it

@@ -157,6 +157,7 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                                   || IsDurationMatch(repairedLocalDuration, soundCloudDurationMs.Value));
 
                 await _orleans.GetGrain<ISong>(id).SetAudioData(true, repairedDurationMs, isValid);
+                await _orleans.GetGrain<ISong>(id).SetAudioSource(SongAudioSource.SoundCloud, null);
 
                 if (state.IsSnipped)
                     await _orleans.GetGrain<ISong>(id).SetSnipped(false);

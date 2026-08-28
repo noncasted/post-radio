@@ -40,6 +40,8 @@ class Track:
     name: str
     url: str
     duration_ms: int | None = None
+    source: str = ""
+    youtube_url: str = ""
 
 
 def main() -> int:
@@ -51,11 +53,14 @@ def main() -> int:
     parser.add_argument("--console", help="console base URL, e.g. http://localhost:7103")
     parser.add_argument("--token", default="", help="CONSOLE_TOKEN when console auth is enabled")
     parser.add_argument("--insecure", action="store_true", help="skip TLS verification for local console")
-    parser.add_argument("--upload", action="store_true", help="upload downloaded files to the console")
+    parser.add_argument("--upload", action="store_true", help="upload files to the console")
+    parser.add_argument("--upload-only", action="store_true",
+                        help="do not download; upload existing {id}.mp3 from --out")
     parser.add_argument("--skip-existing", action="store_true",
                         help="do not re-download if {id}.mp3 already exists in --out")
     parser.add_argument("--missing-only", action="store_true",
                         help="take the work list from GET /console/media/audio/missing")
+    parser.add_argument("--manifest", type=Path, help="JSON index path (default: --out/manifest.json)")
     parser.add_argument("--source", choices=("auto", "soundcloud", "youtube"), default="auto")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--sleep", type=float, default=1.0, help="pause between tracks, seconds")
@@ -74,6 +79,10 @@ def main() -> int:
         print("--missing-only requires --console", file=sys.stderr)
         return 2
 
+    if args.upload_only and session is None:
+        print("--upload-only requires --console", file=sys.stderr)
+        return 2
+
     try:
         tracks = load_tracks(args, session)
     except ConsoleError as exc:
@@ -84,6 +93,7 @@ def main() -> int:
         return 0
 
     args.out.mkdir(parents=True, exist_ok=True)
+    manifest_path = args.manifest or (args.out / "manifest.json")
     print(f"{len(tracks)} track(s) -> {args.out}")
 
     ok = 0
@@ -96,17 +106,25 @@ def main() -> int:
         try:
             if args.dry_run:
                 preview_source(track, args.source)
+            elif args.upload_only:
+                if not dest.exists() or is_preview(dest):
+                    raise RuntimeError(f"missing full file {dest.name}")
+                apply_manifest_source(manifest_path, track)
+                session.upload(dest, track)  # type: ignore[union-attr]
+                print(f"  uploaded {dest.name} source={track.source}")
             else:
                 if args.skip_existing and dest.exists() and not is_preview(dest):
                     print(f"  skip download, using {dest}")
+                    apply_manifest_source(manifest_path, track)
                 else:
                     if dest.exists() and is_preview(dest):
                         print(f"  existing file is a short preview, re-downloading")
                         dest.unlink()
                     download_track(track, dest, args.source)
+                write_manifest_entry(manifest_path, track, dest)
                 if session is not None and args.upload:
-                    session.upload(dest, track.id)
-                    print(f"  uploaded {dest.name}")
+                    session.upload(dest, track)
+                    print(f"  uploaded {dest.name} source={track.source}")
             ok += 1
         except Exception as exc:
             failed.append(f"{label}: {exc}")
@@ -118,6 +136,9 @@ def main() -> int:
     print(f"Done: {ok} ok, {len(failed)} failed.")
     for line in failed:
         print(f"  - {line}")
+    if failed:
+        Path(args.out / "failed.txt").write_text("\n".join(failed) + "\n", encoding="utf-8")
+        print(f"Failed list: {args.out / 'failed.txt'}")
     return 1 if failed else 0
 
 
@@ -146,9 +167,13 @@ def load_tracks(args: argparse.Namespace, session: ConsoleSession | None) -> lis
 
     if selected_ids:
         known = {track.id for track in tracks}
-        missing = [track_id for track_id in selected_ids if track_id not in known]
-        if missing:
-            raise SystemExit(f"ids not in {args.songs}: {missing}")
+        for track_id in selected_ids:
+            if track_id in known:
+                continue
+            tracks.append(Track(id=track_id, author="Unknown", name="Untitled", url=""))
+
+    if args.upload_only:
+        tracks = [track for track in tracks if (args.out / f"{track.id}.mp3").exists()]
 
     return tracks[: args.limit] if args.limit else tracks
 
@@ -181,12 +206,18 @@ def download_track(track: Track, dest: Path, source: str) -> None:
             if downloaded is not None and is_preview(downloaded):
                 print("  soundcloud: 30s preview, ignoring")
                 downloaded = None
+            elif downloaded is not None:
+                track.source = "soundcloud"
+                track.youtube_url = ""
 
         if downloaded is None and source != "soundcloud":
             fill_expected_duration(track)
             match = pick_youtube(track)
-            print(f"  youtube: {match['title']} [{match['id']}] {match.get('duration')}s")
-            downloaded = download_url(f"https://www.youtube.com/watch?v={match['id']}", tmp_dir)
+            video_id = str(match["id"])
+            track.source = "youtube"
+            track.youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+            print(f"  youtube: {match['title']} [{video_id}] {match.get('duration')}s")
+            downloaded = download_url(track.youtube_url, tmp_dir)
 
         if downloaded is None:
             raise RuntimeError("no downloadable source")
@@ -358,6 +389,46 @@ def is_preview(path: Path) -> bool:
     return probe_duration_s(path) < MIN_PLAYABLE_MS / 1000.0
 
 
+def apply_manifest_source(path: Path, track: Track) -> None:
+    if not path.exists():
+        return
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return
+    entry = manifest.get(str(track.id))
+    if not isinstance(entry, dict):
+        return
+    source = str(entry.get("source") or "").strip()
+    if source:
+        track.source = source
+    youtube_url = str(entry.get("youtubeUrl") or "").strip()
+    if youtube_url:
+        track.youtube_url = youtube_url
+
+
+def write_manifest_entry(path: Path, track: Track, dest: Path) -> None:
+    manifest: dict[str, Any] = {}
+    if path.exists():
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            manifest = {}
+    duration_s = probe_duration_s(dest) if dest.exists() else None
+    manifest[str(track.id)] = {
+        "id": track.id,
+        "author": track.author,
+        "name": track.name,
+        "url": track.url,
+        "file": dest.name,
+        "durationSec": None if duration_s is None else round(duration_s, 3),
+        "bytes": dest.stat().st_size if dest.exists() else 0,
+        "source": track.source,
+        "youtubeUrl": track.youtube_url,
+    }
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def normalize(value: str) -> str:
     value = value.casefold()
     value = re.sub(r"[^\w\s]+", " ", value, flags=re.UNICODE)
@@ -392,14 +463,37 @@ class ConsoleSession:
             ))
         return tracks
 
-    def upload(self, path: Path, song_id: int) -> None:
+    def upload(self, path: Path, track: Track) -> None:
+        last_error: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                self._upload_once(path, track)
+                return
+            except ConsoleError as exc:
+                last_error = exc
+                print(f"  upload attempt {attempt}/3 failed: {exc}")
+                time.sleep(2 * attempt)
+                if self.token:
+                    try:
+                        self._login()
+                    except ConsoleError:
+                        pass
+        raise last_error or ConsoleError("upload failed")
+
+    def _upload_once(self, path: Path, track: Track) -> None:
         boundary = "----PostRadioAudioBoundary"
         body = bytearray()
-        body.extend(
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="id"\r\n\r\n'
-            f"{song_id}\r\n".encode("utf-8")
-        )
+        fields = {
+            "id": str(track.id),
+            "source": track.source,
+            "youtubeUrl": track.youtube_url,
+        }
+        for name, value in fields.items():
+            body.extend(
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                f"{value}\r\n".encode("utf-8")
+            )
         body.extend(
             f"--{boundary}\r\n"
             f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'
@@ -437,7 +531,7 @@ class ConsoleSession:
 
     def _open(self, request: urllib.request.Request):
         try:
-            return self.opener.open(request, timeout=60)
+            return self.opener.open(request, timeout=120)
         except URLError as exc:
             raise ConsoleError(
                 f"cannot reach console at {self.base_url.rstrip('/')}: {exc.reason}"

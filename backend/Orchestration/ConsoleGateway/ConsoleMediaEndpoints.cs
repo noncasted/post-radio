@@ -85,7 +85,9 @@ public static class ConsoleMediaEndpoints
                 DurationMs = kv.Value.DurationMs,
                 IsLoaded = kv.Value.IsLoaded,
                 IsValid = kv.Value.IsValid,
-                IsSnipped = kv.Value.IsSnipped
+                IsSnipped = kv.Value.IsSnipped,
+                AudioSource = kv.Value.AudioSource.ToString(),
+                YouTubeUrl = kv.Value.YouTubeUrl
             })
             .OrderBy(song => song.Author, StringComparer.OrdinalIgnoreCase)
             .ThenBy(song => song.Name, StringComparer.OrdinalIgnoreCase)
@@ -121,10 +123,13 @@ public static class ConsoleMediaEndpoints
         if (!TryResolveSongId(form, file, out var songId, out var idError))
             return Results.BadRequest(new { error = idError });
 
+        var source = SongAudioSourceParser.Parse(form["source"].ToString());
+        var youTubeUrl = SongAudioSourceParser.NormalizeYouTubeUrl(form["youtubeUrl"].ToString());
+
         try
         {
             await using var stream = file.OpenReadStream();
-            var imported = await loader.ImportAudio(songId, stream);
+            var imported = await loader.ImportAudio(songId, stream, source, youTubeUrl);
             return Results.Ok(new
             {
                 imported.Id,
@@ -132,6 +137,8 @@ public static class ConsoleMediaEndpoints
                 imported.Name,
                 imported.DurationMs,
                 imported.IsValid,
+                AudioSource = imported.AudioSource.ToString(),
+                imported.YouTubeUrl,
                 SizeBytes = file.Length
             });
         }
