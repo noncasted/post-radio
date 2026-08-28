@@ -67,7 +67,7 @@ python3 -u tools/scripts/sync-audio.py \
 ```
 Omit `--token` when the env var is empty and local console has no auth.
 
-3. Do not wait by sleeping in a loop. Background the command and report that stage 1 is running. On completion, report `Done: N ok, M failed` and `audio-dump/failed.txt` if present.
+3. Do not wait by sleeping in a loop. Background the command. Immediately write the first status table (download format below), then start the 3-minute status schedule for this stage.
 
 DRM on SoundCloud is expected. Weak YouTube matches (`weak youtube match`) are not DRM — they are skipped on purpose so a cooking/challenge video is not imported as the song.
 
@@ -97,11 +97,53 @@ python3 -u tools/scripts/sync-audio.py \
   2>&1 | tee /tmp/sync-audio-upload.log
 ```
 
-Background it. On completion:
+Background it. Immediately write the first status table (upload format below), then start the 3-minute status schedule for this stage.
 
-- `Done: N ok, M failed`
-- `GET .../missing` again — count should drop by N (collection can lag a few seconds)
-- overridden tracks must not reappear in missing (`isLoadingOverridden` in missing = 0)
+When the run finishes (`Done:` in the log): also `GET .../missing` — count should drop by N (collection can lag a few seconds). Overridden tracks must not reappear in missing (`isLoadingOverridden` in missing = 0).
+
+## Status reports (mandatory on both stages)
+
+After starting a background download or upload, always report in this chat:
+
+1. Write the first table immediately (do not wait 3 minutes).
+2. Create a recurring scheduled task: interval `3m`, `foreground: true`, `fire_immediately: false`. Cancel any previous override-invalid-tracks status schedule first.
+3. Each fire: pgrep the `sync-audio.py` process, parse the stage log, write one table. New FAILED since the last table — second table only.
+4. When the log has `Done:` — final table, then `scheduler_delete` that task. If this was stage 1 of `all` / `all prod`, start stage 2 (with a new schedule). Do not keep reporting after Done.
+
+Do not poll with sleep. Do not dump the log. Prose in Russian.
+
+Download log: `/tmp/sync-audio-download.log`. Count `[N/TOTAL]`, `saved `, `FAILED:`, `skip download`, `soundcloud: downloaded`, lines starting `youtube:`.
+
+Upload log: `/tmp/sync-audio-upload.log`. Count `[N/TOTAL]`, `  uploaded `, `FAILED:`, `upload attempt`.
+
+Download table:
+
+```
+| Поле | Значение |
+|---|---|
+| Время | HH:MM |
+| Статус | качается / готово / процесс умер |
+| Прогресс | N/TOTAL |
+| В дампе из списка | X |
+| Ошибки | Y |
+| SoundCloud / YouTube | A / B |
+| Сейчас | author — name #id или Done |
+```
+
+Upload table:
+
+```
+| Поле | Значение |
+|---|---|
+| Время | HH:MM |
+| Статус | заливается / готово / процесс умер |
+| Прогресс | N/TOTAL |
+| Залито | X |
+| Ошибки | Y |
+| Сейчас | author — name #id или Done |
+```
+
+The scheduled prompt must be self-contained: stage, log path, TOTAL, how to detect Done, instruction to `scheduler_delete` itself, and the table format. Never put `CONSOLE_TOKEN` in the prompt.
 
 ## Rules
 
@@ -112,3 +154,4 @@ Background it. On completion:
 5. `Load audio` / InvalidTracksRedownload / duration repair must not run against a target mid-upload.
 6. Prose to the user in Russian; identifiers in English.
 7. Do not commit `audio-dump/` or console tokens.
+8. Every long download or upload gets a 3-minute status table in this session until Done.
