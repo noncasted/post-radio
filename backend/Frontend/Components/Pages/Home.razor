@@ -3,7 +3,11 @@
 @inject IRadioApi Api
 @implements IDisposable
 
-<PageTitle>Post Radio</PageTitle>
+@*
+    No PageTitle here: App.razor already sets the crawler-facing <title>, and anything
+    rendered through HeadOutlet lands after it and wins, so a second title would quietly
+    undo it. Reintroduce this only with the full title text.
+*@
 
 <TelegramLink />
 <ImagesView State="@_state" />
