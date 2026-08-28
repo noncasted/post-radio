@@ -33,7 +33,8 @@ public sealed record SongImportResult(
     long? DurationMs,
     bool IsValid,
     SongAudioSource AudioSource,
-    string YouTubeUrl);
+    string YouTubeUrl,
+    bool IsLoadingOverridden);
 
 public class PlaylistLoader : IPlaylistLoader
 {
@@ -170,6 +171,116 @@ public class PlaylistLoader : IPlaylistLoader
                 "[Audio] [Songs] Failed to download {Author} - {Name}", state.Author, state.Name));
     }
 
+    public async Task<SongDownloadResult> DownloadSong(
+        long id,
+        SongState state,
+        Track? track = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (IsLoadingOverridden(id, state))
+            throw new SongLoadingOverriddenException(id);
+
+        _logger.LogInformation("[Audio] Downloading {Author} {Name}", state.Author, state.Name);
+
+        track ??= await _soundCloud.Tracks.GetAsync(state.Url, cancellationToken)
+                  ?? throw new InvalidOperationException($"SoundCloud track not found: {state.Url}");
+
+        _logger.LogInformation(
+            "[Audio] Download source for {SongId} {Author} - {Name}: {TranscodingAvailability}",
+            id,
+            state.Author,
+            state.Name,
+            FormatTranscodingAvailability(track));
+
+        var mediaUrl = await GetDownloadUrlAsync(track, cancellationToken);
+        if (string.IsNullOrWhiteSpace(mediaUrl))
+            throw new InvalidOperationException($"SoundCloud download URL not found: {state.Url}");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode}).");
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await _mediaStorage.SaveAudio(id, stream, cancellationToken);
+
+        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
+        return new SongDownloadResult(GetTrackDurationMs(track), localDuration);
+    }
+
+    public async Task<SongImportResult> ImportAudio(
+        long id,
+        Stream stream,
+        SongAudioSource source = SongAudioSource.Unknown,
+        string? youTubeUrl = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_songs.TryGetValue(id, out var state))
+            throw new InvalidOperationException($"Song {id} is not in the collection");
+
+        if (source == SongAudioSource.YouTube
+            && string.IsNullOrWhiteSpace(SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)))
+        {
+            throw new InvalidOperationException("YouTube import requires a youtube video url.");
+        }
+
+        await _mediaStorage.SaveAudio(id, stream, cancellationToken);
+
+        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
+        var durationMs = ToDurationMs(localDuration);
+        var isValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
+        var grain = _orleans.GetGrain<ISong>(id);
+
+        await grain.SetAudioData(true, durationMs, isValid);
+        await grain.SetAudioSource(source, youTubeUrl);
+        await grain.SetLoadingOverridden(true);
+
+        if (isValid && state.IsSnipped)
+            await grain.SetSnipped(false);
+
+        _logger.LogInformation(
+            "[Audio] Imported {SongId} {Author} - {Name}: duration={Duration}, valid={IsValid}, source={Source}, loadingOverridden=true",
+            id,
+            state.Author,
+            state.Name,
+            FormatDuration(localDuration),
+            isValid,
+            source);
+
+        return new SongImportResult(
+            id,
+            state.Author,
+            state.Name,
+            durationMs,
+            isValid,
+            source,
+            source == SongAudioSource.YouTube
+                ? SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)
+                : string.Empty,
+            true);
+    }
+
+    public static long? ToDurationMs(TimeSpan? duration)
+    {
+        return duration.HasValue
+            ? (long)Math.Round(duration.Value.TotalMilliseconds)
+            : null;
+    }
+
+    public static long? GetTrackDurationMs(Track? track)
+    {
+        if (track == null)
+            return null;
+
+        return track.FullDuration is > 0
+            ? track.FullDuration
+            : track.Duration is > 0
+                ? track.Duration
+                : null;
+    }
+
     private async Task FetchPlaylist(PlaylistData playlist, IOperationProgress progress)
     {
         progress.Log("Fetching playlist tracks...");
@@ -274,6 +385,9 @@ public class PlaylistLoader : IPlaylistLoader
 
             try
             {
+                if (IsLoadingOverridden(id, state))
+                    throw new SongLoadingOverriddenException(id);
+
                 var result = await DownloadSong(id, state);
                 var isValid = AudioTrackValidation.IsValidLocalDuration(result.LocalDuration);
                 await _orleans.GetGrain<ISong>(id).SetAudioData(true, ToDurationMs(result.LocalDuration), isValid);
@@ -292,6 +406,11 @@ public class PlaylistLoader : IPlaylistLoader
                     downloaded++;
                     progress.Log($"Loaded {i + 1} / {pending.Count}: {state.Author} - {state.Name}");
                 }
+            }
+            catch (SongLoadingOverriddenException)
+            {
+                progress.Log(
+                    $"Skipped {i + 1} / {pending.Count}: {state.Author} - {state.Name}. Loading overridden; local audio kept.");
             }
             catch (SoundCloudSnippedTrackException e)
             {
@@ -387,98 +506,21 @@ public class PlaylistLoader : IPlaylistLoader
             progress.Log($"Short audio validation complete: {markedInvalid} invalid, {refreshed} duration(s) refreshed.");
     }
 
-    public async Task<SongDownloadResult> DownloadSong(
-        long id,
-        SongState state,
-        Track? track = null,
-        CancellationToken cancellationToken = default)
+    private bool IsLoadingOverridden(long id, SongState state)
     {
-        _logger.LogInformation("[Audio] Downloading {Author} {Name}", state.Author, state.Name);
+        if (state.IsLoadingOverridden)
+            return true;
 
-        track ??= await _soundCloud.Tracks.GetAsync(state.Url, cancellationToken)
-                  ?? throw new InvalidOperationException($"SoundCloud track not found: {state.Url}");
-
-        _logger.LogInformation(
-            "[Audio] Download source for {SongId} {Author} - {Name}: {TranscodingAvailability}",
-            id,
-            state.Author,
-            state.Name,
-            FormatTranscodingAvailability(track));
-
-        var mediaUrl = await GetDownloadUrlAsync(track, cancellationToken);
-        if (string.IsNullOrWhiteSpace(mediaUrl))
-            throw new InvalidOperationException($"SoundCloud download URL not found: {state.Url}");
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode}).");
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await _mediaStorage.SaveAudio(id, stream, cancellationToken);
-
-        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
-        return new SongDownloadResult(GetTrackDurationMs(track), localDuration);
+        return _songs.TryGetValue(id, out var live) && live.IsLoadingOverridden;
     }
 
-    public async Task<SongImportResult> ImportAudio(
-        long id,
-        Stream stream,
-        SongAudioSource source = SongAudioSource.Unknown,
-        string? youTubeUrl = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (!_songs.TryGetValue(id, out var state))
-            throw new InvalidOperationException($"Song {id} is not in the collection");
-
-        if (source == SongAudioSource.YouTube
-            && string.IsNullOrWhiteSpace(SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)))
-        {
-            throw new InvalidOperationException("YouTube import requires a youtube video url.");
-        }
-
-        await _mediaStorage.SaveAudio(id, stream, cancellationToken);
-
-        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
-        var durationMs = ToDurationMs(localDuration);
-        var isValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
-        var grain = _orleans.GetGrain<ISong>(id);
-
-        await grain.SetAudioData(true, durationMs, isValid);
-        await grain.SetAudioSource(source, youTubeUrl);
-
-        if (isValid && state.IsSnipped)
-            await grain.SetSnipped(false);
-
-        _logger.LogInformation(
-            "[Audio] Imported {SongId} {Author} - {Name}: duration={Duration}, valid={IsValid}, source={Source}",
-            id,
-            state.Author,
-            state.Name,
-            FormatDuration(localDuration),
-            isValid,
-            source);
-
-        return new SongImportResult(
-            id,
-            state.Author,
-            state.Name,
-            durationMs,
-            isValid,
-            source,
-            source == SongAudioSource.YouTube
-                ? SongAudioSourceParser.NormalizeYouTubeUrl(youTubeUrl)
-                : string.Empty);
-    }
-
-    // Logged once per run so a scan result can be read against the session it
-    // ran under: the same track downloads or comes back as a preview depending
-    // on whether SoundCloud sees an authorized session.
     private static bool IsLoadCandidate(SongState state)
     {
-        return AudioTrackValidation.IsLoadCandidate(state.IsLoaded, state.IsValid, state.DurationMs);
+        return AudioTrackValidation.IsLoadCandidate(
+            state.IsLoaded,
+            state.IsValid,
+            state.DurationMs,
+            state.IsLoadingOverridden);
     }
 
     private static string DescribeCandidates(IReadOnlyList<(long Id, SongState State)> pending)
@@ -493,6 +535,9 @@ public class PlaylistLoader : IPlaylistLoader
         return $"{neverLoaded} never loaded, {tooShort} stored below {FormatDuration(AudioTrackValidation.MinimumPlayableDuration)}, {invalid} marked invalid";
     }
 
+    // Logged once per run so a scan result can be read against the session it
+    // ran under: the same track downloads or comes back as a preview depending
+    // on whether SoundCloud sees an authorized session.
     private async Task LogSessionInfo(long probeTrackId, IOperationProgress progress)
     {
         var session = await _sessionProbe.Describe(probeTrackId);
@@ -504,13 +549,6 @@ public class PlaylistLoader : IPlaylistLoader
     private async Task<TimeSpan?> ReadLocalDuration(long id, CancellationToken cancellationToken = default)
     {
         return await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
-    }
-
-    public static long? ToDurationMs(TimeSpan? duration)
-    {
-        return duration.HasValue
-            ? (long)Math.Round(duration.Value.TotalMilliseconds)
-            : null;
     }
 
     private static string FormatLabel(long id, SongState state)
@@ -670,15 +708,4 @@ public class PlaylistLoader : IPlaylistLoader
         return string.Equals(transcoding.Format?.Protocol, "hls", StringComparison.OrdinalIgnoreCase);
     }
 
-    public static long? GetTrackDurationMs(Track? track)
-    {
-        if (track == null)
-            return null;
-
-        return track.FullDuration is > 0
-            ? track.FullDuration
-            : track.Duration is > 0
-                ? track.Duration
-                : null;
-    }
 }

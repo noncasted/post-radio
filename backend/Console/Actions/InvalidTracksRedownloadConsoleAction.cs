@@ -95,6 +95,15 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                 var hasInvalidLocalDuration = state.IsLoaded && !AudioTrackValidation.IsValidLocalDuration(localDuration);
                 var hasStoredRetryReason = !state.IsValid || hasInvalidLocalDuration;
 
+                if (state.IsLoadingOverridden)
+                {
+                    skipped.Add($"{label} — loading overridden, SoundCloud redownload skipped");
+                    CountReason(skipReasons, "loading overridden");
+                    progress.Log($"SKIP-WARN {skipped.Count}: {label}; loading overridden. Local audio will not be replaced.");
+                    ok++;
+                    continue;
+                }
+
                 if (string.IsNullOrWhiteSpace(state.Url))
                 {
                     await HandleEmptyUrl(
@@ -174,6 +183,13 @@ public class InvalidTracksRedownloadConsoleAction : IConsoleAction
                     CountReason(failureReasons, "Redownloaded but duration still invalid/mismatched");
                     progress.Log($"FAILED {failed.Count}: {label}; {failedReason}; kept invalid.");
                 }
+            }
+            catch (SongLoadingOverriddenException)
+            {
+                skipped.Add($"{label} — loading overridden, SoundCloud redownload skipped");
+                CountReason(skipReasons, "loading overridden");
+                progress.Log($"SKIP-WARN {skipped.Count}: {label}; loading overridden. Local audio will not be replaced.");
+                ok++;
             }
             catch (SoundCloudSnippedTrackException e)
             {

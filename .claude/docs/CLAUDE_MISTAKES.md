@@ -119,6 +119,23 @@ else
 
 ---
 
+## Lesson 6: Не перекачивать `IsLoadingOverridden`
+
+### Ошибка
+Новый путь Load / `DownloadSong` / InvalidTracksRedownload / TrackDurationRepair качает SoundCloud и пишет `media/audio/{id}.mp3` без проверки `SongState.IsLoadingOverridden`. Импорт с консоли/YouTube затирается. `IsLoadCandidate(isLoaded, isValid, durationMs)` без четвёртого аргумента тоже тихо возвращает импорт в очередь (default `false`).
+
+### Правильно
+- `ImportAudio` ставит `SetLoadingOverridden(true)`.
+- Кандидаты на качку: `AudioTrackValidation.IsLoadCandidate(..., state.IsLoadingOverridden)`.
+- `DownloadSong` бросает `SongLoadingOverriddenException` **до** `SaveAudio`.
+- Catch этого исключения не вызывает `SetValid(false)` и не трогает файл.
+- Merge/`UpdateData` копируют флаг.
+
+### Правило
+Импортированный файл — источник истины. Любой новый download-path обязан смотреть на `IsLoadingOverridden` и обрабатывать `SongLoadingOverriddenException`.
+
+---
+
 ## Accumulation Log
 
 | # | Дата | Файл | Ошибка | Урок | Статус |
@@ -126,6 +143,7 @@ else
 | 1 | 2026-03 | Tests/* | `new Lifetime()` вместо `handle.Lifetime` | Lifetime в тестах | Fixed |
 | 2 | 2026-03 | Cluster/Coordination/RuntimePipe.cs | Non-reentrant observer-grain | `[Reentrant]` + discard | Fixed |
 | 3 | 2026-04 | Cluster/Coordination/* | Координатор ждёт свою же запись | Локальный `await` = подтверждение | Fixed |
+| 6 | 2026-08 | Meta/Audio/* | Load/redownload перетирает импортированный mp3 | `IsLoadingOverridden` + `SongLoadingOverriddenException` | Fixed |
 
 ---
 

@@ -52,6 +52,16 @@
 
 ---
 
+## Audio
+
+| Симптом | Причина | Как чинить |
+|---------|---------|------------|
+| Load audio / redownload / duration repair перетирает импортированный mp3 | Путь не смотрит на `SongState.IsLoadingOverridden` | Не качать: `IsLoadCandidate(..., isLoadingOverridden)`, `DownloadSong` бросает `SongLoadingOverriddenException` до `SaveAudio`. Логи `SKIP-WARN … loading overridden` — ожидаемая политика, не ошибка |
+| `AudioTrackValidation.IsLoadCandidate(...)` снова ставит импорт в очередь | Не передан `isLoadingOverridden` (default `false`) | Всегда передавай `state.IsLoadingOverridden` |
+| Merge/SaveEdit сбрасывает защиту | `SongData` собран без `IsLoadingOverridden` | Копируй флаг как `SongMetadataMerge` / `SongsList.SaveEdit` |
+
+---
+
 ## Build / .csproj
 
 | Симптом | Причина | Как чинить |

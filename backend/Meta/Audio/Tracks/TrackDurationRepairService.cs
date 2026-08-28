@@ -76,6 +76,14 @@ public class TrackDurationRepairService : ITrackDurationRepairService
                 var localIsValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
                 await UpdateStoredAudioData(id, state, localDurationMs, localIsValid);
 
+                if (state.IsLoadingOverridden)
+                {
+                    skippedCount++;
+                    progress.Log(
+                        $"SKIP: loading overridden for {label}. Local audio will not be replaced.");
+                    continue;
+                }
+
                 if (!localIsValid)
                 {
                     progress.Log(
@@ -128,6 +136,11 @@ public class TrackDurationRepairService : ITrackDurationRepairService
                     progress.Log(
                         $"ERROR: redownload did not fix {label}: local={FormatDuration(repairedLocalDuration)}, soundcloud={FormatDuration(soundCloudDurationMs.Value)}.");
                 }
+            }
+            catch (SongLoadingOverriddenException)
+            {
+                skippedCount++;
+                progress.Log($"SKIP: loading overridden for {label}. Local audio will not be replaced.");
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

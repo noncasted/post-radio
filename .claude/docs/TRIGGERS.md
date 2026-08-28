@@ -78,6 +78,14 @@
 
 ---
 
+## Audio / Songs
+
+**Keywords:** IsLoadingOverridden, ImportAudio, Load audio, DownloadSong, InvalidTracksRedownload, TrackDurationRepair, SongLoadingOverriddenException, AudioSource, YouTubeUrl, IsSnipped
+
+→ [VOCABULARY.md](VOCABULARY.md) §Audio + [ERRORS.md](ERRORS.md) §Audio + [CLAUDE_MISTAKES.md](CLAUDE_MISTAKES.md) lesson 6
+
+---
+
 ## Vocabulary
 
 **Keywords:** terminology, naming convention, synonyms, Advise vs View

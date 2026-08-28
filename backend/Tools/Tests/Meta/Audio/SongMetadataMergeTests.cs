@@ -63,6 +63,69 @@ public class SongMetadataMergeTests
 
         merged.AudioSource.Should().Be(SongAudioSource.YouTube);
         merged.YouTubeUrl.Should().Be("https://www.youtube.com/watch?v=ufF61Fw6X7E");
+        merged.IsLoadingOverridden.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LookupMergePreservesLoadingOverridden()
+    {
+        var existing = new SongState
+        {
+            Url = "https://soundcloud.example/original",
+            Author = "Author",
+            Name = "Title",
+            IsLoaded = true,
+            DurationMs = 180_000,
+            IsValid = true,
+            IsLoadingOverridden = true
+        };
+        var lookup = new SongLookupInfo
+        {
+            Id = 1,
+            Url = "https://soundcloud.example/cached",
+            Author = "Author",
+            Name = "Title"
+        };
+
+        SongMetadataMerge.MergeLookup(1, existing, lookup)
+                         .IsLoadingOverridden.Should()
+                         .BeTrue();
+    }
+
+    [Fact]
+    public void FetchMergePreservesLoadingOverridden()
+    {
+        var playlistId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var existing = new SongState
+        {
+            Url = "https://soundcloud.example/original",
+            Playlists = new List<Guid> { playlistId },
+            Author = "Author",
+            Name = "Title",
+            AddDate = new DateTime(2024, 01, 02, 03, 04, 05, DateTimeKind.Utc),
+            IsLoaded = true,
+            DurationMs = 180_000,
+            IsValid = true,
+            IsLoadingOverridden = true,
+            AudioSource = SongAudioSource.YouTube,
+            YouTubeUrl = "https://www.youtube.com/watch?v=ufF61Fw6X7E"
+        };
+
+        var merged = SongMetadataMerge.MergeFetchedExisting(
+            1,
+            existing,
+            cached: null,
+            playlistId,
+            "https://soundcloud.example/fetched",
+            "Author",
+            "Title",
+            TimeSpan.FromMinutes(3),
+            new DateTime(2025, 01, 02, 03, 04, 05, DateTimeKind.Utc));
+
+        merged.IsLoadingOverridden.Should().BeTrue();
+        merged.AudioSource.Should().Be(SongAudioSource.YouTube);
+        merged.YouTubeUrl.Should().Be("https://www.youtube.com/watch?v=ufF61Fw6X7E");
+        merged.IsLoaded.Should().BeTrue();
     }
 
     [Fact]

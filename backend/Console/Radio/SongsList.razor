@@ -58,6 +58,13 @@
                             <LucideIcon Name="ban" Size="12" /> invalid
                         </span>
                     }
+                    @if (state.IsLoadingOverridden)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded bg-violet-500/15 text-violet-600 px-2 py-0.5 text-xs"
+                              title="Audio was imported outside the SoundCloud loader. Load audio and redownload will not replace this file.">
+                            <LucideIcon Name="lock" Size="12" /> imported
+                        </span>
+                    }
                     @if (state.IsSnipped)
                     {
                         <span class="inline-flex items-center gap-1 rounded bg-sky-500/15 text-sky-600 px-2 py-0.5 text-xs"
@@ -154,20 +161,6 @@
 
     [Inject] public required IOrleans Orleans { get; init; }
 
-    private static readonly int[] PageSizes = { 10, 30, 50, 100 };
-
-    private List<KeyValuePair<long, SongState>> _filtered = new();
-    private List<KeyValuePair<long, SongState>> _pageSongs = new();
-    private string _search = string.Empty;
-    private int _pageSize = 30;
-    private int _page;
-    private int _totalPages = 1;
-
-    private long? _expandedId;
-    private readonly Dictionary<long, Draft> _drafts = new();
-    private bool _saving;
-    private long _savingId;
-
     private const string BaseBadgeStyle =
         "display:inline-flex;align-items:center;gap:0.25rem;border-radius:0.25rem;padding:0.125rem 0.5rem;font-size:0.75rem;line-height:1rem;";
 
@@ -178,6 +171,19 @@
     private const string ValidDurationBadgeStyle =
         BaseBadgeStyle +
         "background:rgba(14,165,233,0.15);color:rgb(56,189,248);";
+
+    private static readonly int[] PageSizes = { 10, 30, 50, 100 };
+
+    private readonly Dictionary<long, Draft> _drafts = new();
+    private List<KeyValuePair<long, SongState>> _filtered = new();
+    private List<KeyValuePair<long, SongState>> _pageSongs = new();
+    private string _search = string.Empty;
+    private int _pageSize = 30;
+    private int _page;
+    private int _totalPages = 1;
+    private long? _expandedId;
+    private bool _saving;
+    private long _savingId;
 
     protected override void OnParametersSet()
     {
@@ -343,7 +349,8 @@
                 IsValid = state.IsValid,
                 IsSnipped = state.IsSnipped,
                 AudioSource = state.AudioSource,
-                YouTubeUrl = state.YouTubeUrl
+                YouTubeUrl = state.YouTubeUrl,
+                IsLoadingOverridden = state.IsLoadingOverridden
             });
 
             _expandedId = null;

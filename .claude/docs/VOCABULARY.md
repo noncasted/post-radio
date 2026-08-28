@@ -63,6 +63,15 @@
 | Migrations (prod) | migrator init-container | `DeploySetup` |
 | Migrations (dev) | PostResourcesSetup.Run | Вызывается из AppHost после старта ресурсов |
 
+## Audio
+
+| Concept | Primary Term | Notes |
+|---------|--------------|-------|
+| Imported audio lock | `IsLoadingOverridden` | Audio imported outside the SoundCloud loader (console upload, YouTube, local client). Load / redownload / duration repair must not replace the file |
+| Playable local file | `IsLoaded` + `IsValid` + duration ≥ 31s | Playback gate; not a lock against overwrite |
+| Session preview | `IsSnipped` | SoundCloud served a 30s preview for this session; retry is allowed |
+| Import origin | `AudioSource` / `YouTubeUrl` | Where the file came from; UI badge `imported` maps to `IsLoadingOverridden`, not to `AudioSource` |
+
 ## Правила (не использовать синонимы)
 
 - Не смешивать: `Lifetime` vs `Token` (token — часть lifetime, не синоним).
@@ -70,4 +79,5 @@
 - Не смешивать: `EventSource` vs `ViewableProperty` (событие vs состояние).
 - Не смешивать: `State<T>` vs `StateCollection<K,V>` (один vs множество).
 - Не смешивать: `Aspire` vs `Coolify` (dev vs prod orchestrator — разные среды).
+- Не смешивать: `IsLoadingOverridden` vs `IsLoaded` vs `IsValid` vs `IsSnipped` vs `AudioSource`.
 - В одном ответе используй один и тот же термин.

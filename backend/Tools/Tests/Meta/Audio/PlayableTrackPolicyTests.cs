@@ -66,4 +66,42 @@ public class PlayableTrackPolicyTests
 
         PlayableTrackPolicy.IsPlayable(song).Should().Be(expected);
     }
+
+    [Fact]
+    public void OverriddenImportIsNeverALoadCandidate()
+    {
+        AudioTrackValidation.IsLoadCandidate(false, false, null, isLoadingOverridden: true)
+                            .Should()
+                            .BeFalse();
+        AudioTrackValidation.IsLoadCandidate(true, false, 10_000L, isLoadingOverridden: true)
+                            .Should()
+                            .BeFalse();
+        AudioTrackValidation.IsLoadCandidate(true, true, 41_000L, isLoadingOverridden: true)
+                            .Should()
+                            .BeFalse();
+    }
+
+    [Fact]
+    public void NonOverriddenUnplayableTrackIsALoadCandidate()
+    {
+        AudioTrackValidation.IsLoadCandidate(false, false, null)
+                            .Should()
+                            .BeTrue();
+        AudioTrackValidation.IsLoadCandidate(true, true, 30_000L)
+                            .Should()
+                            .BeTrue();
+        AudioTrackValidation.IsLoadCandidate(true, true, 41_000L)
+                            .Should()
+                            .BeFalse();
+    }
+
+    [Fact]
+    public void LoadingOverriddenExceptionIdentifiesTheSongAndBlocksReplace()
+    {
+        var exception = new SongLoadingOverriddenException(1820897418);
+
+        exception.SongId.Should().Be(1820897418);
+        exception.Message.Should().Contain("1820897418");
+        exception.Message.Should().Contain("overridden");
+    }
 }

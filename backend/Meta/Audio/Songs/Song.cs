@@ -15,6 +15,7 @@ public interface ISong : IGrainWithIntegerKey
     Task SetValid(bool isValid);
     Task SetSnipped(bool isSnipped);
     Task SetAudioSource(SongAudioSource source, string? youTubeUrl);
+    Task SetLoadingOverridden(bool isLoadingOverridden);
 }
 
 [GenerateSerializer]
@@ -37,6 +38,10 @@ public class SongData
     [Id(9)] public bool IsSnipped { get; init; }
     [Id(10)] public SongAudioSource AudioSource { get; init; }
     [Id(11)] public string YouTubeUrl { get; init; } = string.Empty;
+
+    // True when audio was imported outside the SoundCloud loader (local client,
+    // YouTube fallback, console upload). Load/redownload must not overwrite it.
+    [Id(12)] public bool IsLoadingOverridden { get; init; }
 }
 
 [GenerateSerializer]
@@ -54,6 +59,7 @@ public class SongState : IStateValue
     [Id(8)] public bool IsSnipped { get; set; }
     [Id(9)] public SongAudioSource AudioSource { get; set; }
     [Id(10)] public string YouTubeUrl { get; set; } = string.Empty;
+    [Id(11)] public bool IsLoadingOverridden { get; set; }
 
     public int Version => 0;
 }
@@ -85,6 +91,7 @@ public class Song : Grain, ISong
             s.IsSnipped = data.IsSnipped;
             s.AudioSource = data.AudioSource;
             s.YouTubeUrl = data.YouTubeUrl ?? string.Empty;
+            s.IsLoadingOverridden = data.IsLoadingOverridden;
         });
 
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
@@ -107,7 +114,8 @@ public class Song : Grain, ISong
             IsValid = state.IsValid,
             IsSnipped = state.IsSnipped,
             AudioSource = state.AudioSource,
-            YouTubeUrl = state.YouTubeUrl
+            YouTubeUrl = state.YouTubeUrl,
+            IsLoadingOverridden = state.IsLoadingOverridden
         };
     }
 
@@ -153,6 +161,12 @@ public class Song : Grain, ISong
             s.AudioSource = source;
             s.YouTubeUrl = normalizedUrl;
         });
+        await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
+    }
+
+    public async Task SetLoadingOverridden(bool isLoadingOverridden)
+    {
+        var updated = await _state.Update(s => s.IsLoadingOverridden = isLoadingOverridden);
         await _collection.OnUpdated(this.GetPrimaryKeyLong(), updated);
     }
 

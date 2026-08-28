@@ -21,7 +21,8 @@ public static class SongMetadataMerge
             IsValid = MergeLookupValidity(existing, lookup, author, durationMs),
             IsSnipped = existing.IsSnipped,
             AudioSource = existing.AudioSource,
-            YouTubeUrl = existing.YouTubeUrl
+            YouTubeUrl = existing.YouTubeUrl,
+            IsLoadingOverridden = existing.IsLoadingOverridden
         };
     }
 
@@ -59,7 +60,8 @@ public static class SongMetadataMerge
             IsValid = MergeFetchValidity(existing, cached, author, localDuration, durationMs),
             IsSnipped = existing.IsSnipped,
             AudioSource = existing.AudioSource,
-            YouTubeUrl = existing.YouTubeUrl
+            YouTubeUrl = existing.YouTubeUrl,
+            IsLoadingOverridden = existing.IsLoadingOverridden
         };
     }
 
@@ -103,7 +105,8 @@ public static class SongMetadataMerge
                || existing.IsValid != data.IsValid
                || existing.IsSnipped != data.IsSnipped
                || existing.AudioSource != data.AudioSource
-               || existing.YouTubeUrl != data.YouTubeUrl;
+               || existing.YouTubeUrl != data.YouTubeUrl
+               || existing.IsLoadingOverridden != data.IsLoadingOverridden;
     }
 
     private static bool MergeLookupValidity(SongState existing, SongLookupInfo lookup, string author, long? durationMs)

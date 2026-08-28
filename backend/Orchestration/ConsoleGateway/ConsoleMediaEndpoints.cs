@@ -75,7 +75,11 @@ public static class ConsoleMediaEndpoints
     private static IResult ListMissingAudio([FromServices] ISongsCollection songs)
     {
         var missing = songs
-            .Where(kv => AudioTrackValidation.IsLoadCandidate(kv.Value.IsLoaded, kv.Value.IsValid, kv.Value.DurationMs))
+            .Where(kv => AudioTrackValidation.IsLoadCandidate(
+                kv.Value.IsLoaded,
+                kv.Value.IsValid,
+                kv.Value.DurationMs,
+                kv.Value.IsLoadingOverridden))
             .Select(kv => new
             {
                 Id = kv.Key,
@@ -87,7 +91,8 @@ public static class ConsoleMediaEndpoints
                 IsValid = kv.Value.IsValid,
                 IsSnipped = kv.Value.IsSnipped,
                 AudioSource = kv.Value.AudioSource.ToString(),
-                YouTubeUrl = kv.Value.YouTubeUrl
+                YouTubeUrl = kv.Value.YouTubeUrl,
+                IsLoadingOverridden = kv.Value.IsLoadingOverridden
             })
             .OrderBy(song => song.Author, StringComparer.OrdinalIgnoreCase)
             .ThenBy(song => song.Name, StringComparer.OrdinalIgnoreCase)
@@ -139,6 +144,7 @@ public static class ConsoleMediaEndpoints
                 imported.IsValid,
                 AudioSource = imported.AudioSource.ToString(),
                 imported.YouTubeUrl,
+                imported.IsLoadingOverridden,
                 SizeBytes = file.Length
             });
         }
