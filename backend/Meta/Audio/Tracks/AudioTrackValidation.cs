@@ -9,6 +9,14 @@ public static class AudioTrackValidation
         return isLoaded && isValid && IsValidLocalDurationMs(durationMs);
     }
 
+    // Anything that is not playable right now is worth downloading again: never
+    // fetched, marked invalid, or already stored but shorter than a real track
+    // (a saved 30s preview looks "loaded" but is useless).
+    public static bool IsLoadCandidate(bool isLoaded, bool isValid, long? durationMs)
+    {
+        return !IsPlayableAudio(isLoaded, isValid, durationMs);
+    }
+
     public static bool IsInvalidPlaybackCandidate(bool isLoaded, bool isValid, long? durationMs)
     {
         return !isValid || (isLoaded && !IsValidLocalDurationMs(durationMs));

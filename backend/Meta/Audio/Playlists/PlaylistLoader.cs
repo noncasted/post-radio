@@ -123,14 +123,14 @@ public class PlaylistLoader : IPlaylistLoader
     public async Task Load(PlaylistData playlist, IOperationProgress progress)
     {
         progress.SetStatus(OperationStatus.InProgress);
-        progress.Log("Scanning playlist for unloaded songs...");
+        progress.Log("Scanning playlist for songs that are not playable...");
 
         var pending = _songs
-                      .Where(kv => kv.Value.Playlists.Contains(playlist.Id) && !kv.Value.IsLoaded && kv.Value.IsValid)
+                      .Where(kv => kv.Value.Playlists.Contains(playlist.Id) && IsLoadCandidate(kv.Value))
                       .Select(kv => (Id: kv.Key, State: kv.Value))
                       .ToList();
 
-        progress.Log($"Found {pending.Count} unloaded songs.");
+        progress.Log($"Found {pending.Count} song(s) to download: {DescribeCandidates(pending)}.");
         await LoadPending(pending,
             progress,
             (state, e) => _logger.LogError(e,
@@ -141,14 +141,14 @@ public class PlaylistLoader : IPlaylistLoader
     public async Task LoadAll(IOperationProgress progress)
     {
         progress.SetStatus(OperationStatus.InProgress);
-        progress.Log("Scanning all songs for unloaded audio...");
+        progress.Log("Scanning all songs for audio that is not playable...");
 
         var pending = _songs
-                      .Where(kv => !kv.Value.IsLoaded && kv.Value.IsValid)
+                      .Where(kv => IsLoadCandidate(kv.Value))
                       .Select(kv => (Id: kv.Key, State: kv.Value))
                       .ToList();
 
-        progress.Log($"Found {pending.Count} unloaded songs.");
+        progress.Log($"Found {pending.Count} song(s) to download: {DescribeCandidates(pending)}.");
         await LoadPending(pending,
             progress,
             (state, e) => _logger.LogError(e,
@@ -410,6 +410,23 @@ public class PlaylistLoader : IPlaylistLoader
     // Logged once per run so a scan result can be read against the session it
     // ran under: the same track downloads or comes back as a preview depending
     // on whether SoundCloud sees an authorized session.
+    private static bool IsLoadCandidate(SongState state)
+    {
+        return AudioTrackValidation.IsLoadCandidate(state.IsLoaded, state.IsValid, state.DurationMs);
+    }
+
+    private static string DescribeCandidates(IReadOnlyList<(long Id, SongState State)> pending)
+    {
+        var neverLoaded = pending.Count(p => !p.State.IsLoaded);
+        var tooShort = pending.Count(p => p.State.IsLoaded
+                                          && !AudioTrackValidation.IsValidLocalDurationMs(p.State.DurationMs));
+        var invalid = pending.Count(p => p.State.IsLoaded
+                                         && !p.State.IsValid
+                                         && AudioTrackValidation.IsValidLocalDurationMs(p.State.DurationMs));
+
+        return $"{neverLoaded} never loaded, {tooShort} stored below {FormatDuration(AudioTrackValidation.MinimumPlayableDuration)}, {invalid} marked invalid";
+    }
+
     private async Task LogSessionInfo(long probeTrackId, IOperationProgress progress)
     {
         var session = await _sessionProbe.Describe(probeTrackId);
