@@ -17,8 +17,6 @@ public sealed record SongStreamUrlResult(bool IsSuccess, string Url, bool IsNotF
 
 public interface IRadioApi
 {
-    void SetSessionId(string sessionId);
-    Task TouchPresence();
     Task<IReadOnlyList<PlaylistDto>> GetPlaylists();
     Task<IReadOnlyList<SongDto>> GetSongs(Guid? playlistId = null);
     Task<SongStreamUrlResult> GetSongStreamUrl(long id, CancellationToken cancellationToken = default);
@@ -38,31 +36,12 @@ public class RadioApi : IRadioApi
 
     private readonly HttpClient _http;
     private readonly ILogger<RadioApi> _logger;
-    private string? _sessionId;
-
-    public void SetSessionId(string sessionId)
-    {
-        _sessionId = sessionId;
-    }
-
-    public async Task TouchPresence()
-    {
-        try
-        {
-            using var response = await _http.PostAsync(WithSession("/api/radio/presence/touch"), null);
-            response.EnsureSuccessStatusCode();
-        }
-        catch (Exception e)
-        {
-            _logger.LogDebug(e, "[RadioApi] TouchPresence failed");
-        }
-    }
 
     public async Task<IReadOnlyList<PlaylistDto>> GetPlaylists()
     {
         try
         {
-            var result = await _http.GetFromJsonAsync<List<PlaylistDto>>(WithSession("/api/radio/playlists"));
+            var result = await _http.GetFromJsonAsync<List<PlaylistDto>>("/api/radio/playlists");
             return result ?? new List<PlaylistDto>();
         }
         catch (Exception e)
@@ -78,7 +57,7 @@ public class RadioApi : IRadioApi
 
         try
         {
-            var result = await _http.GetFromJsonAsync<List<SongDto>>(WithSession(url));
+            var result = await _http.GetFromJsonAsync<List<SongDto>>(url);
             return (result ?? new List<SongDto>())
                    .Where(PlayableTrackPolicy.IsPlayable)
                    .ToList();
@@ -94,7 +73,7 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            using var response = await _http.GetAsync(WithSession($"/api/radio/songs/{id}/stream"),
+            using var response = await _http.GetAsync($"/api/radio/songs/{id}/stream",
                 HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -132,7 +111,7 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            var result = await _http.GetFromJsonAsync<ImagesCountDto>(WithSession("/api/radio/images"));
+            var result = await _http.GetFromJsonAsync<ImagesCountDto>("/api/radio/images");
             return result?.Count ?? 0;
         }
         catch (Exception e)
@@ -146,7 +125,7 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            return await _http.GetStringAsync(WithSession($"/api/radio/images/{index}"));
+            return await _http.GetStringAsync($"/api/radio/images/{index}");
         }
         catch (Exception e)
         {
@@ -159,7 +138,7 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            return await _http.GetFromJsonAsync<FrontendOptionsDto>(WithSession("/api/radio/options"));
+            return await _http.GetFromJsonAsync<FrontendOptionsDto>("/api/radio/options");
         }
         catch (Exception e)
         {
@@ -172,7 +151,7 @@ public class RadioApi : IRadioApi
     {
         try
         {
-            using var response = await _http.PostAsJsonAsync(WithSession("/api/radio/skip-report"),
+            using var response = await _http.PostAsJsonAsync("/api/radio/skip-report",
                 payload,
                 cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -186,12 +165,4 @@ public class RadioApi : IRadioApi
         }
     }
 
-    private string WithSession(string url)
-    {
-        if (string.IsNullOrWhiteSpace(_sessionId))
-            return url;
-
-        var separator = url.Contains('?') ? "&" : "?";
-        return $"{url}{separator}sid={Uri.EscapeDataString(_sessionId)}";
-    }
 }

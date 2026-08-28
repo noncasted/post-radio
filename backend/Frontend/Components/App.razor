@@ -135,6 +135,9 @@
                 Без регистрации, установки и рекламы.
             </p>
             <p>
+                Название пишут по-разному - Post Radio, Postradio, «Пост Радио», - это одно и то же радио.
+            </p>
+            <p>
                 Что нового в эфире - в Telegram-канале
                 <a href="https://t.me/posttradio">@@posttradio</a>.
             </p>
@@ -142,18 +145,26 @@
         </div>
     </div>
 
+    @*
+        Wrapped in Yandex noindex comments: both blocks are display:none until something
+        breaks, but they still ship in the html, and Yandex has pulled the error text into
+        the search snippet in place of the page description. Google ignores the comments.
+    *@
+    @NoIndexOpen
     <div id="components-reconnect-modal">
         <span class="reconnect-retrying">Соединение восстанавливается...</span>
         <span class="reconnect-failed">Соединение потеряно. <a href="">Обновить</a></span>
     </div>
 
     <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
+        Что-то пошло не так.
+        <a href="." class="reload">Обновить страницу</a>
         <span class="dismiss">x</span>
     </div>
+    @NoIndexClose
 
     <script src="js/radio-core.js"></script>
+    <script src="js/radio-presence.js"></script>
     <script src="js/radio-player.js"></script>
     <script src="js/radio-images.js"></script>
     <script src="js/radio-ui.js"></script>
@@ -186,12 +197,20 @@
         values, which turns the "+" of application/ld+json into "&#x2B;". Parsers decode
         that back, but crawlers have no reason to be handed a mangled mime type.
     */
+    /*
+        Razor strips html comments from rendered output, so the Yandex noindex markers
+        have to be emitted as raw markup or they never reach the page.
+    */
+    private static readonly MarkupString NoIndexOpen = (MarkupString)"<!--noindex-->";
+    private static readonly MarkupString NoIndexClose = (MarkupString)"<!--/noindex-->";
+
     private MarkupString StructuredData => (MarkupString)$$"""
         <script type="application/ld+json">
         {
             "@context": "https://schema.org",
             "@type": "RadioStation",
             "name": "Post Radio",
+            "alternateName": ["Postradio", "PostRadio", "Пост Радио", "Пострадио", "post-radio.ru"],
             "url": "{{Site.Url("/")}}",
             "logo": "{{Site.Url("favicon.png")}}",
             "description": "Пост-панк радио: непрерывный поток от русского андеграунда до классики жанра, с меняющимся визуальным рядом.",

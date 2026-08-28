@@ -32,18 +32,15 @@ public static class RadioEndpoints
         group.MapGet("/media/audio/{id:long}", GetAudioFile);
         group.MapGet("/media/images/{key}", GetImageFile);
         group.MapGet("/options", GetOptions);
-        group.MapPost("/presence/touch", TouchPresence);
+        group.MapPost("/presence/beat", ReceivePresenceBeat);
         group.MapPost("/skip-report", ReceiveSkipReport);
 
         return builder;
     }
 
     private static FrontendOptionsDto GetOptions(
-        [FromServices] IFrontendConfig config,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context)
+        [FromServices] IFrontendConfig config)
     {
-        Touch(onlineTracker, context);
         var value = config.Value;
 
         return new FrontendOptionsDto
@@ -56,11 +53,8 @@ public static class RadioEndpoints
     }
 
     private static IReadOnlyList<PlaylistDto> ListPlaylists(
-        [FromServices] IPlaylistsCollection collection,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context)
+        [FromServices] IPlaylistsCollection collection)
     {
-        Touch(onlineTracker, context);
         return collection
                .Select(kv => new PlaylistDto { Id = kv.Key, Name = kv.Value.Name, Url = kv.Value.Url })
                .ToList();
@@ -69,11 +63,8 @@ public static class RadioEndpoints
     private static IReadOnlyList<SongDto> ListSongs(
         [FromServices] ISongsCollection collection,
         [FromServices] IMediaStorage storage,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context,
         [FromQuery] Guid? playlistId)
     {
-        Touch(onlineTracker, context);
         var source = playlistId.HasValue
             ? collection.Where(kv => kv.Value.Playlists.Contains(playlistId.Value))
             : collection;
@@ -101,8 +92,6 @@ public static class RadioEndpoints
     private static IResult GetSongStream(
         [FromServices] IMediaStorage storage,
         [FromServices] ISongsCollection songs,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context,
         long id)
     {
         if (!songs.TryGetValue(id, out var song)
@@ -112,15 +101,12 @@ public static class RadioEndpoints
         if (!File.Exists(storage.GetAudioPath(id)))
             return Results.NotFound();
 
-        var sessionId = Touch(onlineTracker, context);
-        return Results.Text(AppendSessionId(storage.GetAudioUrl(id), sessionId), "text/plain");
+        return Results.Text(storage.GetAudioUrl(id), "text/plain");
     }
 
     private static IResult GetAudioFile(
         [FromServices] IMediaStorage storage,
         [FromServices] ISongsCollection songs,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context,
         long id)
     {
         if (!songs.TryGetValue(id, out var song)
@@ -132,22 +118,17 @@ public static class RadioEndpoints
         if (!File.Exists(path))
             return Results.NotFound();
 
-        Touch(onlineTracker, context);
         return Results.File(path, "audio/mpeg", enableRangeProcessing: true);
     }
 
     private static IResult GetImageFile(
         [FromServices] IMediaStorage storage,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context,
         string key)
     {
         var path = storage.GetImagePath(key);
 
         if (!File.Exists(path))
             return Results.NotFound();
-
-        Touch(onlineTracker, context);
 
         if (!ContentTypes.TryGetContentType(path, out var contentType))
             contentType = "application/octet-stream";
@@ -156,39 +137,37 @@ public static class RadioEndpoints
     }
 
     private static ImagesCountDto ListImages(
-        [FromServices] IImagesCollection collection,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context)
+        [FromServices] IImagesCollection collection)
     {
-        Touch(onlineTracker, context);
         return new ImagesCountDto { Count = collection.Count };
     }
 
     private static async Task<string> GetImageUrl(
         [FromServices] IImagesCollection collection,
-        [FromServices] IOnlineTracker onlineTracker,
-        HttpContext context,
         int index)
     {
-        var sessionId = Touch(onlineTracker, context);
-        return AppendSessionId(await collection.GetUrl(index), sessionId);
+        return await collection.GetUrl(index);
     }
 
-    private static IResult TouchPresence(
+    /// <summary>
+    /// The only presence signal there is. The browser posts it every 30 seconds while audio is
+    /// actually playing, identified by the fingerprint in <c>X-Radio-Client-Id</c>; a request
+    /// without one is not counted, so crawlers and page views never show up as listeners.
+    /// </summary>
+    private static IResult ReceivePresenceBeat(
         [FromServices] IOnlineTracker onlineTracker,
         HttpContext context)
     {
-        Touch(onlineTracker, context);
+        onlineTracker.Touch(GetClientId(context));
         return Results.NoContent();
     }
 
     private static IResult ReceiveSkipReport(
         [FromServices] ILogger<RadioSkipLog> logger,
-        [FromServices] IOnlineTracker onlineTracker,
         [FromBody] JsonElement report,
         HttpContext context)
     {
-        var sessionId = Touch(onlineTracker, context);
+        var sessionId = TryGetString(report, "sessionId") ?? "-";
         var userAgent = context.Request.Headers.UserAgent.ToString();
         var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "-";
         var reason = TryGetString(report, "reason") ?? "-";
@@ -335,33 +314,11 @@ public static class RadioEndpoints
         };
     }
 
-    private static string? Touch(IOnlineTracker onlineTracker, HttpContext context)
+    private static string? GetClientId(HttpContext context)
     {
-        var sessionId = GetSessionId(context);
-        onlineTracker.Touch(sessionId);
-        return sessionId;
-    }
-
-    private static string? GetSessionId(HttpContext context)
-    {
-        if (context.Request.Query.TryGetValue("sid", out var querySessionId))
-            return querySessionId.ToString();
-
-        if (context.Request.Headers.TryGetValue("X-Radio-Session-Id", out var headerSessionId))
-            return headerSessionId.ToString();
-
-        return context.Request.Cookies.TryGetValue("Radio.SessionId", out var cookieSessionId)
-            ? cookieSessionId
+        return context.Request.Headers.TryGetValue("X-Radio-Client-Id", out var clientId)
+            ? clientId.ToString()
             : null;
-    }
-
-    private static string AppendSessionId(string url, string? sessionId)
-    {
-        if (string.IsNullOrWhiteSpace(sessionId))
-            return url;
-
-        var separator = url.Contains('?') ? "&" : "?";
-        return $"{url}{separator}sid={Uri.EscapeDataString(sessionId)}";
     }
 }
 

@@ -80,9 +80,10 @@
 
 ## Audio / Songs
 
-**Keywords:** IsLoadingOverridden, ImportAudio, Load audio, DownloadSong, InvalidTracksRedownload, TrackDurationRepair, SongLoadingOverriddenException, AudioSource, YouTubeUrl, IsSnipped
+**Keywords:** IsLoadingOverridden, ImportAudio, Load audio, DownloadSong, InvalidTracksRedownload, TrackDurationRepair, SongLoadingOverriddenException, AudioSource, YouTubeUrl, IsSnipped, sync-audio, override-invalid-tracks, audio-dump, upload-only
 
 → [VOCABULARY.md](VOCABULARY.md) §Audio + [ERRORS.md](ERRORS.md) §Audio + [CLAUDE_MISTAKES.md](CLAUDE_MISTAKES.md) lesson 6
+→ Skill: `.claude/skills/override-invalid-tracks/SKILL.md` (`/override-invalid-tracks`)
 
 ---
 

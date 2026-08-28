@@ -2,7 +2,7 @@
 // per-track diagnostics. Talks to .NET twice per track, never per audio event.
 window.radioPlayer = window.radioPlayer || {};
 
-(function (player, core) {
+(function (player, core, presence) {
     var DEFAULTS = {
         volume: 0.5,
         startupTimeoutMs: 20000,
@@ -621,6 +621,18 @@ window.radioPlayer = window.radioPlayer || {};
             window.clearInterval(state.watchdogTimer);
 
         state.watchdogTimer = window.setInterval(tick, state.config.watchdogIntervalMs);
+        presence.start(player.isListening);
+    };
+
+    // The online counter asks this: a listener is a browser with a track actually running.
+    player.isListening = function () {
+        var audio = state.audio;
+
+        return state.started
+               && state.current !== null
+               && audio !== null
+               && audio.paused === false
+               && audio.ended === false;
     };
 
     player.enqueue = function (tracks) {
@@ -677,6 +689,8 @@ window.radioPlayer = window.radioPlayer || {};
     };
 
     player.dispose = function () {
+        presence.stop();
+
         if (state.watchdogTimer !== null) {
             window.clearInterval(state.watchdogTimer);
             state.watchdogTimer = null;
@@ -691,4 +705,4 @@ window.radioPlayer = window.radioPlayer || {};
         state.diag = null;
         state.started = false;
     };
-})(window.radioPlayer, window.radioCore);
+})(window.radioPlayer, window.radioCore, window.radioPresence);

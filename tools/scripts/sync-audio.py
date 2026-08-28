@@ -238,10 +238,22 @@ def try_soundcloud(track: Track, tmp_dir: Path) -> Path | None:
         return path
     except CommandError as exc:
         text = str(exc).lower()
-        if "drm" in text or "format is not available" in text or "http error 404" in text:
+        if is_soundcloud_unavailable(text):
             print("  soundcloud: unavailable, falling back to youtube")
             return None
         raise
+
+
+def is_soundcloud_unavailable(text: str) -> bool:
+    needles = (
+        "drm",
+        "format is not available",
+        "http error 404",
+        "geo restriction",
+        "not available from your location",
+        "blocked in your country",
+    )
+    return any(needle in text for needle in needles)
 
 
 def pick_youtube(track: Track) -> dict[str, Any]:

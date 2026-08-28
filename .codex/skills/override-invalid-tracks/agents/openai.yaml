@@ -1,0 +1,3 @@
+interface:
+  display_name: "Override Invalid Tracks"
+  short_description: "Download missing tracks locally and upload them as IsLoadingOverridden imports"

@@ -16,7 +16,6 @@ public class SessionState : IDisposable
     {
         _api = api;
         SessionId = Guid.NewGuid().ToString("N");
-        _api.SetSessionId(SessionId);
     }
 
     private const int MaxRecentSkips = 20;
@@ -85,7 +84,6 @@ public class SessionState : IDisposable
             return;
 
         _isStarted = true;
-        TouchLoop();
         Started?.Invoke();
     }
 
@@ -174,38 +172,6 @@ public class SessionState : IDisposable
         {
             var j = _random.Next(i + 1);
             (list[i], list[j]) = (list[j], list[i]);
-        }
-    }
-
-    private void TouchLoop()
-    {
-        _ = RunTouchLoop();
-    }
-
-    private async Task RunTouchLoop()
-    {
-        while (!_cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await _api.TouchPresence();
-                await Task.Delay(TimeSpan.FromSeconds(60), _cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch
-            {
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(60), _cts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-            }
         }
     }
 

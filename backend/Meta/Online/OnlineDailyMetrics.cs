@@ -115,6 +115,10 @@ public class OnlineDailyMetrics : Grain, IOnlineDailyMetrics
     }
 }
 
+/// <summary>
+/// Mirrors the tracker's hourly history into <see cref="IOnlineDailyMetrics"/> and seeds the
+/// tracker back from it on startup, so a redeploy does not reset the online chart.
+/// </summary>
 public class OnlineHistoryRecorder : ICoordinatorSetupCompleted
 {
     public OnlineHistoryRecorder(
@@ -128,6 +132,9 @@ public class OnlineHistoryRecorder : ICoordinatorSetupCompleted
         _environment = environment;
         _logger = logger;
     }
+
+    private static readonly TimeSpan PersistInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(1);
 
     private readonly IOnlineTracker _onlineTracker;
     private readonly IOrleans _orleans;
@@ -143,14 +150,21 @@ public class OnlineHistoryRecorder : ICoordinatorSetupCompleted
         return Task.CompletedTask;
     }
 
+    public static string ToDateKey(DateTime value)
+    {
+        return value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
     private async Task Loop(IReadOnlyLifetime lifetime)
     {
+        await RestoreHistory();
+
         while (!lifetime.IsTerminated)
         {
             try
             {
                 await PersistToday();
-                await Task.Delay(GetDelayToNextHour(DateTime.UtcNow), lifetime.Token);
+                await Task.Delay(PersistInterval, lifetime.Token);
             }
             catch (OperationCanceledException)
             {
@@ -162,13 +176,38 @@ public class OnlineHistoryRecorder : ICoordinatorSetupCompleted
 
                 try
                 {
-                    await Task.Delay(TimeSpan.FromMinutes(1), lifetime.Token);
+                    await Task.Delay(RetryInterval, lifetime.Token);
                 }
                 catch (OperationCanceledException)
                 {
                     return;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The chart shows a 24 hour window, which spans yesterday as well whenever the process
+    /// starts at anything other than midnight.
+    /// </summary>
+    private async Task RestoreHistory()
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var buckets = new List<OnlineHistoryBucket>();
+
+            foreach (var key in new[] { ToDateKey(now.AddDays(-1)), ToDateKey(now) })
+            {
+                var data = await _orleans.GetGrain<IOnlineDailyMetrics>(key).GetData();
+                buckets.AddRange(data.Hourly);
+            }
+
+            _onlineTracker.Restore(buckets);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "[OnlineHistory] Failed to restore online metrics");
         }
     }
 
@@ -187,18 +226,5 @@ public class OnlineHistoryRecorder : ICoordinatorSetupCompleted
             Hourly = hourly,
             UpdatedAtUtc = now
         });
-    }
-
-    private static TimeSpan GetDelayToNextHour(DateTime now)
-    {
-        var nextHour = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc)
-            .AddHours(1);
-
-        return nextHour - now;
-    }
-
-    public static string ToDateKey(DateTime value)
-    {
-        return value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 }
