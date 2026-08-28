@@ -30,7 +30,7 @@ Published .NET entry points:
 - `Coordinator`
 - `MetaGateway`
 - `ConsoleGateway`
-- `Frontend.Server`
+- `Frontend`
 - `DeploySetup` (migrator)
 
 For fast local smoke tests, run `./tools/scripts/publish-local.sh` and include `docker-compose.local.yaml`; it switches every .NET image to `Dockerfile.prebuilt` and copies `./publish/<Name>/` instead of rebuilding inside Docker.

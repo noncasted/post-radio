@@ -1,0 +1,26 @@
+@page "/"
+@using Frontend.Services
+@inject IRadioApi Api
+@implements IDisposable
+
+<PageTitle>Post Radio</PageTitle>
+
+<TelegramLink />
+<ImagesView State="@_state" />
+<AudioPlayer State="@_state" />
+<SongDataView State="@_state" />
+<ControlsView State="@_state" />
+<SkipNotifications State="@_state" />
+<StartWait State="@_state" />
+
+@code {
+    private SessionState _state = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _state = new SessionState(Api);
+        await _state.LoadOptions();
+    }
+
+    public void Dispose() => _state.Dispose();
+}

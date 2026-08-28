@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Projects;
 using Silo = Projects.Silo;
-using Frontend = Projects.Server;
+using Frontend = Projects.Frontend;
 
 // AppHost is now dev-only: production runs through docker-compose.yaml + Coolify, which
 // does not boot this assembly. Anything that used to read prod-only env (COOLIFY_URL,

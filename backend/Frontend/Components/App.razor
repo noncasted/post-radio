@@ -1,0 +1,184 @@
+@using Microsoft.AspNetCore.Components.Web
+@inject SiteOptions Site
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Post Radio - онлайн-радио с непрерывным потоком музыки</title>
+    <base href="/" />
+    <link rel="canonical" href="@Site.Url("/")" />
+    <meta name="description" content="Post Radio - онлайн-радио: непрерывный музыкальный поток, плейлисты и обложки треков. Слушайте прямо в браузере, без регистрации и установки." />
+    <meta name="theme-color" content="#0a0a0f" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Post Radio" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:url" content="@Site.Url("/")" />
+    <meta property="og:title" content="Post Radio - онлайн-радио с непрерывным потоком музыки" />
+    <meta property="og:description" content="Непрерывный музыкальный поток, плейлисты и обложки треков. Слушайте прямо в браузере, без регистрации и установки." />
+    <meta property="og:image" content="@Site.Url("favicon.png")" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Post Radio - онлайн-радио с непрерывным потоком музыки" />
+    <meta name="twitter:description" content="Непрерывный музыкальный поток, плейлисты и обложки треков. Слушайте прямо в браузере, без регистрации и установки." />
+    <meta name="twitter:image" content="@Site.Url("favicon.png")" />
+
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <script type="application/ld+json">
+        {
+            "@@context": "https://schema.org",
+            "@@type": "RadioStation",
+            "name": "Post Radio",
+            "url": "@Site.Url("/")",
+            "inLanguage": "ru",
+            "description": "Онлайн-радио с непрерывным музыкальным потоком, плейлистами и обложками треков.",
+            "logo": "@Site.Url("favicon.png")"
+        }
+    </script>
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0f; color: #e8e8ef; font-family: system-ui, -apple-system, sans-serif; }
+        #app { min-height: 100%; }
+
+        #splash {
+            position: fixed; inset: 0; z-index: 200;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 70%);
+        }
+        #splash .ring {
+            width: 64px; height: 64px; border-radius: 50%;
+            margin-bottom: 1.25rem;
+            border: 3px solid rgba(120, 120, 220, 0.15);
+            border-top-color: #7a7aff;
+            animation: splash-spin 900ms linear infinite;
+        }
+        #splash .title {
+            font-size: 1.1rem; letter-spacing: 0.25em; text-transform: uppercase;
+            color: #a8a8c8; opacity: 0.85;
+            animation: splash-pulse 1.6s ease-in-out infinite;
+        }
+        /*
+            Crawler-visible copy. #splash is plain server-rendered markup outside the
+            interactive island, so it ships in the initial HTML of every response; the
+            hydration handler in radio-ui.js drops the whole node once the app paints.
+        */
+        #splash .seo {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+        @@keyframes splash-spin { to { transform: rotate(360deg); } }
+        @@keyframes splash-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        #blazor-error-ui {
+            background: lightyellow;
+            bottom: 0;
+            box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+            display: none;
+            left: 0;
+            padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+            position: fixed;
+            width: 100%;
+            z-index: 1000;
+        }
+        #blazor-error-ui .dismiss {
+            cursor: pointer;
+            position: absolute;
+            right: 0.75rem;
+            top: 0.5rem;
+        }
+
+        /*
+            A TV that fell asleep or blinked its Wi-Fi reconnects constantly. The default
+            full-screen "Attempting to reconnect" overlay would sit on top of the player,
+            so the reconnect UI is a small banner instead, and audio keeps playing under it.
+        */
+        #components-reconnect-modal {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(18, 18, 26, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #d8d8e8;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        #components-reconnect-modal.components-reconnect-show,
+        #components-reconnect-modal.components-reconnect-failed,
+        #components-reconnect-modal.components-reconnect-rejected {
+            display: block;
+        }
+        #components-reconnect-modal.components-reconnect-hide { display: none; }
+        #components-reconnect-modal .reconnect-failed { display: none; }
+        #components-reconnect-modal.components-reconnect-failed .reconnect-retrying,
+        #components-reconnect-modal.components-reconnect-rejected .reconnect-retrying { display: none; }
+        #components-reconnect-modal.components-reconnect-failed .reconnect-failed,
+        #components-reconnect-modal.components-reconnect-rejected .reconnect-failed { display: inline; }
+    </style>
+    <HeadOutlet @rendermode="RenderMode" />
+</head>
+<body>
+    <div id="app">
+        <Routes @rendermode="RenderMode" />
+    </div>
+
+    <div id="splash">
+        <div class="ring"></div>
+        <div class="title">Post Radio</div>
+        <div class="seo">
+            <h1>Post Radio - онлайн-радио</h1>
+            <p>
+                Post Radio - это непрерывный музыкальный поток, который играет прямо в браузере.
+                Переключайте плейлисты, смотрите обложки и данные текущего трека, пропускайте песни -
+                без регистрации, установки и рекламы.
+            </p>
+            <p>Если плеер не загрузился, включите JavaScript и обновите страницу.</p>
+        </div>
+    </div>
+
+    <div id="components-reconnect-modal">
+        <span class="reconnect-retrying">Соединение восстанавливается...</span>
+        <span class="reconnect-failed">Соединение потеряно. <a href="">Обновить</a></span>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">x</span>
+    </div>
+
+    <script src="js/radio-core.js"></script>
+    <script src="js/radio-player.js"></script>
+    <script src="js/radio-images.js"></script>
+    <script src="js/radio-ui.js"></script>
+    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script>
+        Blazor.start({
+            circuit: {
+                reconnectionOptions: {
+                    maxRetries: 100,
+                    retryIntervalMilliseconds: 2000
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
+@code {
+    /*
+        Prerendered so crawlers get the real page, not just the splash. Every JS call in
+        this app lives in OnAfterRenderAsync(firstRender), which Blazor does not invoke
+        during the prerender pass (there is no JS runtime yet) - it fires once, after the
+        circuit is up and the DOM is hydrated. That is the callback the player hangs off,
+        so prerendering costs nothing on the interop side.
+    */
+    private static readonly InteractiveServerRenderMode RenderMode = new(prerender: true);
+}

@@ -1,0 +1,193 @@
+@using Frontend.Services
+@using Microsoft.JSInterop
+@inject IRadioApi Api
+@inject IJSRuntime JS
+@inject ILogger<ImagesView> Logger
+@implements IAsyncDisposable
+
+@* Markup is static: radio-images.js owns src and opacity so the slideshow costs no round-trips. *@
+<div class="image-container">
+    <img id="image-a-left" class="image sub blurry" style="position: fixed; left: 0; z-index: -1" alt="" />
+    <img id="image-a-right" class="image sub blurry" style="position: fixed; left: 50%; z-index: -1" alt="" />
+    <img id="image-a-main" class="image main" style="z-index: 1" alt="" />
+    <img id="image-b-left" class="image sub blurry" style="position: fixed; left: 0; z-index: -1" alt="" />
+    <img id="image-b-right" class="image sub blurry" style="position: fixed; left: 50%; z-index: -1" alt="" />
+    <img id="image-b-main" class="image main" style="z-index: 1" alt="" />
+</div>
+
+<style>
+    .image-container {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #0a0a14;
+    }
+    .image {
+        position: absolute;
+        object-fit: cover;
+        object-position: center;
+        opacity: 0;
+    }
+    .sub { height: 100%; width: 50%; }
+    .main { height: 115%; }
+    .blurry { filter: blur(18px); }
+</style>
+
+@code {
+    [Parameter] public required SessionState State { get; set; }
+
+    private const int BatchSize = 24;
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(15);
+
+    private DotNetObjectReference<ImagesView>? _dotNetRef;
+    private CancellationTokenSource? _componentCts;
+    private int _totalImages;
+    private bool _disposed;
+
+    private CancellationToken Token => _componentCts?.Token ?? State.Token;
+
+    protected override void OnInitialized()
+    {
+        _componentCts = CancellationTokenSource.CreateLinkedTokenSource(State.Token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _disposed)
+            return;
+
+        _dotNetRef = DotNetObjectReference.Create(this);
+        var urls = await FetchBatch();
+
+        var options = new
+        {
+            intervalMs = State.Options.ImageSwitchIntervalMs,
+            fadeMs = State.Options.ImageFadeMs
+        };
+
+        await InvokeJs("radioImages.start", _dotNetRef, urls, options);
+
+        if (urls.Count == 0)
+            _ = RetryLater();
+    }
+
+    [JSInvokable]
+    public async Task OnImagesNeeded(int currentCount)
+    {
+        if (_disposed)
+            return;
+
+        var urls = await FetchBatch();
+
+        if (urls.Count == 0)
+        {
+            _ = RetryLater();
+            return;
+        }
+
+        await InvokeJs("radioImages.append", urls);
+    }
+
+    private async Task<IReadOnlyList<string>> FetchBatch()
+    {
+        if (_totalImages == 0)
+            _totalImages = await Api.GetImagesCount();
+
+        if (_totalImages == 0)
+            return Array.Empty<string>();
+
+        var urls = new List<string>(BatchSize);
+
+        for (var i = 0; i < BatchSize; i++)
+        {
+            if (_disposed || Token.IsCancellationRequested)
+                break;
+
+            var index = State.IncImageIndex(_totalImages);
+            var url = await Api.GetImageUrl(index);
+
+            if (!string.IsNullOrWhiteSpace(url))
+                urls.Add(url);
+        }
+
+        return urls;
+    }
+
+    private async Task RetryLater()
+    {
+        try
+        {
+            await Task.Delay(RetryDelay, Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (_disposed)
+            return;
+
+        _totalImages = 0;
+        var urls = await FetchBatch();
+
+        if (urls.Count == 0)
+        {
+            _ = RetryLater();
+            return;
+        }
+
+        await InvokeJs("radioImages.append", urls);
+    }
+
+    private async Task InvokeJs(string identifier, params object?[] args)
+    {
+        if (_disposed)
+            return;
+
+        try
+        {
+            await JS.InvokeVoidAsync(identifier, args);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning(e, "[ImagesView] JS call failed identifier={Identifier}", identifier);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        _componentCts?.Cancel();
+
+        try
+        {
+            await JS.InvokeVoidAsync("radioImages.dispose");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
+        }
+
+        _dotNetRef?.Dispose();
+        _componentCts?.Dispose();
+    }
+}

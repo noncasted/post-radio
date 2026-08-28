@@ -58,8 +58,8 @@ services:
     build:
       dockerfile: ./backend/Orchestration/Dockerfile.prebuilt
       args:
-        PUBLISH_DIR: publish/Frontend.Server
-        ASSEMBLY_NAME: Frontend.Server
+        PUBLISH_DIR: publish/Frontend
+        ASSEMBLY_NAME: Frontend
     ports:
       - "7103:8080"
 

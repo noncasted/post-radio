@@ -215,7 +215,7 @@ services:
     build:
       <<: *service-build
       args:
-        ASSEMBLY_NAME: Frontend.Server
+        ASSEMBLY_NAME: Frontend
     image: post-radio/frontend:latest
     environment:
       ASPNETCORE_ENVIRONMENT: Production

@@ -1,0 +1,34 @@
+@inherits LayoutComponentBase
+@inject IJSRuntime JS
+
+<div class="app-root">
+    @Body
+</div>
+
+<style>
+    .app-root {
+        position: fixed;
+        inset: 0;
+        background: #0a0a14;
+        color: #fff;
+        font-family: system-ui, -apple-system, sans-serif;
+        overflow: hidden;
+    }
+</style>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        // The circuit is up and the app has painted: drop the pre-hydration splash.
+        try
+        {
+            await JS.InvokeVoidAsync("radioUi.ready");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

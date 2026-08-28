@@ -30,7 +30,7 @@ COPY --parents \
 RUN dotnet restore backend/Orchestration/Silo/Silo.csproj \
  && dotnet restore backend/Orchestration/Coordinator/Coordinator.csproj \
  && dotnet restore backend/Orchestration/MetaGateway/MetaGateway.csproj \
- && dotnet restore backend/Frontend/Server/Server.csproj \
+ && dotnet restore backend/Frontend/Frontend.csproj \
  && dotnet restore backend/Orchestration/ConsoleGateway/ConsoleGateway.csproj \
  && dotnet restore backend/Tools/DeploySetup/DeploySetup.csproj
 
@@ -46,7 +46,7 @@ RUN set -e; \
       "backend/Orchestration/Silo/Silo.csproj:Silo" \
       "backend/Orchestration/Coordinator/Coordinator.csproj:Coordinator" \
       "backend/Orchestration/MetaGateway/MetaGateway.csproj:MetaGateway" \
-      "backend/Frontend/Server/Server.csproj:Frontend.Server" \
+      "backend/Frontend/Frontend.csproj:Frontend" \
       "backend/Orchestration/ConsoleGateway/ConsoleGateway.csproj:ConsoleGateway" \
       "backend/Tools/DeploySetup/DeploySetup.csproj:DeploySetup"; do \
       proj=${pair%:*}; name=${pair##*:}; \

@@ -29,7 +29,7 @@
         <ProjectReference Include="..\Coordinator\Coordinator.csproj"/>
         <ProjectReference Include="..\MetaGateway\MetaGateway.csproj"/>
         <ProjectReference Include="..\Silo\Silo.csproj"/>
-        <ProjectReference Include="..\..\Frontend\Server\Server.csproj"/>
+        <ProjectReference Include="..\..\Frontend\Frontend.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
