@@ -140,15 +140,17 @@
         _fetchedPlaylists = fetched;
         _playlists = fetched.Prepend(AllPlaylist).ToList();
 
-        var first = _playlists.Last();
-        _selectedId = first.Id;
+        // "All" is the default: it spans every playlist, so a first-time listener gets
+        // the widest rotation instead of whichever playlist happens to be last.
+        var selected = AllPlaylist;
+        _selectedId = selected.Id;
 
         // Loading a playlist's songs is playback work: pointless on a crawl, and the
         // prerendered frame is replaced the moment the circuit comes up.
         if (!RendererInfo.IsInteractive)
             return;
 
-        await State.SetPlaylist(first);
+        await State.SetPlaylist(selected);
     }
 
     private Task PersistPlaylists()
