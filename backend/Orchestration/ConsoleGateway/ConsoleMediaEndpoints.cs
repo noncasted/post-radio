@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Common;
+using Meta.Audio;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 
@@ -8,6 +9,7 @@ namespace ConsoleGateway;
 public static class ConsoleMediaEndpoints
 {
     private const long MaxImageUploadBytes = 250L * 1024L * 1024L;
+    private const long MaxAudioUploadBytes = 80L * 1024L * 1024L;
     private const long MultipartOverheadBytes = 1024L * 1024L;
 
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
@@ -25,6 +27,13 @@ public static class ConsoleMediaEndpoints
         group.MapGet("/images/selected.zip", DownloadSelectedImages);
         group.MapGet("/images/{key}/download", DownloadImageFile);
         group.MapGet("/images/{key}", GetImageFile);
+
+        group.MapGet("/audio/missing", ListMissingAudio);
+        group.MapPost("/audio/upload", UploadAudio)
+             .DisableAntiforgery()
+             .WithMetadata(
+                 new RequestSizeLimitAttribute(MaxAudioUploadBytes + MultipartOverheadBytes),
+                 new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxAudioUploadBytes + MultipartOverheadBytes });
 
         return builder;
     }
@@ -61,6 +70,97 @@ public static class ConsoleMediaEndpoints
         {
             return Results.BadRequest(new { error = ex.Message });
         }
+    }
+
+    private static IResult ListMissingAudio([FromServices] ISongsCollection songs)
+    {
+        var missing = songs
+            .Where(kv => AudioTrackValidation.IsLoadCandidate(kv.Value.IsLoaded, kv.Value.IsValid, kv.Value.DurationMs))
+            .Select(kv => new
+            {
+                Id = kv.Key,
+                Author = kv.Value.Author,
+                Name = kv.Value.Name,
+                Url = kv.Value.Url,
+                DurationMs = kv.Value.DurationMs,
+                IsLoaded = kv.Value.IsLoaded,
+                IsValid = kv.Value.IsValid,
+                IsSnipped = kv.Value.IsSnipped
+            })
+            .OrderBy(song => song.Author, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(song => song.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Results.Ok(missing);
+    }
+
+    private static async Task<IResult> UploadAudio(
+        [FromServices] IPlaylistLoader loader,
+        HttpRequest request)
+    {
+        if (!request.HasFormContentType)
+            return Results.BadRequest(new { error = "Expected multipart form data." });
+
+        var form = await request.ReadFormAsync();
+        var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+        if (file == null)
+            return Results.BadRequest(new { error = "No file was uploaded." });
+
+        if (file.Length <= 0)
+            return Results.BadRequest(new { error = "Uploaded file is empty." });
+
+        if (file.Length > MaxAudioUploadBytes)
+            return Results.BadRequest(new { error = "Uploaded audio is too large." });
+
+        var contentType = file.ContentType ?? string.Empty;
+        if (!string.IsNullOrEmpty(contentType) &&
+            !contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) &&
+            !contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase))
+            return Results.BadRequest(new { error = $"Uploaded file is not audio. Content-Type: {contentType}" });
+
+        if (!TryResolveSongId(form, file, out var songId, out var idError))
+            return Results.BadRequest(new { error = idError });
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var imported = await loader.ImportAudio(songId, stream);
+            return Results.Ok(new
+            {
+                imported.Id,
+                imported.Author,
+                imported.Name,
+                imported.DurationMs,
+                imported.IsValid,
+                SizeBytes = file.Length
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+    }
+
+    private static bool TryResolveSongId(IFormCollection form, IFormFile file, out long songId, out string error)
+    {
+        songId = 0;
+        error = string.Empty;
+
+        var idValue = form["id"].ToString();
+        if (!string.IsNullOrWhiteSpace(idValue))
+        {
+            if (long.TryParse(idValue, out songId) && songId > 0)
+                return true;
+
+            error = $"Invalid song id: {idValue}";
+            return false;
+        }
+
+        if (AudioImportFileName.TryParseSongId(file.FileName, out songId))
+            return true;
+
+        error = "File name must be {id}.mp3, for example 1820897418.mp3.";
+        return false;
     }
 
     private static IResult GetImageFile([FromServices] IMediaStorage storage, string key)

@@ -28,6 +28,10 @@
                         <LucideIcon Name="cloud-download" Size="14" class="mr-1" />
                         <span>Load audio</span>
                     </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Disabled="@(_busy || _isUploading)" @onclick="OpenUpload">
+                        <LucideIcon Name="upload" Size="14" class="mr-1" />
+                        <span>Upload mp3</span>
+                    </BbButton>
                 </div>
             </div>
 
@@ -112,11 +116,77 @@
     <SongsList Source="@_sorted" ShowUrl="true" ShowDate="true" EmptyText="No songs yet" />
 </div>
 
+@if (_isUploadOpen)
+{
+    <div class="audio-upload-overlay fixed inset-0 z-50 flex items-center justify-center p-4" @onclick="CloseUpload">
+        <div class="w-full max-w-lg rounded-lg border bg-card shadow-lg" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b px-4 py-3">
+                <div>
+                    <h2 class="text-sm font-semibold">Upload audio</h2>
+                    <div class="text-xs text-muted-foreground">Files must be named @("{id}.mp3"), e.g. 1820897418.mp3</div>
+                </div>
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" Disabled="@_isUploading" @onclick="CloseUpload">
+                    <LucideIcon Name="x" Size="16" />
+                </BbButton>
+            </div>
+            <div class="p-4 flex flex-col gap-3">
+                <label class="rounded-md border border-dashed p-4 cursor-pointer hover:bg-muted/40">
+                    <div class="text-sm font-medium">Upload files</div>
+                    <div class="text-xs text-muted-foreground">Select one or more mp3 files</div>
+                    <input id="@FilesUploadInputId"
+                           class="mt-2 block w-full text-xs"
+                           type="file"
+                           accept=".mp3,audio/mpeg"
+                           multiple
+                           disabled="@_isUploading" />
+                </label>
+                <label class="rounded-md border border-dashed p-4 cursor-pointer hover:bg-muted/40">
+                    <div class="text-sm font-medium">Upload a folder</div>
+                    <div class="text-xs text-muted-foreground">All @("{id}.mp3") files in the folder</div>
+                    <input id="@FolderUploadInputId"
+                           class="mt-2 block w-full text-xs"
+                           type="file"
+                           accept=".mp3,audio/mpeg"
+                           multiple
+                           webkitdirectory="webkitdirectory"
+                           directory="directory"
+                           disabled="@_isUploading" />
+                </label>
+                @if (_isUploading || _uploadBytesTotal > 0)
+                {
+                    <div class="flex flex-col gap-1 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span>@_uploadStatus</span>
+                            <span class="font-mono">@UploadPercent.ToString("0")%</span>
+                        </div>
+                        <div class="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div class="h-full rounded-full bg-primary transition-all duration-150" style="width: @UploadPercent%"></div>
+                        </div>
+                        <div class="flex justify-between text-muted-foreground">
+                            <span class="min-w-0 truncate">@_uploadFileName</span>
+                            <span class="shrink-0 font-mono">@FormatBytes(_uploadBytesDone) / @FormatBytes(_uploadBytesTotal)</span>
+                        </div>
+                    </div>
+                }
+                <div class="flex justify-end">
+                    <BbButton Variant="ButtonVariant.Ghost" Disabled="@_isUploading" @onclick="CloseUpload">Close</BbButton>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Inject] public required ISongsCollection Collection { get; init; }
     [Inject] public required IPlaylistLoader Loader { get; init; }
     [Inject] public required ISongDataLookup Lookup { get; init; }
     [Inject] public required IJSRuntime JS { get; init; }
+
+    private const int MaxUploadFiles = 5000;
+    private const long MaxUploadFileSize = 80L * 1024L * 1024L;
+    private const string FilesUploadInputId = "songs-files-upload-input";
+    private const string FolderUploadInputId = "songs-folder-upload-input";
+    private const string UploadEndpoint = "/console/media/audio/upload";
 
     private readonly ILifetime _lifetime = new Lifetime();
 
@@ -127,6 +197,18 @@
     private bool _busy;
     private string _status = string.Empty;
     private string _log = string.Empty;
+    private DotNetObjectReference<Songs>? _uploadCallback;
+    private bool _isUploadOpen;
+    private bool _isUploading;
+    private bool _uploadInputsRegistered;
+    private string _uploadStatus = string.Empty;
+    private string _uploadFileName = string.Empty;
+    private long _uploadBytesDone;
+    private long _uploadBytesTotal;
+
+    private double UploadPercent => _uploadBytesTotal == 0
+        ? 0
+        : Math.Clamp(_uploadBytesDone * 100.0 / _uploadBytesTotal, 0, 100);
 
     private enum SortBy { Name, AddDate, Duration, InvalidAuthor, InvalidTime }
 
@@ -209,6 +291,118 @@
         Collection.Updated.Advise(_lifetime, () => InvokeAsync(() => { Reload(); StateHasChanged(); }));
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_isUploadOpen || _uploadInputsRegistered)
+            return;
+
+        _uploadCallback ??= DotNetObjectReference.Create(this);
+
+        try
+        {
+            await JS.InvokeVoidAsync("registerAudioUploadInput", FilesUploadInputId, UploadEndpoint, _uploadCallback, MaxUploadFileSize, MaxUploadFiles);
+            await JS.InvokeVoidAsync("registerAudioUploadInput", FolderUploadInputId, UploadEndpoint, _uploadCallback, MaxUploadFileSize, MaxUploadFiles);
+            _uploadInputsRegistered = true;
+        }
+        catch (Exception ex)
+        {
+            _status = "Failed: " + ex.Message;
+            _log = $"[Songs] Upload picker initialization failed: {ex.Message}";
+        }
+    }
+
+    private void OpenUpload()
+    {
+        ResetUploadProgress();
+        _isUploadOpen = true;
+        _uploadInputsRegistered = false;
+    }
+
+    private void CloseUpload()
+    {
+        if (_isUploading)
+            return;
+
+        _isUploadOpen = false;
+        _uploadInputsRegistered = false;
+    }
+
+    [JSInvokable]
+    public Task OnHttpUploadStarted(int fileCount, long totalBytes)
+    {
+        _isUploading = true;
+        _uploadBytesDone = 0;
+        _uploadBytesTotal = totalBytes;
+        _uploadStatus = $"Preparing {fileCount} file(s)...";
+        _uploadFileName = string.Empty;
+        _status = "Uploading audio";
+        _log = string.Empty;
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnHttpUploadProgress(long bytesDone, long totalBytes, int fileIndex, int fileCount, string fileName)
+    {
+        if (!_isUploading && _uploadBytesTotal > 0)
+            return Task.CompletedTask;
+
+        _isUploading = true;
+        _uploadBytesDone = Math.Clamp(bytesDone, 0, totalBytes);
+        _uploadBytesTotal = totalBytes;
+        _uploadStatus = $"Uploading {fileIndex} of {fileCount}";
+        _uploadFileName = $"{fileIndex} / {fileCount}: {fileName}";
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnHttpUploadCompleted(int uploaded, int failed, string errorMessage)
+    {
+        _isUploading = false;
+        _uploadBytesDone = _uploadBytesTotal;
+        _uploadStatus = $"Uploaded {uploaded} file(s)" + (failed > 0 ? $", failed {failed}" : "");
+        _uploadFileName = failed > 0 ? "Finished with errors" : "Finished";
+        _status = failed > 0 ? "Upload finished with errors" : "Success";
+        _log = string.IsNullOrWhiteSpace(errorMessage)
+            ? _uploadStatus
+            : $"{_uploadStatus}\n{errorMessage}";
+        Reload();
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnHttpUploadFailed(string errorMessage)
+    {
+        _isUploading = false;
+        _status = "Failed: " + errorMessage;
+        _log = $"[Songs] Upload failed: {errorMessage}";
+        _uploadStatus = "Upload failed";
+        _uploadFileName = string.Empty;
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void ResetUploadProgress()
+    {
+        _uploadStatus = string.Empty;
+        _uploadFileName = string.Empty;
+        _uploadBytesDone = 0;
+        _uploadBytesTotal = 0;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+
+        if (bytes < 1024 * 1024)
+            return $"{bytes / 1024.0:0.#} KB";
+
+        return $"{bytes / (1024.0 * 1024.0):0.#} MB";
+    }
+
     private void Reload()
     {
         for (var attempt = 0; attempt < 5; attempt++)
@@ -282,5 +476,15 @@
             song.Value.DurationMs);
     }
 
-    public void Dispose() => _lifetime.Terminate();
+    public void Dispose()
+    {
+        _uploadCallback?.Dispose();
+        _lifetime.Terminate();
+    }
 }
+
+<style>
+    .audio-upload-overlay {
+        background: rgba(0, 0, 0, 0.6);
+    }
+</style>

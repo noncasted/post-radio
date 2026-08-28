@@ -16,9 +16,12 @@ public interface IPlaylistLoader
     Task Load(PlaylistData playlist, IOperationProgress progress);
     Task LoadAll(IOperationProgress progress);
     Task<SongDownloadResult> DownloadSong(long id, SongState state, Track? track = null, CancellationToken cancellationToken = default);
+    Task<SongImportResult> ImportAudio(long id, Stream stream, CancellationToken cancellationToken = default);
 }
 
 public sealed record SongDownloadResult(long? SoundCloudDurationMs, TimeSpan? LocalDuration);
+
+public sealed record SongImportResult(long Id, string Author, string Name, long? DurationMs, bool IsValid);
 
 public class PlaylistLoader : IPlaylistLoader
 {
@@ -405,6 +408,36 @@ public class PlaylistLoader : IPlaylistLoader
 
         var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
         return new SongDownloadResult(GetTrackDurationMs(track), localDuration);
+    }
+
+    public async Task<SongImportResult> ImportAudio(
+        long id,
+        Stream stream,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_songs.TryGetValue(id, out var state))
+            throw new InvalidOperationException($"Song {id} is not in the collection");
+
+        await _mediaStorage.SaveAudio(id, stream, cancellationToken);
+
+        var localDuration = await AudioDurationReader.TryReadDuration(_mediaStorage.GetAudioPath(id), cancellationToken);
+        var durationMs = ToDurationMs(localDuration);
+        var isValid = AudioTrackValidation.IsValidLocalDuration(localDuration);
+
+        await _orleans.GetGrain<ISong>(id).SetAudioData(true, durationMs, isValid);
+
+        if (isValid && state.IsSnipped)
+            await _orleans.GetGrain<ISong>(id).SetSnipped(false);
+
+        _logger.LogInformation(
+            "[Audio] Imported {SongId} {Author} - {Name}: duration={Duration}, valid={IsValid}",
+            id,
+            state.Author,
+            state.Name,
+            FormatDuration(localDuration),
+            isValid);
+
+        return new SongImportResult(id, state.Author, state.Name, durationMs, isValid);
     }
 
     // Logged once per run so a scan result can be read against the session it

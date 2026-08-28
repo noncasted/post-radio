@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The SoundCloud DRM Wall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:   #F6F8FA;
+    --surface:  #FFFFFF;
+    --sunken:   #EEF2F6;
+    --ink:      #15202B;
+    --muted:    #56697A;
+    --faint:    #8195A6;
+    --line:     #DCE4EC;
+    --rule:     #C3D0DB;
+    --ok:       #1B7566;
+    --ok-bg:    #E2F1ED;
+    --blocked:  #A33A2B;
+    --blocked-bg:#F8E7E3;
+    --warn:     #8A5E14;
+    --warn-bg:  #F7EEDC;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0E141A;
+      --surface:  #151D25;
+      --sunken:   #1B242D;
+      --ink:      #E3EAF1;
+      --muted:    #95A6B6;
+      --faint:    #6F8294;
+      --line:     #253340;
+      --rule:     #34455470;
+      --ok:       #4FC0A9;
+      --ok-bg:    #12302B;
+      --blocked:  #E4735E;
+      --blocked-bg:#361C18;
+      --warn:     #D7A241;
+      --warn-bg:  #33280F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0E141A;
+    --surface:  #151D25;
+    --sunken:   #1B242D;
+    --ink:      #E3EAF1;
+    --muted:    #95A6B6;
+    --faint:    #6F8294;
+    --line:     #253340;
+    --rule:     #34455470;
+    --ok:       #4FC0A9;
+    --ok-bg:    #12302B;
+    --blocked:  #E4735E;
+    --blocked-bg:#361C18;
+    --warn:     #D7A241;
+    --warn-bg:  #33280F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78ch;
+    margin: 0 auto;
+    padding: 72px 28px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 14px;
+  }
+
+  h1 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.1rem, 5.4vw, 3.1rem);
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+
+  .standfirst {
+    font-size: 1.13rem;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  h2 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    letter-spacing: -0.008em;
+    text-wrap: balance;
+    margin: 0 0 6px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  h3 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 1.06rem;
+    margin: 0 0 4px;
+  }
+
+  section { display: flex; flex-direction: column; gap: 16px; }
+  p { margin: 0; max-width: 66ch; }
+  strong { font-weight: 600; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.875em;
+    background: var(--sunken);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+  }
+
+  /* ---- pipeline stages ---- */
+  .stages { display: flex; flex-direction: column; gap: 2px; }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr;
+    gap: 16px;
+    padding: 18px 20px 18px 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  .stage + .stage { border-top: none; }
+  .stage:first-child { border-radius: 6px 6px 0 0; }
+  .stage:last-child  { border-radius: 0 0 6px 6px; }
+
+  .stage-n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--faint);
+    padding-top: 1px;
+  }
+  .stage-body { display: flex; flex-direction: column; gap: 6px; }
+  .stage p { font-size: 0.95rem; color: var(--muted); }
+
+  .stage.is-break { background: var(--blocked-bg); border-color: var(--blocked); position: relative; }
+  .stage.is-break + .stage { border-top: 1px solid var(--line); }
+  .stage.is-break .stage-n { color: var(--blocked); }
+
+  .verdict {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+  .v-ok      { background: var(--ok-bg);      color: var(--ok); }
+  .v-blocked { background: var(--blocked-bg); color: var(--blocked); border: 1px solid var(--blocked); }
+  .v-warn    { background: var(--warn-bg);    color: var(--warn); }
+
+  /* ---- figure ---- */
+  figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .fig-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 22px 18px; }
+  svg { display: block; max-width: 100%; height: auto; min-width: 620px; margin: 0 auto; }
+  figcaption { font-size: 0.875rem; color: var(--faint); max-width: 64ch; }
+
+  /* ---- table ---- */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 560px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  thead th {
+    font-family: "IBM Plex Sans Condensed", sans-serif;
+    font-weight: 600; font-size: 0.8rem;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--faint); background: var(--sunken);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, td.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .pill {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+  }
+
+  /* ---- callout ---- */
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: 0 6px 6px 0;
+    padding: 18px 22px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .callout.is-hard { border-left-color: var(--blocked); }
+
+  ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 7px; max-width: 66ch; }
+  li::marker { color: var(--faint); }
+
+  .tally { display: flex; flex-wrap: wrap; gap: 2px; }
+  .tally-cell {
+    flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+    padding: 16px 18px; display: flex; flex-direction: column; gap: 3px;
+  }
+  .tally-cell:first-child { border-radius: 6px 0 0 6px; }
+  .tally-cell:last-child  { border-radius: 0 6px 6px 0; }
+  .tally-n {
+    font-family: "IBM Plex Sans Condensed", sans-serif;
+    font-size: 2rem; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .tally-l { font-size: 0.82rem; color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); padding-top: 20px; font-size: 0.85rem; color: var(--faint); }
+</style>
+
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">post-radio · audio pipeline</p>
+    <h1>The SoundCloud DRM Wall</h1>
+    <p class="standfirst">Around 200 tracks stopped downloading. It looked like a regional block for a week of debugging, and a proxy would have fixed that. It is not a regional block — SoundCloud retired the unencrypted renditions for this content, and no exit country brings them back.</p>
+  </header>
+
+  <section>
+    <h2>Where it actually breaks</h2>
+    <p>Downloading a track is four hops. The first two always succeed, which is why the failure was hard to place — the metadata keeps advertising a plain audio file long after that file stops existing.</p>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 940 400" role="img" aria-label="Two paths from track metadata: the plain progressive rendition dies with a 404 when resolving its media URL, while the encrypted HLS rendition resolves and downloads but needs a Widevine key that only a browser DRM module can obtain.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="ar-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#A33A2B"/>
+            </marker>
+          </defs>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor">
+
+            <!-- start -->
+            <rect x="16" y="164" width="152" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <text x="92" y="190" text-anchor="middle" font-size="11.5">GET /tracks/{id}</text>
+            <text x="92" y="208" text-anchor="middle" font-size="10.5" opacity="0.65">metadata + policy</text>
+            <text x="92" y="150" text-anchor="middle" font-size="10.5" fill="#1B7566">always 200</text>
+
+            <!-- fan out -->
+            <path d="M 168 186 C 190 186 190 92 208 92" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+            <path d="M 168 208 C 190 208 190 302 208 302" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+
+            <!-- LANE A: plain -->
+            <rect x="212" y="60" width="152" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <text x="288" y="86" text-anchor="middle" font-size="11.5">progressive / hls</text>
+            <text x="288" y="104" text-anchor="middle" font-size="10.5" opacity="0.65">plain, unencrypted</text>
+
+            <line x1="364" y1="93" x2="404" y2="93" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+
+            <rect x="408" y="60" width="152" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <text x="484" y="86" text-anchor="middle" font-size="11.5">resolve media</text>
+            <text x="484" y="104" text-anchor="middle" font-size="10.5" opacity="0.65">stream endpoint</text>
+
+            <line x1="560" y1="93" x2="600" y2="93" stroke="#A33A2B" stroke-width="1.5" marker-end="url(#ar-b)"/>
+
+            <rect x="604" y="60" width="200" height="66" rx="5" fill="#F8E7E3" stroke="#A33A2B" stroke-width="1.5"/>
+            <text x="704" y="86" text-anchor="middle" font-size="12" fill="#A33A2B" font-weight="500">404</text>
+            <text x="704" y="105" text-anchor="middle" font-size="10.5" fill="#A33A2B">rendition retired</text>
+
+            <text x="288" y="40" text-anchor="middle" font-size="10.5" opacity="0.7">what our loader wants</text>
+
+            <!-- LANE B: encrypted -->
+            <rect x="212" y="270" width="152" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <text x="288" y="296" text-anchor="middle" font-size="11.5">cbcs / cenc hls</text>
+            <text x="288" y="314" text-anchor="middle" font-size="10.5" opacity="0.65">AES-encrypted</text>
+
+            <line x1="364" y1="303" x2="404" y2="303" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+
+            <rect x="408" y="270" width="152" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <text x="484" y="296" text-anchor="middle" font-size="11.5">resolve media</text>
+            <text x="484" y="314" text-anchor="middle" font-size="10.5" fill="#1B7566">200</text>
+
+            <line x1="560" y1="303" x2="600" y2="303" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+
+            <rect x="604" y="270" width="152" height="66" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <text x="680" y="296" text-anchor="middle" font-size="11.5">segments</text>
+            <text x="680" y="314" text-anchor="middle" font-size="10.5" fill="#1B7566">200 · ciphertext</text>
+
+            <!-- the wall -->
+            <line x1="800" y1="248" x2="800" y2="358" stroke="#A33A2B" stroke-width="2" stroke-dasharray="5 4"/>
+            <text x="800" y="240" text-anchor="middle" font-size="10.5" fill="#A33A2B">key wall</text>
+
+            <line x1="756" y1="303" x2="794" y2="303" stroke="#A33A2B" stroke-width="1.5" marker-end="url(#ar-b)"/>
+
+            <rect x="812" y="270" width="112" height="66" rx="5" fill="#F8E7E3" stroke="#A33A2B" stroke-width="1.5"/>
+            <text x="868" y="292" text-anchor="middle" font-size="11" fill="#A33A2B" font-weight="500">AES key</text>
+            <text x="868" y="309" text-anchor="middle" font-size="10" fill="#A33A2B">Widevine</text>
+            <text x="868" y="323" text-anchor="middle" font-size="10" fill="#A33A2B">CDM only</text>
+
+            <text x="288" y="368" text-anchor="middle" font-size="10.5" opacity="0.7">what the web player uses</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Both lanes start from the same metadata response. The plain lane dies at hop 3; the encrypted lane completes every HTTP hop and fails on a key that never travels over HTTP.</figcaption>
+    </figure>
+
+    <div class="stages">
+      <div class="stage">
+        <div class="stage-n">01</div>
+        <div class="stage-body">
+          <h3>Fetch track metadata</h3>
+          <p><code>GET /tracks/{id}</code> returns the policy, the real duration, and the list of transcodings. This always works, from every region tested.</p>
+          <span class="verdict v-ok">passes</span>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-n">02</div>
+        <div class="stage-body">
+          <h3>Pick a transcoding</h3>
+          <p>Our loader takes the first non-snipped <code>progressive</code> entry. It is listed, it is marked <code>snipped: false</code>, and its duration matches the full track — so selection succeeds and looks entirely healthy.</p>
+          <span class="verdict v-ok">passes</span>
+        </div>
+      </div>
+      <div class="stage is-break">
+        <div class="stage-n">03</div>
+        <div class="stage-body">
+          <h3>Resolve the media URL — this is the break</h3>
+          <p>Asking that transcoding for its CDN link returns <code>404 {}</code>. The entry in the metadata is a leftover: SoundCloud kept advertising it after removing the file behind it. Only the <code>cbcs</code> / <code>cenc</code> entries resolve.</p>
+          <span class="verdict v-blocked">404 · plain renditions gone</span>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-n">04</div>
+        <div class="stage-body">
+          <h3>Download the bytes</h3>
+          <p>Reachable only via the encrypted lane. The segments download fine, but they are ciphertext. The key sits behind a license server that hands it to a certified decryption module inside the browser — never to an HTTP client.</p>
+          <span class="verdict v-blocked">unreadable without DRM</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two different failures wearing one mask</h2>
+    <p>The confusing part was that the same tracks reported two different things depending on where the request came from. They are two faces of one migration.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Exit</th><th>Policy</th><th>Transcodings</th><th>Plain lane</th><th>Verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">PL</td><td class="mono">SNIP</td><td class="num">2</td>
+            <td class="mono">snipped, 0:30</td>
+            <td><span class="pill v-blocked">preview only</span></td>
+          </tr>
+          <tr>
+            <td class="mono">KZ <span style="opacity:.6">prod</span></td><td class="mono">SNIP</td><td class="num">2</td>
+            <td class="mono">snipped, 0:30</td>
+            <td><span class="pill v-blocked">preview only</span></td>
+          </tr>
+          <tr>
+            <td class="mono">DE</td><td class="mono">MONETIZE</td><td class="num">8</td>
+            <td class="mono">404</td>
+            <td><span class="pill v-blocked">DRM only</span></td>
+          </tr>
+          <tr>
+            <td class="mono">CH</td><td class="mono">MONETIZE</td><td class="num">8</td>
+            <td class="mono">404</td>
+            <td><span class="pill v-blocked">DRM only</span></td>
+          </tr>
+          <tr>
+            <td class="mono">US</td><td class="mono">MONETIZE</td><td class="num">8</td>
+            <td class="mono">404</td>
+            <td><span class="pill v-blocked">DRM only</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>In an unlicensed region</strong> the API hides the track behind <code>policy: SNIP</code> and serves a 30-second preview. SoundCloud's own player says it plainly: <em>Not available in Poland</em>. This part really is regional, and a proxy really would lift it.</p>
+    <p><strong>In a licensed region</strong> the block lifts and the full track appears — as four encrypted renditions. The unencrypted ones are listed but return 404. So changing region moves a track from one dead end to another.</p>
+  </section>
+
+  <section>
+    <h2>Why no proxy, VPN or local client fixes it</h2>
+    <p>The two failures need very different things, and only one of them is solvable by moving the request.</p>
+    <div class="callout">
+      <h3>SNIP is a policy flag</h3>
+      <p>A field in a JSON response. The server decides by IP what to show you. Nothing is encrypted — change the exit country and the field changes with it.</p>
+    </div>
+    <div class="callout is-hard">
+      <h3>DRM is cryptography</h3>
+      <p>The audio is AES-encrypted at rest on the CDN. The manifest carries an <code>#EXT-X-KEY</code> pointer to a license server, which releases the key only to Widevine, FairPlay or PlayReady after verifying the module's signature. Decryption happens inside that closed module and the decoded audio is never exposed to the page.</p>
+      <p>A proxy, a VPN, an OAuth token, or a downloader running on your own machine all issue ordinary HTTP requests. Every one of them receives the same ciphertext and none can obtain the key.</p>
+    </div>
+    <p>This is also why the plan to route downloads through a home machine would not have helped: it changes the exit IP, which was never the binding constraint for these tracks.</p>
+  </section>
+
+  <section>
+    <h2>What this costs, concretely</h2>
+    <p>Measured across the 273 tracks of <em>post radio alternative</em> by resolving every transcoding rather than trusting the metadata.</p>
+    <div class="tally">
+      <div class="tally-cell">
+        <div class="tally-n" style="color: var(--ok)">172</div>
+        <div class="tally-l">still download — old plain rendition alive</div>
+      </div>
+      <div class="tally-cell">
+        <div class="tally-n" style="color: var(--blocked)">80</div>
+        <div class="tally-l">preview only in this region</div>
+      </div>
+      <div class="tally-cell">
+        <div class="tally-n" style="color: var(--blocked)">15</div>
+        <div class="tally-l">migrated to DRM, plain lane 404</div>
+      </div>
+      <div class="tally-cell">
+        <div class="tally-n" style="color: var(--warn)">6</div>
+        <div class="tally-l">no transcodings at all</div>
+      </div>
+    </div>
+    <p>In production the same pattern covers 204 of 1002 stored songs, most of them holding a saved 30-second preview from before the check existed. The trend runs one way: SoundCloud is moving monetized catalogue onto encrypted HLS, so the 172 is a number that shrinks over time. That is not something the code can defend against.</p>
+  </section>
+
+  <section>
+    <h2>What the investigation changed in the code</h2>
+    <ul>
+      <li><strong>Snipped is now its own outcome.</strong> <code>SoundCloudSnippedTrackException</code> separates "restricted for this session" from "track is broken", so a regional block no longer looks like corruption.</li>
+      <li><strong>Songs carry <code>IsSnipped</code>.</strong> A restricted track stays a retry candidate and clears itself on the first successful download, instead of being written off permanently.</li>
+      <li><strong>Every run prints its session.</strong> <code>SoundCloudSessionProbe</code> reports the resolved region, whether authorization reached the runtime, and the policy for a probe track — this is what finally showed production egressing from <code>KZ</code>.</li>
+      <li><strong>Load retries everything unplayable.</strong> <code>IsLoadCandidate</code> now includes stored files under 31 seconds, which had been silently skipped — 204 tracks in production had never been reconsidered.</li>
+      <li><strong>Proxy and authorization are wired end to end</strong>, dev and prod, through <code>Audio__Socks5Proxy</code> and <code>Audio__SoundCloudAuthorization</code>. Useful for genuinely regional tracks, useless against DRM.</li>
+    </ul>
+    <div class="callout">
+      <h3>Worth doing next</h3>
+      <p>Split a <code>DrmOnly</code> outcome away from <code>Snipped</code>. Right now the DRM-migrated tracks are retried on every load and fail every time. A track whose only resolvable renditions are <code>*-encrypted-hls</code> is permanently out of reach and should be recorded as such, not retried forever.</p>
+    </div>
+  </section>
+
+  <footer>
+    Findings verified by resolving individual transcodings against api-v2 from five exits (PL, KZ, DE, CH, US) and confirmed against SoundCloud's own web player. Track sample: <span style="font-family:'IBM Plex Mono',monospace">1820897418</span> and seven others from the same playlist.
+  </footer>
+
+</div>
+
+</body>
+</html>

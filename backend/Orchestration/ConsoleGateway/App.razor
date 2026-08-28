@@ -171,6 +171,110 @@
                 return request.responseText || `HTTP ${request.status}`;
             }
         };
+
+        window.registerAudioUploadInput = (inputId, endpoint, dotNetHelper, maxFileSize, maxFileCount) => {
+            const input = document.getElementById(inputId);
+            if (!input) {
+                throw new Error(`Upload input '${inputId}' was not found.`);
+            }
+
+            if (input.dataset.audioUploadRegistered === '1') {
+                return;
+            }
+
+            input.dataset.audioUploadRegistered = '1';
+            input.addEventListener('change', async () => {
+                const files = Array.from(input.files || []);
+                input.value = '';
+                await window.uploadAudioFiles(files, endpoint, dotNetHelper, maxFileSize, maxFileCount);
+            });
+        };
+
+        window.uploadAudioFiles = async (files, endpoint, dotNetHelper, maxFileSize, maxFileCount) => {
+            try {
+                const candidates = files.filter(isAudioUploadCandidate);
+                if (candidates.length === 0) {
+                    await dotNetHelper.invokeMethodAsync('OnHttpUploadFailed', 'No mp3 files were selected. Name files as {id}.mp3.');
+                    return;
+                }
+
+                if (candidates.length > maxFileCount) {
+                    await dotNetHelper.invokeMethodAsync('OnHttpUploadFailed', `Too many files selected: ${candidates.length}. Limit is ${maxFileCount}.`);
+                    return;
+                }
+
+                const totalBytes = candidates.reduce((sum, file) => sum + file.size, 0);
+                await dotNetHelper.invokeMethodAsync('OnHttpUploadStarted', candidates.length, totalBytes);
+
+                let uploaded = 0;
+                let failed = 0;
+                let completedBytes = 0;
+                let firstError = '';
+
+                for (let index = 0; index < candidates.length; index++) {
+                    const file = candidates[index];
+
+                    if (file.size > maxFileSize) {
+                        failed++;
+                        completedBytes += file.size;
+                        firstError ||= `${file.name} is too large.`;
+                        await dotNetHelper.invokeMethodAsync('OnHttpUploadProgress', completedBytes, totalBytes, index + 1, candidates.length, file.name);
+                        continue;
+                    }
+
+                    try {
+                        await uploadOneAudio(file, endpoint, (loaded) => {
+                            reportUploadProgress(dotNetHelper, completedBytes + loaded, totalBytes, index + 1, candidates.length, file.name);
+                        });
+                        uploaded++;
+                    } catch (error) {
+                        failed++;
+                        firstError ||= `${file.name}: ${error.message || error}`;
+                    } finally {
+                        completedBytes += file.size;
+                        await dotNetHelper.invokeMethodAsync('OnHttpUploadProgress', completedBytes, totalBytes, index + 1, candidates.length, file.name);
+                    }
+                }
+
+                await dotNetHelper.invokeMethodAsync('OnHttpUploadCompleted', uploaded, failed, firstError);
+            } catch (error) {
+                await dotNetHelper.invokeMethodAsync('OnHttpUploadFailed', error.message || String(error));
+            }
+        };
+
+        const isAudioUploadCandidate = (file) => {
+            const type = (file.type || '').toLowerCase();
+            if (type === 'audio/mpeg' || type === 'audio/mp3' || type === 'application/octet-stream') {
+                return /\.mp3$/i.test(file.name || '');
+            }
+
+            return /\.mp3$/i.test(file.name || '');
+        };
+
+        const uploadOneAudio = (file, endpoint, onProgress) => new Promise((resolve, reject) => {
+            const form = new FormData();
+            form.append('file', file, file.name);
+
+            const request = new XMLHttpRequest();
+            request.open('POST', endpoint);
+            request.withCredentials = true;
+            request.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    onProgress(event.loaded);
+                }
+            };
+            request.onload = () => {
+                if (request.status >= 200 && request.status < 300) {
+                    resolve();
+                    return;
+                }
+
+                reject(new Error(readUploadError(request)));
+            };
+            request.onerror = () => reject(new Error('Network error while uploading audio.'));
+            request.onabort = () => reject(new Error('Upload was aborted.'));
+            request.send(form);
+        });
     </script>
 </body>
 </html>
