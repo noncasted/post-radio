@@ -30,6 +30,7 @@ window.radioPlayer = window.radioPlayer || {};
         current: null,
         diag: null,
         started: false,
+        paused: false,
         advancing: false,
         watchdogTimer: null,
         lastStarvedAt: 0,
@@ -321,7 +322,7 @@ window.radioPlayer = window.radioPlayer || {};
     }
 
     function playNext() {
-        if (!state.started || state.advancing)
+        if (!state.started || state.advancing || state.paused)
             return;
 
         if (state.queue.length === 0) {
@@ -441,6 +442,12 @@ window.radioPlayer = window.radioPlayer || {};
     function tick() {
         if (!state.started)
             return;
+
+        // A paused stream makes no progress by definition: hold the watchdog off.
+        if (state.paused) {
+            markProgress(false);
+            return;
+        }
 
         if (!state.current) {
             if (state.queue.length > 0)
@@ -652,13 +659,14 @@ window.radioPlayer = window.radioPlayer || {};
 
     player.start = function () {
         if (state.started) {
-            if (state.audio && state.audio.paused && state.current)
+            if (!state.paused && state.audio && state.audio.paused && state.current)
                 state.audio.play();
 
             return;
         }
 
         state.started = true;
+        state.paused = false;
         playNext();
     };
 
@@ -683,6 +691,41 @@ window.radioPlayer = window.radioPlayer || {};
         state.diag = null;
     };
 
+    player.setPaused = function (paused) {
+        state.paused = paused === true;
+
+        if (state.paused) {
+            if (state.audio) {
+                try {
+                    state.audio.pause();
+                } catch (e) {
+                    core.log("pause failed", e);
+                }
+            }
+
+            return;
+        }
+
+        if (!state.started)
+            return;
+
+        // Nothing is loaded when the pause outlived the track it started on: take the next one.
+        if (!state.current) {
+            playNext();
+            return;
+        }
+
+        // The stall clock ran while paused; the stream only owes progress from now on.
+        markProgress(false);
+
+        if (state.audio) {
+            var promise = state.audio.play();
+
+            if (promise && promise.catch)
+                promise.catch(function (e) { core.log("resume after pause rejected", e); });
+        }
+    };
+
     player.setVolume = function (value) {
         state.config.volume = value;
         applyVolume();
@@ -704,5 +747,6 @@ window.radioPlayer = window.radioPlayer || {};
         state.current = null;
         state.diag = null;
         state.started = false;
+        state.paused = false;
     };
 })(window.radioPlayer, window.radioCore, window.radioPresence);

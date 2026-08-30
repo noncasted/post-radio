@@ -9,12 +9,30 @@
                    @oninput="OnVolumeInput" />
         </div>
 
-        <button class="skip-btn" @onclick="@(() => State.RequestSkip())" title="Skip">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="5 4 15 12 5 20 5 4"></polygon>
-            <line x1="19" y1="5" x2="19" y2="19"></line>
-        </svg>
-    </button>
+        <div class="transport">
+            <button class="round-btn" @onclick="@(() => State.TogglePause())" title="@(State.IsPlaying ? "Pause" : "Play")">
+                @if (!State.IsPlaying)
+                {
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                    </svg>
+                }
+                else
+                {
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="9" y1="4" x2="9" y2="20"></line>
+                        <line x1="15" y1="4" x2="15" y2="20"></line>
+                    </svg>
+                }
+            </button>
+
+            <button class="round-btn" @onclick="@(() => State.RequestSkip())" title="Skip">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                    <line x1="19" y1="5" x2="19" y2="19"></line>
+                </svg>
+            </button>
+        </div>
     </div>
 
     <div class="playlist-selection">
@@ -66,7 +84,12 @@
         height: 300px;
         accent-color: #7e6fff;
     }
-    .skip-btn {
+    .transport {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .round-btn {
         width: 56px;
         height: 56px;
         border-radius: 50%;
@@ -79,7 +102,7 @@
         justify-content: center;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .skip-btn:hover { background: #6a5cff; }
+    .round-btn:hover { background: #6a5cff; }
     .playlist-selection {
         display: flex;
         flex-direction: column;
@@ -124,7 +147,17 @@
     private IReadOnlyList<PlaylistDto> _playlists = Array.Empty<PlaylistDto>();
     private List<PlaylistDto> _fetchedPlaylists = new();
     private PersistingComponentStateSubscription _persistSubscription;
+    private Action? _playbackChangedHandler;
     private Guid _selectedId;
+
+    protected override void OnInitialized()
+    {
+        // The start overlay and the transport button change the same playback intent,
+        // so the icon has to follow the session, not only local clicks.
+        _playbackChangedHandler = () => _ = InvokeAsync(StateHasChanged);
+        State.Started += _playbackChangedHandler;
+        State.PauseChanged += _playbackChangedHandler;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,7 +192,16 @@
         return Task.CompletedTask;
     }
 
-    public void Dispose() => _persistSubscription.Dispose();
+    public void Dispose()
+    {
+        _persistSubscription.Dispose();
+
+        if (_playbackChangedHandler != null)
+        {
+            State.Started -= _playbackChangedHandler;
+            State.PauseChanged -= _playbackChangedHandler;
+        }
+    }
 
     private async Task OnPlaylistChanged(PlaylistDto playlist)
     {

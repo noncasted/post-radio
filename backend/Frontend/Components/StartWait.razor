@@ -1,6 +1,7 @@
 @using Frontend.Services
+@implements IDisposable
 
-@if (!_started)
+@if (!State.IsStarted)
 {
     <button class="start-btn" @onclick="StartFromClick">Play</button>
 }
@@ -26,12 +27,21 @@
 @code {
     [Parameter] public required SessionState State { get; set; }
 
-    private bool _started;
+    private Action? _startedHandler;
 
-    private Task StartFromClick()
+    protected override void OnInitialized()
     {
-        _started = true;
-        State.InvokeStart();
-        return InvokeAsync(StateHasChanged);
+        // The transport play button can start playback too, so the overlay follows the
+        // session instead of its own click.
+        _startedHandler = () => _ = InvokeAsync(StateHasChanged);
+        State.Started += _startedHandler;
     }
+
+    public void Dispose()
+    {
+        if (_startedHandler != null)
+            State.Started -= _startedHandler;
+    }
+
+    private void StartFromClick() => State.InvokeStart();
 }

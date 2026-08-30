@@ -33,6 +33,7 @@ public partial class AudioPlayer : IAsyncDisposable
 
     private Action? _startedHandler;
     private Action? _skipRequestedHandler;
+    private Action? _pauseChangedHandler;
     private Action? _playlistChangedHandler;
     private Action? _volumeChangedHandler;
 
@@ -44,11 +45,13 @@ public partial class AudioPlayer : IAsyncDisposable
 
         _startedHandler = () => _ = OnStarted();
         _skipRequestedHandler = () => _ = OnSkipRequested();
+        _pauseChangedHandler = () => _ = OnPauseChanged();
         _playlistChangedHandler = () => _ = OnPlaylistChanged();
         _volumeChangedHandler = () => _ = OnVolumeChanged(State.Volume);
 
         State.Started += _startedHandler;
         State.SkipRequested += _skipRequestedHandler;
+        State.PauseChanged += _pauseChangedHandler;
         State.PlaylistChanged += _playlistChangedHandler;
         State.VolumeChanged += _volumeChangedHandler;
     }
@@ -89,6 +92,14 @@ public partial class AudioPlayer : IAsyncDisposable
     {
         Logger.LogInformation("[AudioPlayer] Skip requested songId={SongId}", State.CurrentSong?.Id);
         await InvokeJs("radioPlayer.skip");
+    }
+
+    private async Task OnPauseChanged()
+    {
+        Logger.LogInformation("[AudioPlayer] Pause changed paused={Paused} songId={SongId}",
+            State.IsPaused, State.CurrentSong?.Id);
+
+        await InvokeJs("radioPlayer.setPaused", State.IsPaused);
     }
 
     private async Task OnPlaylistChanged()
@@ -180,6 +191,8 @@ public partial class AudioPlayer : IAsyncDisposable
             State.Started -= _startedHandler;
         if (_skipRequestedHandler != null)
             State.SkipRequested -= _skipRequestedHandler;
+        if (_pauseChangedHandler != null)
+            State.PauseChanged -= _pauseChangedHandler;
         if (_playlistChangedHandler != null)
             State.PlaylistChanged -= _playlistChangedHandler;
         if (_volumeChangedHandler != null)

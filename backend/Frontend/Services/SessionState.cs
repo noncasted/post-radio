@@ -37,6 +37,12 @@ public class SessionState : IDisposable
     public PlaylistDto? Playlist { get; private set; }
     public SongDto? CurrentSong { get; private set; }
     public double Volume { get; private set; } = 50;
+    public bool IsPaused { get; private set; }
+
+    public bool IsStarted => _isStarted;
+
+    /// <summary>Playback intent, not the audio element state: the JS player follows it.</summary>
+    public bool IsPlaying => _isStarted && !IsPaused;
 
     public IReadOnlyList<SkipNotification> RecentSkips
     {
@@ -57,6 +63,7 @@ public class SessionState : IDisposable
 
     public event Action? Started;
     public event Action? SkipRequested;
+    public event Action? PauseChanged;
     public event Action? PlaylistChanged;
     public event Action? VolumeChanged;
     public event Action? CurrentSongChanged;
@@ -84,10 +91,34 @@ public class SessionState : IDisposable
             return;
 
         _isStarted = true;
+        SetPaused(false);
         Started?.Invoke();
     }
 
     public void RequestSkip() => SkipRequested?.Invoke();
+
+    public void TogglePause()
+    {
+        if (IsPlaying)
+        {
+            SetPaused(true);
+            return;
+        }
+
+        // Resuming before the first start is still a play request: the overlay may be gone
+        // (the listener clicked pause first), so the toggle has to arm playback itself.
+        SetPaused(false);
+        InvokeStart();
+    }
+
+    public void SetPaused(bool paused)
+    {
+        if (IsPaused == paused)
+            return;
+
+        IsPaused = paused;
+        PauseChanged?.Invoke();
+    }
 
     public void ReportSkip(SkipNotification notification)
     {

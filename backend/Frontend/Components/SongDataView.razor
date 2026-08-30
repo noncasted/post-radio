@@ -28,13 +28,17 @@
         max-width: 100%;
         overflow: hidden;
         text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
-        overflow-wrap: anywhere;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        /* Side bearing глифа масштабируется с font-size: компенсируем его в em,
+           чтобы крупный заголовок и мелкий автор начинались на одной вертикали. */
+        margin-left: -0.06em;
+        padding-left: 0.06em;
+        text-indent: -0.06em;
     }
 
     .song-title {
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
+        width: fit-content;
         font-size: clamp(1.35rem, 2.6vw, 3rem);
         line-height: 1.1;
         font-weight: 600;
@@ -43,23 +47,16 @@
 
     .song-author {
         width: fit-content;
-        max-width: 100%;
         color: #eee;
         font-size: clamp(0.95rem, 1.35vw, 1.45rem);
         line-height: 1.2;
         font-weight: 500;
-        white-space: nowrap;
-        text-overflow: ellipsis;
         opacity: 0.92;
     }
 
     @@media (max-width: 700px) {
         .song-data-overlay {
             width: calc(100vw - 2rem);
-        }
-
-        .song-title {
-            -webkit-line-clamp: 3;
         }
     }
 </style>
