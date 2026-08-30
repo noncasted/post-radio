@@ -149,6 +149,7 @@
     private PersistingComponentStateSubscription _persistSubscription;
     private Action? _playbackChangedHandler;
     private Guid _selectedId;
+    private bool _skipVolumeRender;
 
     protected override void OnInitialized()
     {
@@ -211,7 +212,20 @@
 
     private void OnVolumeInput(ChangeEventArgs e)
     {
+        // The slider is the source of truth while it is being dragged. Re-rendering here
+        // would push a value that already lost the race with the pointer back into the
+        // DOM, and the thumb would jump backwards on every server round trip.
+        _skipVolumeRender = true;
         OnVolumeChanged(e.Value?.ToString() ?? "0");
+    }
+
+    protected override bool ShouldRender()
+    {
+        if (!_skipVolumeRender)
+            return true;
+
+        _skipVolumeRender = false;
+        return false;
     }
 
     private void OnVolumeChanged(string value)
