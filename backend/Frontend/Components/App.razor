@@ -25,7 +25,7 @@
     <meta name="twitter:description" content="Пост-панк нон-стоп с меняющимся визуальным рядом - от русского андеграунда до классики жанра. Играет в браузере, без регистрации." />
     <meta name="twitter:image" content="@Site.Url("favicon.png")" />
 
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="icon" type="image/png" href="@Assets["favicon.png"]" />
 
     @(StructuredData)
     <style>
@@ -163,12 +163,12 @@
     </div>
     @NoIndexClose
 
-    <script src="js/radio-core.js"></script>
-    <script src="js/radio-presence.js"></script>
-    <script src="js/radio-player.js"></script>
-    <script src="js/radio-images.js"></script>
-    <script src="js/radio-ui.js"></script>
-    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script src="@Assets["js/radio-core.js"]"></script>
+    <script src="@Assets["js/radio-presence.js"]"></script>
+    <script src="@Assets["js/radio-player.js"]"></script>
+    <script src="@Assets["js/radio-images.js"]"></script>
+    <script src="@Assets["js/radio-ui.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
     <script>
         Blazor.start({
             circuit: {

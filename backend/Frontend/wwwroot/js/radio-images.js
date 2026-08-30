@@ -22,7 +22,8 @@ window.radioImages = window.radioImages || {};
             return {
                 main: document.getElementById("image-" + name + "-main"),
                 left: document.getElementById("image-" + name + "-left"),
-                right: document.getElementById("image-" + name + "-right")
+                right: document.getElementById("image-" + name + "-right"),
+                hideTimer: null
             };
         };
 
@@ -49,8 +50,15 @@ window.radioImages = window.radioImages || {};
         apply(state.slots.b);
     }
 
+    // A faded-out slot must stop being a hit-test target: otherwise the invisible
+    // image on top steals the right-click and "copy image" grabs the wrong picture.
     function setSlot(slot, url, visible) {
         var parts = [slot.main, slot.left, slot.right];
+
+        if (slot.hideTimer !== null && slot.hideTimer !== undefined) {
+            window.clearTimeout(slot.hideTimer);
+            slot.hideTimer = null;
+        }
 
         for (var i = 0; i < parts.length; i++) {
             if (!parts[i])
@@ -60,7 +68,24 @@ window.radioImages = window.radioImages || {};
                 parts[i].src = url;
 
             parts[i].style.opacity = visible ? "1" : "0";
+            parts[i].style.pointerEvents = visible ? "auto" : "none";
+
+            if (visible)
+                parts[i].style.visibility = "visible";
         }
+
+        if (visible)
+            return;
+
+        // Once the fade is over the slot is fully out of the layout's hit testing.
+        slot.hideTimer = window.setTimeout(function () {
+            slot.hideTimer = null;
+
+            for (var j = 0; j < parts.length; j++) {
+                if (parts[j])
+                    parts[j].style.visibility = "hidden";
+            }
+        }, state.fadeMs + 50);
     }
 
     function preload(url, done) {
@@ -148,12 +173,27 @@ window.radioImages = window.radioImages || {};
         state.pendingRefill = false;
         applyFade();
 
+        // The prerendered document paints the first picture into slot A before the circuit
+        // is even up. Hiding it only to fade the same file back in would blank the
+        // background for a whole fade, so adopt the slot instead of restarting from empty.
+        var primed = state.slots && state.slots.a.main ? state.slots.a.main.getAttribute("src") : null;
+        var adopt = primed && state.urls.length > 0 && state.urls[0] === primed;
+
         if (state.slots) {
-            setSlot(state.slots.a, null, false);
+            if (!adopt)
+                setSlot(state.slots.a, null, false);
+
             setSlot(state.slots.b, null, false);
         }
 
-        step();
+        if (adopt) {
+            setSlot(state.slots.a, primed, true);
+            state.index = 1;
+            state.active = "a";
+        } else {
+            step();
+        }
+
         restartTimer();
     };
 
@@ -183,6 +223,17 @@ window.radioImages = window.radioImages || {};
         if (state.timer !== null) {
             window.clearInterval(state.timer);
             state.timer = null;
+        }
+
+        if (state.slots) {
+            var slots = [state.slots.a, state.slots.b];
+
+            for (var i = 0; i < slots.length; i++) {
+                if (slots[i].hideTimer !== null) {
+                    window.clearTimeout(slots[i].hideTimer);
+                    slots[i].hideTimer = null;
+                }
+            }
         }
 
         state.dotnet = null;

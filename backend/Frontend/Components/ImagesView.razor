@@ -5,11 +5,16 @@
 @inject ILogger<ImagesView> Logger
 @implements IAsyncDisposable
 
-@* Markup is static: radio-images.js owns src and opacity so the slideshow costs no round-trips. *@
+@*
+    Slot A carries the first picture already in the prerendered html, so the browser starts
+    the 250 KB download while the circuit is still negotiating instead of after it is up.
+    Everything past that is owned by radio-images.js: it recognises the primed slot and
+    reuses it rather than fading a second copy in.
+*@
 <div class="image-container">
-    <img id="image-a-left" class="image sub blurry" style="position: fixed; left: 0; z-index: -1" alt="" />
-    <img id="image-a-right" class="image sub blurry" style="position: fixed; left: 50%; z-index: -1" alt="" />
-    <img id="image-a-main" class="image main" style="z-index: 1" alt="" />
+    <img id="image-a-left" class="image sub blurry" style="position: fixed; left: 0; z-index: -1@(PrimedStyle)" src="@_primedUrl" alt="" />
+    <img id="image-a-right" class="image sub blurry" style="position: fixed; left: 50%; z-index: -1@(PrimedStyle)" src="@_primedUrl" alt="" />
+    <img id="image-a-main" class="image main" style="z-index: 1@(PrimedStyle)" src="@_primedUrl" alt="" />
     <img id="image-b-left" class="image sub blurry" style="position: fixed; left: 0; z-index: -1" alt="" />
     <img id="image-b-right" class="image sub blurry" style="position: fixed; left: 50%; z-index: -1" alt="" />
     <img id="image-b-main" class="image main" style="z-index: 1" alt="" />
@@ -31,6 +36,8 @@
         object-fit: cover;
         object-position: center;
         opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
     }
     .sub { height: 100%; width: 50%; }
     .main { height: 115%; }
@@ -40,20 +47,51 @@
 @code {
     [Parameter] public required SessionState State { get; set; }
 
+    [Inject] private PersistentComponentState PersistentState { get; set; } = null!;
+
     private const int BatchSize = 24;
+    private const string PrimedUrlKey = "images.primed";
 
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(15);
 
     private DotNetObjectReference<ImagesView>? _dotNetRef;
     private CancellationTokenSource? _componentCts;
-    private int _totalImages;
+    private PersistingComponentStateSubscription _persistSubscription;
+    private string? _primedUrl;
     private bool _disposed;
 
     private CancellationToken Token => _componentCts?.Token ?? State.Token;
 
+    private string PrimedStyle => string.IsNullOrEmpty(_primedUrl) ? string.Empty : "; opacity: 1";
+
     protected override void OnInitialized()
     {
         _componentCts = CancellationTokenSource.CreateLinkedTokenSource(State.Token);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _persistSubscription = PersistentState.RegisterOnPersisting(PersistPrimedUrl);
+
+        // The interactive pass must reuse the url the prerender put in the markup, otherwise
+        // the browser downloads one picture and the slideshow then shows a different one.
+        if (PersistentState.TryTakeFromJson<string>(PrimedUrlKey, out var persisted))
+        {
+            _primedUrl = persisted;
+            return;
+        }
+
+        if (RendererInfo.IsInteractive)
+            return;
+
+        var batch = await Api.GetImageBatch(State.TakeImageRange(1), 1);
+        _primedUrl = batch.Urls.FirstOrDefault();
+    }
+
+    private Task PersistPrimedUrl()
+    {
+        PersistentState.PersistAsJson(PrimedUrlKey, _primedUrl);
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -62,7 +100,7 @@
             return;
 
         _dotNetRef = DotNetObjectReference.Create(this);
-        var urls = await FetchBatch();
+        var urls = await FetchBatch(_primedUrl);
 
         var options = new
         {
@@ -93,28 +131,24 @@
         await InvokeJs("radioImages.append", urls);
     }
 
-    private async Task<IReadOnlyList<string>> FetchBatch()
+    /// <summary>
+    /// One gateway call per batch. Resolving urls one index at a time used to cost
+    /// <see cref="BatchSize"/> sequential round trips before the first background could paint.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> FetchBatch(string? primed = null)
     {
-        if (_totalImages == 0)
-            _totalImages = await Api.GetImagesCount();
-
-        if (_totalImages == 0)
+        if (_disposed || Token.IsCancellationRequested)
             return Array.Empty<string>();
 
-        var urls = new List<string>(BatchSize);
+        var batch = await Api.GetImageBatch(State.TakeImageRange(BatchSize), BatchSize);
+        var urls = batch.Urls.Where(url => !string.IsNullOrWhiteSpace(url)).ToList();
 
-        for (var i = 0; i < BatchSize; i++)
-        {
-            if (_disposed || Token.IsCancellationRequested)
-                break;
+        if (string.IsNullOrEmpty(primed))
+            return urls;
 
-            var index = State.IncImageIndex(_totalImages);
-            var url = await Api.GetImageUrl(index);
-
-            if (!string.IsNullOrWhiteSpace(url))
-                urls.Add(url);
-        }
-
+        // Keep the primed picture first: JS shows it straight from the slot the prerender
+        // filled instead of fading in a second one the browser has yet to fetch.
+        urls.Insert(0, primed);
         return urls;
     }
 
@@ -132,7 +166,6 @@
         if (_disposed)
             return;
 
-        _totalImages = 0;
         var urls = await FetchBatch();
 
         if (urls.Count == 0)
@@ -171,6 +204,7 @@
             return;
 
         _disposed = true;
+        _persistSubscription.Dispose();
         _componentCts?.Cancel();
 
         try

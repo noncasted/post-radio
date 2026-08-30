@@ -20,8 +20,7 @@ public interface IRadioApi
     Task<IReadOnlyList<PlaylistDto>> GetPlaylists();
     Task<IReadOnlyList<SongDto>> GetSongs(Guid? playlistId = null);
     Task<SongStreamUrlResult> GetSongStreamUrl(long id, CancellationToken cancellationToken = default);
-    Task<int> GetImagesCount();
-    Task<string> GetImageUrl(int index);
+    Task<ImagesBatchDto> GetImageBatch(int start, int count);
     Task<FrontendOptionsDto?> GetFrontendOptions();
     Task ReportSkip(object payload, CancellationToken cancellationToken = default);
 }
@@ -33,6 +32,8 @@ public class RadioApi : IRadioApi
         _http = http;
         _logger = logger;
     }
+
+    private static readonly ImagesBatchDto EmptyImageBatch = new() { Urls = Array.Empty<string>() };
 
     private readonly HttpClient _http;
     private readonly ILogger<RadioApi> _logger;
@@ -107,30 +108,19 @@ public class RadioApi : IRadioApi
         }
     }
 
-    public async Task<int> GetImagesCount()
+    public async Task<ImagesBatchDto> GetImageBatch(int start, int count)
     {
         try
         {
-            var result = await _http.GetFromJsonAsync<ImagesCountDto>("/api/radio/images");
-            return result?.Count ?? 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning(e, "[RadioApi] GetImagesCount failed");
-            return 0;
-        }
-    }
+            var result = await _http.GetFromJsonAsync<ImagesBatchDto>(
+                $"/api/radio/images/batch?start={start}&count={count}");
 
-    public async Task<string> GetImageUrl(int index)
-    {
-        try
-        {
-            return await _http.GetStringAsync($"/api/radio/images/{index}");
+            return result ?? EmptyImageBatch;
         }
         catch (Exception e)
         {
-            _logger.LogWarning(e, "[RadioApi] GetImageUrl failed");
-            return string.Empty;
+            _logger.LogWarning(e, "[RadioApi] GetImageBatch failed");
+            return EmptyImageBatch;
         }
     }
 

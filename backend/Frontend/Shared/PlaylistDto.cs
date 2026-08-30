@@ -39,6 +39,11 @@ public class ImagesCountDto
     public required int Count { get; init; }
 }
 
+public class ImagesBatchDto
+{
+    public required IReadOnlyList<string> Urls { get; init; }
+}
+
 public class FrontendOptionsDto
 {
     public required float BaseVolume { get; init; }

@@ -13,6 +13,7 @@ public interface IImagesCollection
 
     Task Refresh();
     Task<string> GetUrl(int index);
+    Task<IReadOnlyList<string>> GetUrls(int start, int count);
     Task<MediaImage> Save(string fileName, Stream stream);
     Task<bool> Delete(string key);
 }
@@ -62,6 +63,27 @@ public class ImagesCollection : IImagesCollection, ICoordinatorSetupCompleted
     {
         var key = _entries[index].Key;
         return Task.FromResult(_mediaStorage.GetImageUrl(key));
+    }
+
+    /// <summary>
+    /// A whole slideshow batch in one call. The frontend walks a contiguous run from a random
+    /// offset, so <paramref name="start"/> wraps instead of clamping, and asking per index
+    /// would cost one frontend-to-gateway round trip per picture.
+    /// </summary>
+    public Task<IReadOnlyList<string>> GetUrls(int start, int count)
+    {
+        var entries = _entries;
+
+        if (entries.Count == 0 || count <= 0)
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        var offset = (int)(((long)start % entries.Count + entries.Count) % entries.Count);
+        var urls = new List<string>(count);
+
+        for (var i = 0; i < count; i++)
+            urls.Add(_mediaStorage.GetImageUrl(entries[(offset + i) % entries.Count].Key));
+
+        return Task.FromResult<IReadOnlyList<string>>(urls);
     }
 
     public async Task<MediaImage> Save(string fileName, Stream stream)

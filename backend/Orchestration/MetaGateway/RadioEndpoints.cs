@@ -7,6 +7,7 @@ using Meta.Online;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 
 namespace MetaGateway;
 
@@ -19,6 +20,8 @@ public static class RadioEndpoints
     private static readonly Dictionary<string, SkipLogRateLimitEntry> EmptyUrlSkipLogRateLimits = new();
     private static readonly object EmptyUrlSkipLogRateLimitLock = new();
     private const int MaxEmptyUrlSkipLogRateLimitEntries = 1024;
+    private const int MaxImageBatchSize = 128;
+    private const string ImageCacheControl = "public, max-age=604800";
 
     public static IEndpointRouteBuilder AddRadioEndpoints(this IEndpointRouteBuilder builder)
     {
@@ -28,6 +31,7 @@ public static class RadioEndpoints
         group.MapGet("/songs", ListSongs);
         group.MapGet("/songs/{id:long}/stream", GetSongStream);
         group.MapGet("/images", ListImages);
+        group.MapGet("/images/batch", GetImageUrls);
         group.MapGet("/images/{index:int}", GetImageUrl);
         group.MapGet("/media/audio/{id:long}", GetAudioFile);
         group.MapGet("/media/images/{key}", GetImageFile);
@@ -114,26 +118,41 @@ public static class RadioEndpoints
             return Results.NotFound();
 
         var path = storage.GetAudioPath(id);
+        var file = new FileInfo(path);
 
-        if (!File.Exists(path))
+        if (!file.Exists)
             return Results.NotFound();
 
-        return Results.File(path, "audio/mpeg", enableRangeProcessing: true);
+        // No Cache-Control: tracks are large and rarely repeat inside one session. The
+        // validators are still worth having so a re-listen costs a 304 instead of the file.
+        return Results.File(path, "audio/mpeg",
+            lastModified: file.LastWriteTimeUtc,
+            entityTag: BuildEntityTag(file),
+            enableRangeProcessing: true);
     }
 
     private static IResult GetImageFile(
         [FromServices] IMediaStorage storage,
+        HttpContext context,
         string key)
     {
         var path = storage.GetImagePath(key);
+        var file = new FileInfo(path);
 
-        if (!File.Exists(path))
+        if (!file.Exists)
             return Results.NotFound();
 
         if (!ContentTypes.TryGetContentType(path, out var contentType))
             contentType = "application/octet-stream";
 
-        return Results.File(path, contentType, enableRangeProcessing: true);
+        // Backgrounds are a quarter of a megabyte each and the slideshow revisits them, so
+        // without this every loop re-downloads the whole set.
+        context.Response.Headers.CacheControl = ImageCacheControl;
+
+        return Results.File(path, contentType,
+            lastModified: file.LastWriteTimeUtc,
+            entityTag: BuildEntityTag(file),
+            enableRangeProcessing: true);
     }
 
     private static ImagesCountDto ListImages(
@@ -147,6 +166,19 @@ public static class RadioEndpoints
         int index)
     {
         return await collection.GetUrl(index);
+    }
+
+    /// <summary>
+    /// One request per slideshow batch instead of one per picture: the frontend used to spend
+    /// a round trip on every url, which delayed the first painted background by that whole run.
+    /// </summary>
+    private static async Task<ImagesBatchDto> GetImageUrls(
+        [FromServices] IImagesCollection collection,
+        [FromQuery] int start,
+        [FromQuery] int count)
+    {
+        var urls = await collection.GetUrls(start, Math.Clamp(count, 0, MaxImageBatchSize));
+        return new ImagesBatchDto { Urls = urls };
     }
 
     /// <summary>
@@ -297,6 +329,12 @@ public static class RadioEndpoints
         public int SuppressedCount { get; set; }
     }
 
+    /// <summary>Size and mtime are enough to tell one revision of a media file from the next.</summary>
+    private static EntityTagHeaderValue BuildEntityTag(FileInfo file)
+    {
+        return new EntityTagHeaderValue($"\"{file.LastWriteTimeUtc.Ticks:x}-{file.Length:x}\"");
+    }
+
     private static string? TryGetString(JsonElement root, string name)
     {
         if (root.ValueKind != JsonValueKind.Object)
@@ -344,6 +382,11 @@ public class SongDto
 public class ImagesCountDto
 {
     public required int Count { get; init; }
+}
+
+public class ImagesBatchDto
+{
+    public required IReadOnlyList<string> Urls { get; init; }
 }
 
 public class FrontendOptionsDto

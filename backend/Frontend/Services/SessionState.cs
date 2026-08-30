@@ -19,6 +19,7 @@ public class SessionState : IDisposable
     }
 
     private const int MaxRecentSkips = 20;
+    private const int ImageCursorWrap = 1 << 24;
 
     private readonly IRadioApi _api;
     private readonly CancellationTokenSource _cts = new();
@@ -27,7 +28,9 @@ public class SessionState : IDisposable
 
     private List<SongDto> _playlistSongs = new();
     private int _songIndex;
-    private int _imageIndex = Random.Shared.Next();
+    // Random so two listeners do not start the slideshow on the same picture. The gateway
+    // wraps it against the real image count, so the cursor only ever has to move forward.
+    private int _imageIndex = Random.Shared.Next(0, ImageCursorWrap);
 
     public CancellationToken Token => _cts.Token;
     public string SessionId { get; }
@@ -182,13 +185,12 @@ public class SessionState : IDisposable
             _songIndex = songIndex + 1;
     }
 
-    public int IncImageIndex(int total)
+    /// <summary>Reserves the next <paramref name="count"/> slideshow slots and returns their start.</summary>
+    public int TakeImageRange(int count)
     {
-        if (total == 0)
-            return 0;
-
-        _imageIndex = (_imageIndex + 1) % total;
-        return _imageIndex;
+        var start = _imageIndex;
+        _imageIndex = (_imageIndex + count) % ImageCursorWrap;
+        return start;
     }
 
     public void SetCurrentSong(SongDto? song)

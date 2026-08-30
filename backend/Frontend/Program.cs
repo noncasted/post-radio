@@ -37,8 +37,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-app.UseStaticFiles();
 app.UseAntiforgery();
+
+// MapStaticAssets over UseStaticFiles: it fingerprints wwwroot and _framework at build time
+// and serves them immutable, so a repeat visit stops spending a round trip revalidating
+// every script. Plain UseStaticFiles sent no Cache-Control at all.
+app.MapStaticAssets();
 
 // Still required: audio and image urls handed to the browser are relative to this host.
 app.Map("/api/{**path}", async (HttpContext ctx, IHttpClientFactory factory, string path) =>
